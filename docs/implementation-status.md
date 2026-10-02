@@ -53,6 +53,26 @@ complete exports. Current unit coverage cannot establish competition readiness.
 The recorded 60-request timing repeats one pair; it is not a diverse full-pipeline
 rehearsal. See [the retained measurement](../backend/validation/rehearsal-2026-10-02.json).
 
+## Decisions
+
+Record every decision here with its status and where its reasoning lives.
+Open decisions are not settled until the project owner agrees.
+
+| Decision | Status | Reasoning |
+| --- | --- | --- |
+| Compete in Challenge 03, Influence Graph | Decided 2026-10-02 | [Research](research/research-2026-10-02-reversa-challenges.md); the owner chose it over the recommended Challenge 02 |
+| Work in this repository, separate from the earlier ChamberLens audio project | Decided 2026-10-02 | The old repository's code does not apply to this challenge |
+| Architecture: seven parts plus a practice loop | Decided 2026-10-02 | [Explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture) |
+| Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
+| Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the explainer |
+| TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
+| `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
+| Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
+| D1: language-model judge (none, Jev, Claude or a local model) | **Open** | Explainer §12–13; no API keys on the machine |
+| D3: the earlier prototype in `attic/` | **Open**; not an implementation source | Explainer §10 and §13 |
+| D4: team split | **Open** | Explainer §13 |
+| D5: organizer questions: input format, recall threshold, use of the final law's text, advance preparation | **Open**; ask before the event | Bead `rev-qvmx` |
+
 ## Next Work in Competition Order
 
 `rev-6i5t` establishes a reproducible starting measurement: the lexical scorer ranks the

@@ -46,7 +46,7 @@ clears the window and the exception can be removed.
 
 | Package | Version | Published | Reason | Approved by | Clears window |
 | --- | --- | --- | --- | --- | --- |
-| `next`, `@next/env` and eight `@next/swc-*` binaries | 16.3.6 | 2026-09-22 | 16.3.5 has the critical advisory GHSA-vcvr-r3jv-pc5j; 16.3.6 is the first fixed version (note 1) | Pending project owner approval in this PR | 2026-10-06 |
+| `next`, `@next/env` and eight `@next/swc-*` binaries | 16.3.6 | 2026-09-22 | 16.3.5 has the critical advisory GHSA-vcvr-r3jv-pc5j; 16.3.6 is the first fixed version (note 1) | Lensa Billion, by merging PRs #5 and #8 on 2026-10-02 | 2026-10-06 |
 
 Notes:
 
