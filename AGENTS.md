@@ -31,6 +31,19 @@ Read [the explainer](docs/explainer/influence-graph-primer.md) and the
 [organizers' brief](docs/brief/madrid-open-reversa-challenges.pdf) before changing
 behavior.
 
+## Where the Project's State Lives
+
+Chat history, a session's context and an agent's local memory files are not sources of
+truth: other agents, other tools and teammates cannot see them, and they are lost when a
+session ends or is compacted. The repository is the source of truth.
+
+- **Start every session** by reading
+  [docs/implementation-status.md](docs/implementation-status.md) (what is built, verified,
+  decided and next) and running `tbd ready`.
+- **Before a session ends**, record anything the next session needs: state changes and
+  verified facts in `docs/implementation-status.md`, decisions with their reasons in its
+  Decisions section, and open work as tbd beads. Work that exists only in a chat is lost.
+
 ## The Four Project Rules
 
 These come from the project owner and override any default habit.
@@ -54,6 +67,7 @@ These come from the project owner and override any default habit.
 | `backend/` | Python 3.14 service and pipeline (uv project) |
 | `frontend/` | Next.js web app (npm project) |
 | `scripts/` | Repository checks used by `make` targets and CI |
+| `docs/implementation-status.md` | Current state, decisions and next work; read first |
 | `docs/brief/` | The organizers' brief |
 | `docs/research/` | Research documents and softschema catalogs |
 | `docs/explainer/` | The team explainer, in Markdown so GitHub renders it |
