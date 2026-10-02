@@ -1,0 +1,174 @@
+# Project Instructions for AI Agents
+
+This file provides instructions and context for AI coding agents working on this project.
+Humans follow the same rules. `CLAUDE.md` imports this file, so there is one copy.
+
+<!-- BEGIN TBD INTEGRATION format=f08 surface=agents-md -->
+## tbd
+
+This repository uses **tbd** for git-native issue tracking (beads), spec-driven
+planning, and on-demand engineering guidelines.
+As the agent, you operate tbd on the user’s behalf: translate their requests into tbd
+actions rather than telling them to run commands.
+
+- Run `tbd prime` to load current project state and the full tbd workflow.
+- Run `tbd skill` for the complete reusable tbd skill instructions.
+- Run `tbd shortcut --list` and `tbd guidelines --list` for on-demand resources.
+- Track all work as beads: `tbd create`, `tbd ready`, `tbd start`, `tbd close`, and
+  `tbd sync`.
+- Before editing a bead, pull and re-read it, run `tbd start <id>`, then run `tbd sync`
+  so other replicas can see the claim.
+
+<!-- END TBD INTEGRATION -->
+
+## What This Project Is
+
+Our entry for Reversa's Challenge 03, Influence Graph, at the Madrid Open on Saturday
+3 October 2026. Given an EU amendment and a lobby submission, the system scores how
+likely the amendment was written from the submission; it then maps who wins and predicts
+which consultation proposals reach the final law.
+Read [the explainer](docs/explainer/influence-graph-primer.html) and the
+[organizers' brief](docs/brief/madrid-open-reversa-challenges.pdf) before changing
+behavior.
+
+## The Four Project Rules
+
+These come from the project owner and override any default habit.
+
+1. **Every PR explains itself from first principles.** The description assumes the
+   reader knows nothing about the domain, the tools, or the code. It explains what
+   problem the change solves, the concepts needed to understand it, what each changed
+   file does and why, which alternatives were rejected and why, and how it was verified.
+   Use [the PR template](.github/pull_request_template.md).
+2. **Code is efficient, optimized, evaluated, and tested from several angles.** See
+   [Code Quality](#code-quality) and [Testing and Evaluation](#testing-and-evaluation).
+3. **tbd is the source of truth for work.** Follow the tbd skill and guidelines, and keep
+   beads current: create, start, update with PR links, close with evidence, sync.
+4. **Ruff checks and formats Python; Biome checks and formats TypeScript.** No other
+   linter or formatter is added for those languages.
+
+## Repository Layout
+
+| Path | Contents |
+| --- | --- |
+| `backend/` | Python 3.14 service and pipeline (uv project) |
+| `frontend/` | Next.js web app (npm project) |
+| `scripts/` | Repository checks used by `make` targets and CI |
+| `docs/brief/` | The organizers' brief |
+| `docs/research/` | Research documents and softschema catalogs |
+| `docs/explainer/` | The team explainer page |
+| `data/` | Downloaded public data; never committed |
+| `attic/` | Local scratch and superseded prototypes; never committed |
+
+## Commands
+
+`make check` is the one gate: it verifies everything and changes nothing.
+CI runs the same targets, so a local pass predicts a CI pass.
+Each area adds its own `check-*` target to the root `Makefile` when it lands.
+
+## Workflow
+
+1. **Find or create the bead.** `tbd ready` lists available work.
+   Every piece of work, including discovered follow-ups, gets a bead.
+2. **Claim it.** `tbd sync --pull`, re-read the bead, `tbd start <id>`, `tbd sync`.
+3. **Load the guidelines** that match the change, in one call, before writing code:
+   always `general-eng-agent-principles`; then `python-rules python-modern-guidelines`
+   for Python, `typescript-rules typescript-lint-format-rules` for TypeScript, and
+   `ci-and-gates-rules supply-chain-hardening general-testing-rules` for tooling, gates,
+   dependencies, or tests.
+4. **Branch per PR**, named `<type>/<short-topic>`, for example `feat/pair-scorer`.
+5. **Commit** with Conventional Commits (`tbd guidelines commit-conventions`): `feat`,
+   `fix`, `test`, `refactor`, `chore`, `docs`, `plan`, `research`, `ops`, `process`.
+6. **Open the PR** with the template, then wait for every CI check to finish green.
+   Absent CI is not passing CI.
+7. **Record the PR** on the bead (`tbd update <id> --notes`), close the bead when the PR
+   merges with the evidence in `--reason`, and `tbd sync`.
+
+When work naturally splits into layers that depend on each other, use a stack of PRs
+(`tbd shortcut stacked-prs`): each PR's base is the branch below it, and they merge
+bottom to top with merge commits.
+
+## Pull Requests
+
+- **One concern per PR.** If its purpose cannot be stated in one sentence, split it.
+- **The description is part of the deliverable.** Fill every template section.
+  Define each term the first time it appears.
+  Show the commands run and their real output, not a claim that they passed.
+- **State what is not verified.** Measured, verified, and assumed are different things;
+  say which applies to every claim.
+- **Generated files are named as generated** (lockfiles, tbd surfaces), so the reviewer
+  knows not to read them line by line.
+
+## Code Quality
+
+- **Measure before optimizing, then keep the measurement.** Any claim that code is fast
+  enough cites a benchmark run, its input size, and the hardware.
+  The 19:00–20:00 test window is the real budget: the full pipeline over 60 pairs and 20
+  proposals must finish in minutes, not the hour.
+- **State the complexity** of every non-trivial algorithm in its docstring when it is not
+  linear, and the input sizes it was designed for.
+- **Prefer the standard library and existing dependencies.** Every new dependency needs
+  a stated reason in the PR and must pass the supply-chain rules below.
+- **No premature abstraction.** Add an interface when the second implementation exists,
+  not before.
+- **Types everywhere.** Python passes basedpyright in strict mode; TypeScript passes
+  `tsc` with the tsconfig floor from `typescript-lint-format-rules`.
+- **Errors are explicit.** No bare `except`, no silently swallowed failures, no fallback
+  that hides a missing input. Follow `tbd guidelines error-handling-rules`.
+
+## Testing and Evaluation
+
+Each behavior is checked from the angles that can catch its failures:
+
+| Angle | Question it answers | Tools |
+| --- | --- | --- |
+| Unit | Does each function meet its contract on representative and edge inputs? | pytest, Vitest |
+| Property-based | Does an invariant hold on many generated inputs (for example, a score stays within 0–1, matching is symmetric where it should be)? | Hypothesis, fast-check |
+| Contract | Do the API, CLI, and CSV outputs keep their exact shape? | pytest with the FastAPI test client; golden files |
+| Gate probes | Do the linters still reject a known violation? | committed probe files run by the gates |
+| Evaluation | Does a model change improve the metrics the hidden test uses? | the practice harness: precision in the top 20, recall, AUC, on lobbyist-grouped folds |
+| Performance | Does the pipeline stay inside its time budget? | timed runs on fixed inputs |
+| End to end | Does the 19:00 command turn raw inputs into valid CSVs? | a rehearsal on held-out practice inputs |
+
+Rules that apply to every test (`tbd guidelines general-testing-rules`):
+
+- No vacuous tests: a test must be able to fail because of the code under test.
+- Deterministic: fixed seeds printed on failure, injected clocks, no sleeps.
+- An empty or skipped selection must never look like a pass.
+- Model changes are accepted on evaluation evidence, never on intuition.
+  Report the metric before and after, on the same folds and seeds.
+
+## Python
+
+- Python 3.14, managed by uv. Never call `pip` or a bare `python`.
+- `backend/` uses a `src/` layout and absolute imports only.
+- Ruff configuration lives once, in the root `ruff.toml`; `backend/` extends it.
+- Annotations are evaluated lazily in Python 3.14 (PEP 649 and PEP 749), so
+  `from __future__ import annotations` is not used.
+- Follow `tbd guidelines python-rules`: docstrings explain why, not what; no trivial
+  wrappers; `pathlib` over string paths; atomic writes for completed output files.
+
+## TypeScript and Next.js
+
+- This Next.js version is newer than most model training data and has breaking changes.
+  Read the relevant guide in `frontend/node_modules/next/dist/docs/` before writing
+  Next.js code, and heed deprecation notices.
+- Biome is the only formatter and linter, at the floor in
+  `tbd guidelines typescript-lint-format-rules`, verified in CI with
+  `biome ci --error-on-warnings`.
+- Follow `tbd guidelines typescript-rules`: no `any`, exhaustive `switch`, explicit
+  `| null` over optional parameters where omission would be a bug.
+
+## Supply Chain
+
+[SUPPLY-CHAIN-SECURITY.md](SUPPLY-CHAIN-SECURITY.md) is binding: no package version
+younger than 14 days without a recorded, human-approved exception; install scripts off;
+lockfiles committed and installed frozen; GitHub Actions pinned to commit SHAs.
+
+## Data and Challenge Rules
+
+- Public data only. Downloads go under `data/`, which is never committed.
+- Hand-labelling the hidden test pairs disqualifies the team.
+  The pipeline must produce every submitted score without human edits.
+- Keep raw model output separate from human labels and corrections.
+- Practice labels come from public datasets (LobbyPlag); record their provenance.
