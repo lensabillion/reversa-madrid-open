@@ -21,9 +21,9 @@ turn raw inputs into both CSVs with one command.
 - [AGENTS.md](AGENTS.md): how we work, for humans and AI agents alike: the four project
   rules, the PR format, testing and evaluation, and the commands.
 - [SUPPLY-CHAIN-SECURITY.md](SUPPLY-CHAIN-SECURITY.md): rules for adding dependencies.
-- [The explainer](https://claude.ai/artifact/HL1KzDHpMWYerESyy3pLje): the challenge explained
-  from first principles. The page is private; the owner shares it from its Share menu. Its
-  source is [docs/explainer/influence-graph-primer.html](docs/explainer/influence-graph-primer.html);
-  GitHub shows HTML files as code, so download that file and open it in a browser to read it.
+- [The explainer](docs/explainer/influence-graph-primer.md): the challenge explained from
+  first principles. A styled version is
+  [published separately](https://claude.ai/artifact/HL1KzDHpMWYerESyy3pLje) (private; the
+  owner shares it from its Share menu).
 
 The repository layout is described in AGENTS.md.

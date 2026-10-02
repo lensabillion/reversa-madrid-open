@@ -27,7 +27,7 @@ Our entry for Reversa's Challenge 03, Influence Graph, at the Madrid Open on Sat
 3 October 2026. Given an EU amendment and a lobby submission, the system scores how
 likely the amendment was written from the submission; it then maps who wins and predicts
 which consultation proposals reach the final law.
-Read [the explainer](docs/explainer/influence-graph-primer.html) and the
+Read [the explainer](docs/explainer/influence-graph-primer.md) and the
 [organizers' brief](docs/brief/madrid-open-reversa-challenges.pdf) before changing
 behavior.
 
@@ -56,7 +56,7 @@ These come from the project owner and override any default habit.
 | `scripts/` | Repository checks used by `make` targets and CI |
 | `docs/brief/` | The organizers' brief |
 | `docs/research/` | Research documents and softschema catalogs |
-| `docs/explainer/` | The team explainer page |
+| `docs/explainer/` | The team explainer, in Markdown so GitHub renders it |
 | `data/` | Downloaded public data; never committed |
 | `attic/` | Local scratch and superseded prototypes; never committed |
 
