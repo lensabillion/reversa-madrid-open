@@ -95,6 +95,7 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
 | `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
+| `make submit PAIRS=<file> OUT=<dir>` | The 19:00 command: scores a JSON Lines pairs file into `OUT/pairs.csv` and `OUT/pairs.evidence.jsonl`; `EXPECTED_PAIRS=<n>` overrides the brief's 60 |
 
 Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 

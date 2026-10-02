@@ -10,6 +10,10 @@ dependencies = [
   "uvicorn==0.53.0",
 ]
 
+[project.scripts]
+# The 19:00 batch command; `make submit` runs it. See README.md, "Submission Command".
+influence = "influence.cli:main"
+
 [dependency-groups]
 dev = [
   "basedpyright==1.40.1",
