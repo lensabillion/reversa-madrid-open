@@ -32,10 +32,7 @@ def test_demo_routes_present_source_data_and_pagination(tmp_path: Path) -> None:
     assert detail.json()["amendment"]["id"] == "a1"
     assert detail.json()["sources"][0]["historically_verified"] is True
 
-    graph = client.get("/api/v1/amendments/a1/graph")
-    assert graph.status_code == 200
-    assert graph.json()["amendment_id"] == "a1"
-    assert any(edge["kind"] == "historically_verified" for edge in graph.json()["edges"])
+    assert client.get("/api/v1/amendments/a1/graph").status_code == 404
 
     organizations = client.get("/api/v1/organizations")
     assert organizations.status_code == 200

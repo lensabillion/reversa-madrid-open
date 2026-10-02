@@ -21,16 +21,16 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 | Capability | Evidence | Limit |
 | --- | --- | --- |
 | Public-data API and lexical baseline | Foundation PR [#10](https://github.com/lensabillion/reversa-madrid-open/pull/10) merged; 74 tests, 100% branch coverage | No trained or calibrated predictor |
-| LobbyPlag browsing and historical graph | All 4,867 amendment detail/graph records rehearsed; 1,957 unique candidate links, 172 verified | Historical verification is separate from computed similarity; unverified links are not negative labels |
+| LobbyPlag browsing | All 4,867 amendment detail records rehearsed; 1,957 unique candidate links, 172 verified | Historical verification is separate from computed similarity; unverified links are not negative labels |
 | PDF/text ingestion | 16-page organizers' PDF yields 10,569 characters; byte, page, text and expansion limits tested | No OCR, column reconstruction, automatic passage selection or hard parser process isolation |
 | Supplied-text comparison | Known originals select edit overlap; unknown originals select whole-passage overlap; explicit validation and Unicode evidence offsets | English lexical baseline, 12,000 characters and 800 tokens per supplied text; passage overlap can reward boilerplate |
 | Backend ingestion gate | `make check`: 106 backend tests, 100% coverage (475 statements, 104 branches); baseline frontend 19 tests; both audits clean | Tests establish behavior, not predictive accuracy |
 
 The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
-historical evidence/network views, pasted text and PDF/TXT/MD page review. Combined
+historical evidence views, pasted text and PDF/TXT/MD page review. Combined
 `make check` passes 106 backend and 38 frontend tests, the production build and audits.
 Browser verification covers actual PDF upload/page selection/comparison, historical
-evidence and a 390-pixel network layout; details are in the
+evidence and a 390-pixel layout; details are in the
 [frontend README](../frontend/README.md). Backend extraction belongs to `rev-i2v8`
 ([PR #11](https://github.com/lensabillion/reversa-madrid-open/pull/11), all nine CI checks
 passed). Do not infer merge status from files present in a worktree.

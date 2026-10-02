@@ -8,7 +8,6 @@ import type {
   AmendmentPage,
   AmendmentSummary,
   DatasetOverview,
-  InfluenceGraph,
   ScoreResult,
   SourceMatch,
 } from "../lib/api";
@@ -105,15 +104,6 @@ const secondDetail: AmendmentDetail = {
   total_sources: 0,
   coverage_note: overview.coverage_note,
 };
-const graph: InfluenceGraph = {
-  amendment_id: "a1",
-  nodes: [
-    { id: "amendment:a1", kind: "amendment", label: "ITRE 12" },
-    { id: "organization:o1", kind: "organization", label: "Civic Group" },
-  ],
-  edges: [{ source: "organization:o1", target: "amendment:a1", kind: "historically_verified" }],
-  coverage_note: overview.coverage_note,
-};
 
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -139,9 +129,6 @@ function installFetch(
     if (url.pathname === "/api/v1/amendments/a2") {
       return reply(secondDetail);
     }
-    if (url.pathname === "/api/v1/amendments/a1/graph") {
-      return reply(graph);
-    }
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -153,7 +140,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("loads evidence, changes amendment and source, then opens the network on demand", async () => {
+test("loads evidence, then changes source and amendment without any graph request", async () => {
   const fetchMock = installFetch(() =>
     reply({ items: [first, second], total: 2, offset: 0, limit: 12 } satisfies AmendmentPage),
   );
@@ -163,7 +150,6 @@ test("loads evidence, changes amendment and source, then opens the network on de
   expect(screen.getByText("Loading amendments…")).toBeDefined();
   expect(await screen.findByRole("heading", { name: "ITRE 12" })).toBeDefined();
   expect(screen.getByText("1.00")).toBeDefined();
-  expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/graph"))).toBe(false);
   const evidence = screen.getByRole("region", { name: "Source evidence" });
   const original = within(evidence).getByRole("region", { name: "Before the amendment" });
   const proposed = within(evidence).getByRole("region", { name: "Lawmaker's proposal" });
@@ -187,24 +173,12 @@ test("loads evidence, changes amendment and source, then opens the network on de
   ).toBeDefined();
   expect(evidence.querySelectorAll("mark")).toHaveLength(0);
 
-  fireEvent.click(screen.getByRole("button", { name: "Network" }));
-  expect(await screen.findByRole("button", { name: "Civic Group" })).toBeDefined();
-  expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/graph"))).toBe(true);
-  fireEvent.click(
-    within(screen.getByRole("region", { name: "Influence network" })).getByRole("button", {
-      name: "Civic Group",
-    }),
-  );
-  expect(
-    within(screen.getByRole("region", { name: "Influence network" }))
-      .getByRole("button", { name: "Civic Group" })
-      .getAttribute("aria-pressed"),
-  ).toBe("true");
+  expect(screen.queryByRole("button", { name: "Network" })).toBeNull();
 
-  fireEvent.click(screen.getByRole("button", { name: "Evidence" }));
   fireEvent.click(screen.getByRole("button", { name: /libe 13/i }));
   expect(await screen.findByRole("heading", { name: "LIBE 13" })).toBeDefined();
   expect(screen.getByText("No source candidates recorded for this amendment.")).toBeDefined();
+  expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/graph"))).toBe(false);
 });
 
 test("submitted search, filter and pagination request the selected slice", async () => {
