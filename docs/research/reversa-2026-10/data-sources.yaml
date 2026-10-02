@@ -1,0 +1,457 @@
+softschema:
+  contract: chamberlens.research:DataSourceCatalog/v1
+  schema: data-source.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+sources:
+  - id: congreso-opendata-iniciativas
+    name: Congreso open data, legislative initiatives (current legislature)
+    publisher: Congreso de los Diputados
+    challenges: [c02-bill-to-law, open-track]
+    url: https://www.congreso.es/es/opendata/iniciativas
+    access: bulk-download
+    formats: [json, csv, xml]
+    coverage: >-
+      Legislature XV only (from 17 August 2023). Regenerated daily. On 2026-10-01:
+      115 government bills, 369 proposiciones de ley, 155 approved laws and decree-laws.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Downloaded all four JSON files and counted records and fields.
+    use: >-
+      Current-legislature bills with filing date, author, procedure type, committee,
+      stage history (TRAMITACIONSEGUIDA), deadlines (PLAZOS) and result.
+    example: >-
+      https://www.congreso.es/webpublica/opendata/iniciativas/ProyectosDeLey__<timestamp>.json
+      (timestamped file names change daily; scrape the landing page for current links)
+    caveats: >-
+      Most fields describe events after filing. For the bill-to-law challenge only
+      NUMEXPEDIENTE, TIPO, OBJETO, AUTOR, FECHAPRESENTACION and arguably FECHACALIFICACION
+      are filing-date information. RESULTADOTRAMITACION gives the Congress result date,
+      not the BOE date.
+  - id: congreso-iniciativas-search-endpoint
+    name: Congreso initiative search JSON endpoint (all legislatures)
+    publisher: Congreso de los Diputados
+    challenges: [c02-bill-to-law, open-track]
+    url: https://www.congreso.es/es/busqueda-de-iniciativas
+    access: scrape
+    formats: [json]
+    coverage: >-
+      Every legislature from the Constituent Cortes onward. Scanned V to XV for types
+      120, 121, 122, 124 and 125: 4,148 initiatives with outcome and filing date.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        POSTed the filtrarListado resource for each legislature and type, 25 rows per page,
+        and reproduced Newtral's figure of 89 of 155 government bills passing in XIV.
+    use: >-
+      Historical training labels: id_iniciativa, titulo, autor, fecha_presentado,
+      fecha_calificado and resultado_tram for every bill.
+    example: >-
+      POST https://www.congreso.es/es/busqueda-de-iniciativas?p_p_id=iniciativas&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view&p_p_resource_id=filtrarListado&p_p_cacheability=cacheLevelPage
+      with form data _iniciativas_legislatura=XIV&_iniciativas_tipo=121&_iniciativas_paginaActual=1
+    caveats: >-
+      Undocumented internal endpoint; be polite (under 3 requests per second). Type codes:
+      120 popular legislative initiative, 121 government bill, 122 group bill, 123 deputies,
+      124 Senate, 125 regional parliaments.
+  - id: congreso-iniciativa-detail-page
+    name: Congreso initiative detail page
+    publisher: Congreso de los Diputados
+    challenges: [c02-bill-to-law]
+    url: https://www.congreso.es/es/busqueda-de-iniciativas
+    access: scrape
+    formats: [html]
+    coverage: All legislatures.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Fetched XIV 121/000150 and read the stage dates, BOCG links and vote links.
+    use: >-
+      Stage history with dates, BOCG publication links (the filed text is BOCG series A
+      for government bills, series B for group bills), plenary vote links, origin
+      initiatives (for example the decree-law a bill comes from).
+    example: >-
+      https://www.congreso.es/es/busqueda-de-iniciativas?p_p_id=iniciativas&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view&_iniciativas_mode=mostrarDetalle&_iniciativas_legislatura=XIV&_iniciativas_id=121/000150
+    caveats: HTML layout; everything after the filing date is leakage for prediction.
+  - id: congreso-opendata-votaciones
+    name: Congreso roll-call votes
+    publisher: Congreso de los Diputados
+    challenges: [c02-bill-to-law, open-track]
+    url: https://www.congreso.es/es/opendata/votaciones
+    access: bulk-download
+    formats: [json, xml, zip]
+    coverage: >-
+      Legislatures X to XV (from December 2011), one file per vote with every deputy's
+      seat, name, group and vote; one zip per session.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Downloaded a 30 September 2026 vote file and read its structure.
+    use: >-
+      Who votes with whom before a bill's filing date: group agreement rates, coalition
+      strength, deputy-level cohesion and rebellion.
+    example: >-
+      https://www.congreso.es/webpublica/opendata/votaciones/Leg15/Sesion202/20260930/Votacion001/VOT_<timestamp>.json
+    caveats: >-
+      Only votes before the filing date may feed a bill-to-law model. Legislature
+      selector on the page; file paths are per session and date.
+  - id: congreso-opendata-intervenciones
+    name: Congreso interventions (speeches) and Diario de Sesiones
+    publisher: Congreso de los Diputados
+    challenges: [open-track]
+    url: https://www.congreso.es/es/opendata/intervenciones
+    access: bulk-download
+    formats: [json, csv, xml]
+    coverage: Current legislature through open data; older sessions via search.
+    verification:
+      status: reported
+      evidence: Listed on the open data landing page; not downloaded.
+    use: Who said what, when, linked to initiatives; the say-versus-vote ideas.
+  - id: congreso-api-ardanazangel
+    name: congreso-api (community static JSON API)
+    publisher: ardanazangel on GitHub
+    challenges: [c02-bill-to-law, open-track]
+    url: https://github.com/ardanazangel/congreso-api
+    access: library
+    formats: [json]
+    coverage: Current legislature; regenerated daily (last commit 2026-10-01).
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Cloned and read the README.
+    use: Initiatives, laws and per-session roll-call votes cross-referenced by expediente.
+    caveats: Published laws lack expediente IDs, so BOE matching is by title.
+  - id: spanish-legislative-amendments-dataset
+    name: Spanish Legislative Amendments Dataset (1996-2023)
+    publisher: Palau, Casas, Muñoz-Márquez and Rodilla (University of Barcelona)
+    challenges: [c02-bill-to-law]
+    url: https://doi.org/10.34810/data2541
+    access: bulk-download
+    formats: [ods]
+    coverage: >-
+      924 government bills, 117,575 proposed amendments, legislatures VI to XIV except XI
+      and XIII. Bills that lapsed, were withdrawn or carried over are excluded.
+    licence: CC BY-NC
+    verification:
+      status: reported
+      evidence: Read the Data in Brief article (PMC13080642); file not downloaded.
+    use: >-
+      CAP policy-topic codes, committee and bill type per bill; amendment counts by group
+      for the "in what form" bonus.
+    caveats: >-
+      Selection on success makes it useless for pass/fail labels. Amendment counts are
+      post-filing information.
+  - id: boe-api-legislacion-consolidada
+    name: BOE consolidated legislation API
+    publisher: Agencia Estatal Boletín Oficial del Estado
+    challenges: [c02-bill-to-law, c01-law-markets]
+    url: https://www.boe.es/datosabiertos/api/legislacion-consolidada
+    access: api
+    formats: [json, xml]
+    coverage: All consolidated state legislation.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Queried the list endpoint and read the 2 September 2025 API manual.
+    use: >-
+      Publication date (fecha_publicacion) and signing date for each law, its rank (Ley
+      code 1300; Ley Orgánica is a separate rank code), its text split into blocks and
+      articles, and analysis (references to laws it modifies).
+    example: >-
+      GET /datosabiertos/api/legislacion-consolidada?query={"query":{"query_string":{"query":"rango@codigo:1300"},"range":{"fecha_publicacion":{"gte":"20190101"}}}}&limit=-1
+      with header Accept: application/json; text index at /id/{BOE-A-...}/texto/indice
+    caveats: >-
+      GET only. Titles of laws differ from bill titles ("Proyecto de Ley de X" becomes
+      "Ley n/yyyy, de dd de mes, de X"), so match on the descriptive part of the title.
+  - id: yfinance-prices
+    name: yfinance (Yahoo Finance daily prices)
+    publisher: Yahoo Finance via the yfinance Python library
+    challenges: [c01-law-markets]
+    url: https://github.com/ranaroussi/yfinance
+    access: library
+    formats: [pandas dataframe]
+    coverage: Daily OHLC and adjusted close for the IBEX 35 index (^IBEX) and its members (.MC tickers).
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        Reproduced every return in the brief's 12 July 2022 example to within rounding
+        (CaixaBank -8.63%, Sabadell -7.44%, Bankinter -5.08%, BBVA -3.77%, Santander -3.65%).
+    use: >-
+      Event-day and next-day returns, the IBEX 35 benchmark, abnormal returns
+      (stock minus IBEX) and volatility estimates.
+    example: yf.download(["CABK.MC", "^IBEX"], start="2022-06-01", end="2022-07-25", auto_adjust=True)
+    caveats: >-
+      Unofficial scraper of Yahoo; rate limits and occasional schema changes. Delisted and
+      renamed tickers need manual mapping. The scorers almost certainly use the same source.
+  - id: gdelt-doc-api
+    name: GDELT DOC 2.0 API
+    publisher: The GDELT Project
+    challenges: [c01-law-markets]
+    url: https://api.gdeltproject.org/api/v2/doc/doc
+    access: api
+    formats: [json, csv, html]
+    coverage: >-
+      Rolling 3 months by default, up to 1 year with timespan=1y (data from 2017); modes
+      include timelinevol and timelinetone; filters sourcecountry, sourcelang, theme.
+    verification:
+      status: reported
+      evidence: >-
+        Endpoint responded but rate-limited this machine ("one request every 5 seconds");
+        coverage limits taken from the GDELT blog posts of 2017 and 8 January 2018.
+    use: News volume and tone around recent events (last 12 months).
+    caveats: Cannot reach 2022 events; use GKG raw files or BigQuery for history.
+  - id: gdelt-gkg-history
+    name: GDELT Global Knowledge Graph 2.0 (raw files and BigQuery)
+    publisher: The GDELT Project
+    challenges: [c01-law-markets]
+    url: http://data.gdeltproject.org/gdeltv2/masterfilelist.txt
+    access: bulk-download
+    formats: [csv in zip, bigquery table]
+    coverage: >-
+      15-minute files from February 2015; BigQuery table gdelt-bq.gdeltv2.gkg (about
+      3.6 TB) with tone (V2Tone), themes, organizations and source URLs.
+    verification:
+      status: reported
+      evidence: GDELT data page and community ETL repositories; not downloaded.
+    use: Historical news volume and tone for the 30+ event dataset.
+    caveats: >-
+      Raw files are large (roughly 100 files per day). BigQuery needs a Google Cloud
+      account; filter by date partitions to stay inside the free query allowance.
+  - id: moncloa-referencias
+    name: La Moncloa, Council of Ministers references
+    publisher: Presidencia del Gobierno
+    challenges: [c01-law-markets, c02-bill-to-law]
+    url: https://www.lamoncloa.gob.es/consejodeministros/referencias/paginas/index.aspx
+    access: scrape
+    formats: [html]
+    coverage: Weekly summaries of every Council of Ministers meeting (decree-laws, bills approved, reports).
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        Index page returns 200. Individual URLs are irregular
+        (refc20220711_cc.aspx, refc20220913sini.aspx; a different pattern from 2024), so
+        a guessed refc20220712.aspx returned "page not found".
+    use: Cabinet-approval milestone dates and what was approved.
+    caveats: Crawl the index rather than constructing URLs.
+  - id: cnmv-disclosures
+    name: CNMV inside information and other relevant information
+    publisher: Comisión Nacional del Mercado de Valores
+    challenges: [c01-law-markets]
+    url: https://www.cnmv.es/portal/Otra-Informacion-Relevante/OIR.aspx
+    access: scrape
+    formats: [html, pdf]
+    coverage: Listed-company disclosures, including company estimates of a new tax's cost.
+    verification:
+      status: reported
+      evidence: Known regulator portal; not fetched in this research.
+    use: Company-specific exposure (for example each bank's disclosed levy cost).
+  - id: epu-spain
+    name: Economic Policy Uncertainty index for Spain
+    publisher: Baker, Bloom and Davis (policyuncertainty.com)
+    challenges: [c01-law-markets]
+    url: https://www.policyuncertainty.com/europe_monthly.html
+    access: bulk-download
+    formats: [xlsx]
+    coverage: Monthly newspaper-based index for Spain.
+    verification:
+      status: reported
+      evidence: Known public index; not downloaded.
+    use: Background uncertainty level at each event as a control variable.
+  - id: have-your-say-api
+    name: Have Your Say (Better Regulation portal) API
+    publisher: European Commission
+    challenges: [c03-influence-graph]
+    url: https://ec.europa.eu/info/law/better-regulation/brpapi/searchInitiatives
+    access: api
+    formats: [json, pdf attachments]
+    coverage: >-
+      Every Commission initiative with its consultation stages and every public feedback
+      item (organization, user type, country, language, text, attachments).
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        searchInitiatives found the AI White Paper (id 12270); groupInitiatives/12270
+        listed publication 12902 with 1,216 feedback items; allFeedback returned records
+        with organization, userType, country and PDF attachment names.
+    use: The "submission" side of each amendment-submission pair; proposals for adoption prediction.
+    example: >-
+      GET https://ec.europa.eu/info/law/better-regulation/brpapi/groupInitiatives/12270 then
+      GET https://ec.europa.eu/info/law/better-regulation/api/allFeedback?publicationId=12902&page=0&size=100
+    caveats: >-
+      Undocumented API used by the portal itself. Most lobby substance sits in PDF
+      attachments, which need text extraction; many are not in English.
+  - id: parltrack-dumps
+    name: Parltrack data dumps
+    publisher: Parltrack
+    challenges: [c03-influence-graph, open-track]
+    url: https://parltrack.org/dumps/
+    access: bulk-download
+    formats: [json.zst, json.lz]
+    coverage: >-
+      ep_amendments (committee amendments, about 120 MB compressed, 2026-02), 
+      ep_plenary_amendments (49,201 records, 2026-07), ep_dossiers, ep_meps, ep_votes,
+      MEP meetings with lobbyists.
+    licence: ODbL 1.0
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        Listed the directory; downloaded and parsed ep_plenary_amendments.json.zst
+        (fields old, new, location, reference, committee, authors, meps).
+    use: >-
+      Amendment text before and after, the article it targets, its procedure and its
+      authors; MEP-lobbyist meetings as extra influence evidence.
+    caveats: Authors are present on only about 28% of plenary records; committee dump is richer.
+  - id: ep-open-data-portal
+    name: European Parliament Open Data Portal API v2
+    publisher: European Parliament
+    challenges: [c03-influence-graph, open-track]
+    url: https://data.europarl.europa.eu/api/v2/
+    access: api
+    formats: [json-ld, rdf-xml]
+    coverage: MEPs, documents, plenary data; 100 requests per minute.
+    verification:
+      status: reported
+      evidence: Community documentation and the EP beta-testing repository.
+    use: Official metadata for amendments, reports and votes.
+  - id: oeil-legislative-observatory
+    name: Legislative Observatory (OEIL)
+    publisher: European Parliament
+    challenges: [c03-influence-graph]
+    url: https://oeil.secure.europarl.europa.eu/oeil/
+    access: scrape
+    formats: [html]
+    coverage: Every EU procedure with its stages, rapporteurs, documents and final act.
+    verification:
+      status: reported
+      evidence: Mirrored by Parltrack ep_dossiers; not fetched directly.
+    use: Linking a Commission proposal to its amendments and final act.
+  - id: eurlex-cellar-sparql
+    name: EUR-Lex via the Publications Office CELLAR SPARQL endpoint
+    publisher: Publications Office of the EU
+    challenges: [c03-influence-graph]
+    url: https://publications.europa.eu/webapi/rdf/sparql
+    access: api
+    formats: [sparql json, xml, html text]
+    coverage: All EU legal acts and proposals with metadata and links to text in all languages.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: A trivial SELECT query returned HTTP 200.
+    use: Final adopted text, to test whether a consultation proposal ended up in the law.
+  - id: transparency-register
+    name: EU Transparency Register
+    publisher: European Parliament and European Commission
+    challenges: [c03-influence-graph]
+    url: https://transparency-register.europa.eu/
+    access: bulk-download
+    formats: [xml, xlsx]
+    coverage: Registered lobbying organizations with category, spending band, staff and interests.
+    verification:
+      status: reported
+      evidence: Search of data.europa.eu found related datasets; the official export was not fetched.
+    use: Organization type and resources as features; the TR number links Have Your Say feedback to organizations.
+  - id: lobbyfacts
+    name: LobbyFacts
+    publisher: Corporate Europe Observatory and LobbyControl
+    challenges: [c03-influence-graph]
+    url: https://www.lobbyfacts.eu/
+    access: bulk-download
+    formats: [csv]
+    coverage: Historical snapshots of the Transparency Register with spending and meeting counts.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Site returned HTTP 200; downloads not tested.
+    use: Lobbying spend and Commission meetings per organization over time.
+  - id: howtheyvote-data
+    name: HowTheyVote.eu data release
+    publisher: HowTheyVote.eu
+    challenges: [open-track, c03-influence-graph]
+    url: https://github.com/HowTheyVote/data/releases
+    access: bulk-download
+    formats: [csv.gz, zip]
+    coverage: >-
+      European Parliament roll-call votes with member votes, amendment authors and URLs,
+      EuroVoc and OEIL subjects; weekly releases (latest 2026-09-26).
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Listed the latest release assets via the GitHub API.
+    use: Which amendments passed in plenary, who voted for them, group cohesion.
+  - id: parlamint-es
+    name: ParlaMint corpus, Spanish Congress (ParlaMint-ES)
+    publisher: CLARIN.SI
+    challenges: [open-track]
+    url: https://www.clarin.si/repository/xmlui/handle/11356/2004
+    access: bulk-download
+    formats: [tei xml, txt, tsv]
+    coverage: Speeches mostly 2015 to mid-2022 with speaker, party and linguistic annotation (.ana version).
+    verification:
+      status: reported
+      evidence: CLARIN repository listing for ParlaMint 5.0; not downloaded.
+    use: Speeches with clean speaker metadata for say-versus-vote and party-agent ideas.
+  - id: congreso-api-sessions
+    name: congreso-api session roll calls (local clone)
+    publisher: ardanazangel on GitHub
+    challenges: [open-track, c02-bill-to-law]
+    url: https://github.com/ardanazangel/congreso-api
+    access: library
+    formats: [json]
+    coverage: 142 plenary sessions of legislature XV (19 September 2023 to 30 September 2026), compact per-deputy vote strings.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: Computed quarterly and monthly group agreement with PSOE from all 142 files.
+    use: Fast group-agreement and coalition-stability features without downloading every vote file.
+    caveats: Fewer sessions than the official record (around 200); confirm completeness against Congreso.
+  - id: lobbyplag-data
+    name: LobbyPlag data repository (GDPR amendments, lobby proposals and verified matches)
+    publisher: LobbyPlag (OpenDataCity)
+    challenges: [c03-influence-graph]
+    url: https://github.com/lobbyplag/lobbyplag-data
+    access: bulk-download
+    formats: [json]
+    coverage: >-
+      GDPR procedure 2012/0011(COD): MEP amendments with old and new text, 1,159 lobby
+      proposals extracted from 76 documents of 44 lobbyists, the GDPR text in 23
+      languages, and 1,976 candidate proposal-amendment matches of which 175 are
+      human-checked and verified.
+    verification:
+      status: verified
+      date: '2026-10-02'
+      evidence: >-
+        Downloaded plags.json, proposals.json, documents.json and lobbyists.json and
+        counted records; checked=false for the 1,801 unverified candidates.
+    use: >-
+      A labelled practice set for Challenge 03: 175 real lobby-to-amendment pairs, plus
+      decoys built from same-article proposals that were not matched.
+    caveats: >-
+      Unchecked candidates are not confirmed negatives. Data from 2013-2014; amendments
+      file is 9.7 MB.
+  - id: parllawspeech
+    name: ParlLawSpeech (linked speeches, bills and laws)
+    publisher: Schwalbach, Hetzer, Proksch, Rauh and Sebők (OPTED project), via GESIS
+    challenges: [c02-bill-to-law, c03-influence-graph, open-track]
+    url: https://parllawspeech.org/data
+    access: bulk-download
+    formats: [rds]
+    coverage: >-
+      Spain 1996-2023: 4,188 bills (full text, initiation date, final status), 1,563 laws
+      (full text, adoption date), 318,576 speeches. European Parliament 1999-2024: 14,105
+      bills, 10,554 laws, 574,119 speeches. Linked by procedure_ID; about 4 GB in total.
+    licence: CC BY 4.0
+    verification:
+      status: reported
+      evidence: >-
+        Read the project site and the codebook; the GESIS download (DOI 10.7802/2824)
+        returned 403 to an anonymous request and probably needs a free GESIS account.
+    use: >-
+      Filed bill text and final law text already linked: text features for the passage
+      model, the article-survival bonus, and final EU texts for adoption prediction.
+    example: Read .RDS files in Python with the pyreadr package.
+    caveats: Ends in 2023; check whether bill_text is the filed version before using it as a filing-date feature.

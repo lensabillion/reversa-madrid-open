@@ -1,0 +1,102 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: DataSourceCatalog
+description: >-
+  Public data sources for the Reversa Madrid Open challenges. One record per source.
+  Consumers: the research brief, and data-loading scripts on event day that read `url`,
+  `access` and `formats`.
+type: object
+required:
+  - updated
+  - sources
+properties:
+  updated:
+    description: Date the catalog was last checked, YYYY-MM-DD.
+    type: string
+    pattern: '^\d{4}-\d{2}-\d{2}$'
+  sources:
+    type: array
+    items:
+      $ref: '#/$defs/DataSource'
+$defs:
+  Challenge:
+    type: string
+    enum:
+      - open-track
+      - c01-law-markets
+      - c02-bill-to-law
+      - c03-influence-graph
+  DataSource:
+    type: object
+    required:
+      - id
+      - name
+      - challenges
+      - url
+      - access
+      - formats
+      - coverage
+      - verification
+      - use
+    properties:
+      id:
+        description: Stable kebab-case identifier.
+        type: string
+        pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      name:
+        type: string
+      publisher:
+        type: string
+      challenges:
+        type: array
+        minItems: 1
+        items:
+          $ref: '#/$defs/Challenge'
+      url:
+        description: Entry point (landing page, API base or repository).
+        type: string
+        pattern: '^https?://'
+      access:
+        description: How the data is obtained.
+        type: string
+        enum:
+          - bulk-download
+          - api
+          - scrape
+          - library
+          - manual
+      formats:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      coverage:
+        description: Time span and scope actually available.
+        type: string
+      licence:
+        type: string
+      verification:
+        type: object
+        required:
+          - status
+        properties:
+          status:
+            description: >-
+              verified = fetched and inspected during this research; reported = described
+              by a secondary source but not fetched.
+            type: string
+            enum:
+              - verified
+              - reported
+          date:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          evidence:
+            type: string
+      use:
+        description: What the source is for in the challenge.
+        type: string
+      example:
+        description: A concrete request, URL pattern or command.
+        type: string
+      caveats:
+        type: string

@@ -1,0 +1,11 @@
+clean matches: 144
+all approved bills                     n=144 median= 244 p10=  64 p90= 437  MAE(median)= 110
+legislature XII                        n= 18 median= 268 p10=  85 p90= 495  MAE(median)= 108
+legislature XIV                        n=108 median= 238 p10=  56 p90= 419  MAE(median)= 102
+legislature XV                         n= 18 median= 257 p10= 111 p90= 667  MAE(median)= 152
+government bills (121)                 n=114 median= 240 p10=  65 p90= 422  MAE(median)= 103
+group bills (122)                      n= 27 median= 254 p10=  42 p90= 538  MAE(median)= 134
+from decree-law                        n= 17 median= 278 p10= 113 p90= 510  MAE(median)= 103
+not from decree-law, not budget        n=122 median= 242 p10=  56 p90= 437  MAE(median)= 108
+budget bills                           n=  5 median=  79 p10=  64 p90=  92  MAE(median)=   7
+leave-one-out MAE, median by (type, decree-law, budget): 108

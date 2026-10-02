@@ -1,0 +1,91 @@
+Legislature | gov bills (121): n, passed, failed, pending, pass% of closed | group bills (122): n, passed, pass% of closed | baseline accuracy on closed 121+122
+V     |  130  112   18    0  86.2% |  140   17  12.1% | acc  87.0%  (n closed 270)
+VI    |  192  172   20    0  89.6% |  300   28   9.3% | acc  90.2%  (n closed 492)
+VII   |  175  173    2    0  98.9% |  322   16   5.0% | acc  96.4%  (n closed 497)
+VIII  |  152  140   12    0  92.1% |  235   18   7.7% | acc  92.2%  (n closed 387)
+IX    |  147  120   27    0  81.6% |  292   17   5.8% | acc  90.0%  (n closed 439)
+X     |  163  160    3    0  98.2% |  216    6   2.8% | acc  97.6%  (n closed 379)
+XI    |    0    0    0    0   0.0% |   37    0   0.0% | acc 100.0%  (n closed 37)
+XII   |   49   18   31    0  36.7% |  333   15   4.5% | acc  88.0%  (n closed 382)
+XIII  |    1    0    1    0   0.0% |   54    0   0.0% | acc  98.2%  (n closed 55)
+XIV   |  155   89   66    0  57.4% |  334   20   6.0% | acc  82.4%  (n closed 489)
+XV    |  115   21    4   90  84.0% |  305   10   7.0% | acc  91.6%  (n closed 167)
+overall baseline accuracy (V-XV closed): 90.8 % n 3594
+gov bill failure reasons: [('Caducado', 158), ('Retirado', 9), ('Rechazado', 8), ('Subsumido en otra iniciativa', 7), ('Caducado sin calificación previa', 2)]
+group bill outcomes: [('Caducado', 1030), ('Rechazado', 719), ('Retirado', 317), ('', 163), ('Aprobado con modificaciones', 128), ('Decaído', 87), ('Subsumido en otra iniciativa', 55), ('Inadmitido a trámite en términos absolutos', 31), ('Aprobado sin modificaciones', 19), ('Caducado sin calificación previa', 11), ('Inadmitido a trámite con recalificación', 4), ('Inadmitido a trámite con requerimiento de aclaración', 3), ('Extinguido por desaparición o cese del autor', 1)]
+group bills passed by author (leg, author: passed/closed) where passed>0:
+   V Grupo Parlamentario Popular en el Congreso 6/61
+   V Grupo Parlamentario Catalán (Convergencia i Unió) 4/12
+   V Comisión de Justicia e Interior 2/2
+   V Grupo Parlamentario Federal Izquierda Unida-Iniciativa per Catalunya 1/45
+   V Grupo Socialista del Congreso <br>Grupo Parlamentario Federal Izquierd 1/1
+   V Grupo Vasco (PNV) 1/9
+   V Grupo Socialista del Congreso <br>Grupo Parlamentario Catalán (Converg 1/1
+   V Congreso de los Diputados. Pleno 1/1
+   VI Grupo Socialista del Congreso 7/88
+   VI Grupo Parlamentario Catalán (Convergència i Unió) 3/17
+   VI Grupo Parlamentario Popular en el Congreso 3/27
+   VI Comisión de Justicia e Interior 3/3
+   VI Grupo Parlamentario Federal de Izquierda Unida-Iniciativa per Cataluny 2/41
+   VI Grupo Parlamentario Mixto 1/50
+   VI Grupo Parlamentario Vasco (EAJ-PNV) 1/5
+   VI Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Cat 1/1
+   VI Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Cat 1/2
+   VI Comisión Constitucional 1/2
+   VI Grupo Parlamentario Popular en el Congreso <br>Grupo Socialista del Co 1/1
+   VI Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Cat 1/1
+   VI Comisión de Infraestructuras 1/1
+   VI Comisión de Política Social y Empleo 1/1
+   VI Grupo Parlamentario Popular en el Congreso <br>Grupo Socialista del Co 1/1
+   VII Comisión de Justicia e Interior 4/4
+   VII Grupo Parlamentario Socialista 2/115
+   VII Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Soc 2/2
+   VII Grupo Parlamentario Popular en el Congreso 2/7
+   VII Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Soc 2/2
+   VII Grupo Parlamentario Catalán (Convergència i Unió) 1/39
+   VII Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Soc 1/2
+   VII Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Soc 1/1
+   VII Grupo Parlamentario Popular en el Congreso <br>Grupo Parlamentario Soc 1/1
+   VIII Grupo Parlamentario Catalán (Convergència i Unió) 6/47
+   VIII Grupo Parlamentario de Izquierda Verde-Izquierda Unida-Iniciativa per  6/53
+   VIII Grupo Parlamentario de Esquerra Republicana (ERC) 1/53
+   VIII Grupo Parlamentario Socialista del Congreso <br>Grupo Parlamentario Ca 1/1
+   VIII Grupo Parlamentario Socialista del Congreso <br>Grupo Parlamentario Po 1/1
+   VIII Grupo Parlamentario Socialista del Congreso <br>Grupo Parlamentario Po 1/1
+   VIII Grupo Parlamentario Socialista del Congreso <br>Grupo Parlamentario Ca 1/1
+   VIII Comisión Constitucional 1/1
+   IX Grupo Parlamentario Catalán (Convergència i Unió) 2/44
+   IX Grupo Parlamentario Popular en el Congreso 2/89
+   IX Comisión de Industria, Turismo y Comercio 2/2
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario Popular en el 2/2
+   IX Grupo Parlamentario de Esquerra Republicana-Izquierda Unida-Iniciativa 1/101
+   IX Grupo Parlamentario Mixto 1/31
+   IX Grupo Parlamentario Vasco (EAJ-PNV) 1/9
+   IX Grupo Parlamentario Socialista 1/5
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario Popular en el 1/1
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario de Esquerra R 1/1
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario Popular en el 1/1
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario Catalán (Conv 1/1
+   IX Grupo Parlamentario Socialista <br />Grupo Parlamentario Popular en el 1/1
+   X Grupo Parlamentario Popular en el Congreso 3/5
+   X Comisión de Economía y Competitividad 1/1
+   X Grupo Parlamentario Popular en el Congreso <br />Grupo Parlamentario S 1/1
+   X Comisión Constitucional 1/1
+   XII Grupo Parlamentario Popular en el Congreso 9/48
+   XII Grupo Parlamentario Socialista 3/57
+   XII Grupo Parlamentario Mixto 1/40
+   XII Grupo Parlamentario Ciudadanos 1/34
+   XII Grupo Parlamentario Popular en el Congreso <br />Grupo Parlamentario S 1/1
+   XIV Grupo Parlamentario Socialista 13/22
+   XIV Grupo Parlamentario Socialista <br />Grupo Parlamentario Confederal de 4/5
+   XIV Grupo Parlamentario Confederal de Unidas Podemos-En Comú Podem-Galicia 1/37
+   XIV Comisión de Igualdad 1/1
+   XIV Comisión de Justicia 1/1
+   XV Grupo Parlamentario Socialista 6/15
+   XV Grupo Parlamentario Junts per Catalunya 1/11
+   XV Grupo Parlamentario Socialista <br />Grupo Parlamentario Mixto 1/1
+   XV Grupo Parlamentario Popular en el Congreso <br />Grupo Parlamentario S 1/1
+   XV Comisión de Derechos Sociales y Consumo 1/1
+Senate-origin closed 30 passed 4
+Regional parliaments closed 76 passed 5
+Popular ILP closed 129 passed 2

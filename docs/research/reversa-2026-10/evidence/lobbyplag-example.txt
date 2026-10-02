@@ -1,0 +1,14 @@
+Verified copies of a lobby paper on Article 26(1):
+  IMCO 333 by Malcolm Harbour <- AMAZON-amendments.pdf
+  ITRE 614 by Giles Chichester <- AMAZON-amendments.pdf
+  JURI 259 by Sajjad Karim <- AMAZON-amendments.pdf
+  ITRE 616 by Seán Kelly, Adina-Ioana Vălean, Angelika Niebler <- AMAZON-amendments.pdf
+
+Amazon's inserted text: [' and which involves the processing of data that would permit the processor to reasonably identify the data subject', ' The controller remains solely responsible for ensuring compliance with the requirements of this Regulation.']
+
+kind           amendment     whole text  changes only  inserted text
+verified copy  ITRE 616            0.96          0.67  ['and which involves the processing of data that would permit the proces']
+not checked    ITRE 615            1.00          0.98  ['and involves the processing of data that would permit the processor to']
+not checked    LIBE 1773           0.63          0.12  ['processing']
+not checked    LIBE 1774           0.95          0.65  ['and involves the processing of data that would permit the processor to']
+not checked    LIBE 1775           0.60          0.06  ['; the controller shall also ensure that']

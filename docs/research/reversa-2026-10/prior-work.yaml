@@ -1,0 +1,400 @@
+softschema:
+  contract: chamberlens.research:PriorWorkCatalog/v1
+  schema: prior-work.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+works:
+  # Challenge 02: Bill-to-Law
+  - id: nay-2017-law-making-word-vectors
+    title: Predicting and understanding law-making with word vectors and an ensemble model
+    authors: John J. Nay
+    year: 2017
+    venue: PLOS ONE
+    kind: paper
+    challenges: [c02-bill-to-law]
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC5425031/
+    finding: >-
+      About 70,000 US bills (2001-2015), 4% enacted. Stacked ensemble (gradient boosting,
+      random forest, elastic net) on context features plus word2vec sentence scores.
+      Trained on past Congresses, tested on later ones. AUC 0.96 text+context, 0.93 text
+      only, 0.87 context only, 0.81 title only. Sponsor in the majority party was the
+      strongest context effect.
+    relevance: >-
+      The template: temporal train/test split and context plus text. Only introduced
+      text is legal under the hackathon's filing-date rule; "latest version" text leaks.
+    confidence: read
+  - id: yano-2012-bill-survival
+    title: Textual predictors of bill survival in congressional committees
+    authors: Tae Yano, Noah A. Smith, John D. Wilkerson
+    year: 2012
+    venue: NAACL-HLT
+    kind: paper
+    challenges: [c02-bill-to-law]
+    url: https://aclanthology.org/N12-1088/
+    finding: Bill text features improve committee-survival prediction over sponsor and committee features alone.
+    relevance: Early evidence that the words of a bill carry signal beyond who filed it.
+    confidence: cited
+  - id: eidelman-2018-state-floor-action
+    title: How predictable is your state? Leveraging lexical and contextual information for predicting legislative floor action at the state level
+    authors: Vlad Eidelman, Anastassia Kornilova, Daniel Argyle
+    year: 2018
+    venue: COLING
+    kind: paper
+    challenges: [c02-bill-to-law]
+    url: https://arxiv.org/abs/1806.05284
+    finding: Over one million bills in 50 states; text plus context improves accuracy by 18% on average over state-specific baselines.
+    relevance: Confirms text and context are complementary across different legislatures.
+    confidence: read
+  - id: govtrack-skopos-prognosis
+    title: GovTrack bill prognosis and Skopos Labs probability of enactment
+    authors: GovTrack.us; Skopos Labs (PredictGov)
+    year: 2017
+    kind: product
+    challenges: [c02-bill-to-law]
+    url: https://www.govtrack.us/about/analysis
+    finding: Published per-bill enactment probabilities from late 2016 to mid 2023 using over 250 factors, text included.
+    relevance: Shows a production version of the task exists; Reversa's clients want the same for Spain.
+    confidence: cited
+  - id: palau-2026-spanish-amendments-dataset
+    title: 'Opening the black box of the Spanish legislative process: the Legislative Amendments Dataset (1996-2023)'
+    authors: Anna M. Palau, Andreu Casas, Luz Muñoz-Márquez, Andreu Rodilla
+    year: 2026
+    venue: Data in Brief
+    kind: dataset
+    challenges: [c02-bill-to-law]
+    url: https://pmc.ncbi.nlm.nih.gov/articles/PMC13080642/
+    finding: >-
+      924 government bills and 117,575 proposed amendments. Amendments per bill rose to
+      202.5 in 2019-2023. Around half of bills pass with minimal change. Spain does not
+      record which amendments are accepted.
+    relevance: >-
+      Topic codes and amendment structure for the "in what form" bonus. It excludes bills
+      that lapsed or were withdrawn, so it cannot provide pass/fail labels.
+    confidence: read
+  - id: field-minority-governments-spain
+    title: Why Minority Governments Work, and the 2019 EUROPP blog on Spain's minority governments
+    authors: Bonnie N. Field
+    year: 2016
+    venue: Palgrave Macmillan; LSE EUROPP blog (25 April 2019)
+    kind: paper
+    challenges: [c02-bill-to-law]
+    url: https://blogs.lse.ac.uk/europpblog/2019/04/25/do-spains-minority-governments-work/
+    finding: >-
+      1982-2015: minority governments passed 88% of their bills, majority governments
+      89%. After 2015 fragmentation, governments held only 24-39% of seats instead of
+      45-48%, and legislative output fell.
+    relevance: Government seat share and the availability of regional partners are the key structural features.
+    confidence: read
+  - id: democrata-2025-no-psoe-no-boe
+    title: 'No PSOE, no BOE: la Mesa del Congreso bloquea en fase de enmiendas todas las proposiciones de ley sin firma socialista'
+    authors: Demócrata (DemoData)
+    year: 2025
+    venue: Demócrata, 17 January 2025
+    kind: journalism
+    challenges: [c02-bill-to-law]
+    url: https://www.democrata.es/demodata/no-psoe-no-boe-la-mesa-del-congreso-bloquea-en-fase-de-enmiendas-todas-las-proposiciones-de-ley-sin-firma-socialista/
+    finding: >-
+      In legislature XV, 41 of 197 group bills passed the consideration vote; only 7
+      advanced past amendments, all signed by the PSOE group; over 628 amendment-deadline
+      extensions since November 2023.
+    relevance: >-
+      Explains the mechanism behind the strongest group-bill feature (governing party's
+      signature). Extension counts themselves are post-filing and therefore off-limits.
+    confidence: read
+  - id: newtral-2023-bills-since-1977
+    title: Desde 1977, el 80% de los proyectos de ley registrados en el Congreso fueron aprobados
+    authors: Newtral
+    year: 2023
+    venue: Newtral, 6 June 2023
+    kind: journalism
+    challenges: [c02-bill-to-law]
+    url: https://www.newtral.es/leyes-legislaturas-congreso/20230606/
+    finding: Over 2,100 government bills since 1977, 80% published in the BOE; XIV passed 89 of 155 (57.4%).
+    relevance: Independent check of our own scan, which reproduced the 89 of 155 figure.
+    confidence: cited
+  - id: tc-2026-71-extensions
+    title: Constitutional Court protects deputies against 71 repeated amendment-deadline extensions
+    authors: Iberley; El Español
+    year: 2026
+    venue: News, April 2026
+    kind: journalism
+    challenges: [c02-bill-to-law]
+    url: https://www.iberley.es/noticias/el-tc-ampara-diputados-prorrogas-reiteradas-enmiendas-36335
+    finding: >-
+      The Mesa extended the amendment deadline of one urgent bill 71 times without
+      justification; the prosecutor asked the Constitutional Court to protect the
+      deputies (April 2026) and Iberley reports the Court upheld their appeal.
+    relevance: Freezing by extension is a known, litigated practice and drives long tails in timing.
+    confidence: cited
+  - id: koenig-2007-eu-legislative-duration
+    title: 'Divergence or convergence? From ever-growing to ever-slowing European legislative decision making'
+    authors: Thomas König
+    year: 2007
+    venue: European Journal of Political Research
+    kind: paper
+    challenges: [c02-bill-to-law]
+    url: https://www.sowi.uni-mannheim.de/media/Lehrstuehle/sowi/Koenig/Dokumente/2007_Koenig_Divergence.pdf
+    finding: Duration analysis of about 9,500 EU proposals (1984-1999) from Commission initiative to Council decision.
+    relevance: Precedent for modelling time-to-adoption with survival methods.
+    confidence: cited
+  - id: jones-branton-2005-cox-duration
+    title: 'Beyond logit and probit: Cox duration models of single, repeating, and competing events for state policy adoption'
+    authors: Bradford S. Jones, Regina P. Branton
+    year: 2005
+    venue: State Politics and Policy Quarterly
+    kind: method
+    challenges: [c02-bill-to-law]
+    url: https://journals.sagepub.com/doi/10.1177/153244000500500406
+    finding: Cox models with competing events outperform binary-link event-history models for policy adoption.
+    relevance: Bills end in competing ways (law, rejection, lapse, withdrawal); model them as competing risks.
+    confidence: cited
+  # Challenge 01: Law x Markets
+  - id: martins-2025-windfall-tax-banks
+    title: 'Banks stock market reaction to the Italian and Spanish windfall tax announcement: an event study'
+    authors: A. M. Martins
+    year: 2025
+    venue: Journal of Banking Regulation 26, 54-61
+    kind: paper
+    challenges: [c01-law-markets]
+    url: https://link.springer.com/article/10.1057/s41261-024-00246-x
+    finding: >-
+      Significant negative abnormal returns, strongest for directly affected Spanish and
+      Italian banks; high-tax, small, efficient, profitable banks with high institutional
+      ownership fell more.
+    relevance: Directly the brief's example; supplies candidate cross-sectional factors.
+    confidence: cited
+  - id: italy-2023-windfall-august
+    title: "Don't go on holiday in August! Market reaction to an unexpected windfall tax on banks"
+    year: 2023
+    venue: Economics Letters
+    kind: paper
+    challenges: [c01-law-markets]
+    url: https://www.sciencedirect.com/science/article/abs/pii/S0165176523004330
+    finding: >-
+      Italy's 7 August 2023 announcement: average returns between -7% and -3% around
+      day -1 to +1; larger falls for banks expected to pay more.
+    relevance: A second, comparable event; shows surprise and exposure drive magnitude.
+    confidence: cited
+  - id: sp-2021-spain-gas-clawback
+    title: Spain's plan to claw back billions from utilities (RDL 17/2021) and its amendment
+    authors: S&P Global
+    year: 2021
+    venue: S&P Global Ratings and Market Intelligence
+    kind: journalism
+    challenges: [c01-law-markets]
+    url: https://www.spglobal.com/ratings/en/research/articles/210929-spain-s-plan-to-claw-back-billions-from-utilities-could-stunt-renewables-growth-12127471
+    finding: >-
+      Iberdrola lost almost 14% in under three weeks after the September 2021 decree,
+      then recovered once a 26 October amendment exempted fixed-price contracts; Endesa's
+      impact fell to zero.
+    relevance: A multi-milestone event (decree, then softening amendment) for the dataset; reversals matter.
+    confidence: cited
+  - id: mackinlay-1997-event-studies
+    title: Event studies in economics and finance
+    authors: A. Craig MacKinlay
+    year: 1997
+    venue: Journal of Economic Literature 35(1)
+    kind: method
+    challenges: [c01-law-markets]
+    url: https://www.jstor.org/stable/2729691
+    finding: Standard reference for abnormal returns, estimation windows, market models and test statistics.
+    relevance: The vocabulary and procedure behind the brief's "abnormal return".
+    confidence: cited
+  - id: kolari-pynnonen-2010-cross-correlation
+    title: Event study testing with cross-sectional correlation of abnormal returns
+    authors: James W. Kolari, Seppo Pynnönen
+    year: 2010
+    venue: Review of Financial Studies 23(11)
+    kind: method
+    challenges: [c01-law-markets]
+    url: https://ideas.repec.org/a/oup/rfinst/v23y2010i11p3996-4025.html
+    finding: When many firms share an event date, even small cross-correlation makes standard tests over-reject.
+    relevance: >-
+      All banks on 12 July 2022 are one observation, not five; treat firm-level
+      outcomes on the same date as correlated when ranking variables.
+    confidence: cited
+  - id: schwert-1981-regulation-financial-data
+    title: Using financial data to measure effects of regulation
+    authors: G. William Schwert
+    year: 1981
+    venue: Journal of Law and Economics 24(1)
+    kind: method
+    challenges: [c01-law-markets]
+    url: https://www.journals.uchicago.edu/doi/abs/10.1086/466977
+    finding: Lays out how stock prices reveal the expected wealth effects of regulation, and the pitfalls of anticipation.
+    relevance: Why later milestones (vote, publication) usually move prices less than the first surprise.
+    confidence: cited
+  - id: binder-1985-regulation-stock-prices
+    title: Measuring the effects of regulation with stock price data
+    authors: John J. Binder
+    year: 1985
+    venue: RAND Journal of Economics 16(2)
+    kind: method
+    challenges: [c01-law-markets]
+    url: https://www.jstor.org/stable/2555408
+    finding: Regulatory events are often anticipated and spread over several dates, which weakens single-date tests.
+    relevance: Supports modelling stage and surprise explicitly, as the brief's Layer 2 asks.
+    confidence: cited
+  - id: angelopoulos-bates-2021-conformal
+    title: A gentle introduction to conformal prediction and distribution-free uncertainty quantification
+    authors: Anastasios N. Angelopoulos, Stephen Bates
+    year: 2021
+    venue: arXiv
+    kind: method
+    challenges: [c01-law-markets, c02-bill-to-law]
+    url: https://arxiv.org/abs/2107.07511
+    finding: Turns any point predictor into intervals with guaranteed average coverage on exchangeable data.
+    relevance: The brief scores 80% intervals for coverage and narrowness; conformal calibration targets exactly that.
+    confidence: cited
+  # Challenge 03: Influence Graph
+  - id: lobbyplag-2013
+    title: LobbyPlag
+    authors: OpenDataCity, Richard Gutjahr and volunteers
+    year: 2013
+    kind: tool
+    challenges: [c03-influence-graph]
+    url: https://blog.okfn.org/2013/03/22/lobbyplag-who-is-really-writing-the-law/
+    finding: >-
+      Compared GDPR amendments with lobby papers; some MEPs had 22-25% of amendments
+      containing lobby text (Harbour 25.45%, Karim 23.64%, Chichester 22.73%).
+    relevance: The brief's named precedent; mostly verbatim copying found by crowdsourced comparison.
+    confidence: read
+  - id: burgess-2016-legislative-influence-detector
+    title: 'The Legislative Influence Detector: finding text reuse in state legislation'
+    authors: Matthew Burgess, Eugenia Giraudy, Julian Katz-Samuels, Joe Walsh, Derek Willis, Lauren Haynes, Rayid Ghani
+    year: 2016
+    venue: KDD
+    kind: paper
+    challenges: [c03-influence-graph]
+    url: https://dl.acm.org/doi/abs/10.1145/2939672.2939697
+    finding: >-
+      Elasticsearch candidate retrieval plus Smith-Waterman local alignment; found 45,405
+      bill-to-bill and 14,137 model-legislation-to-bill reuse instances.
+    relevance: Two-stage architecture (cheap retrieval, then exact alignment) suits the 60 given pairs and larger searches.
+    confidence: read
+  - id: linder-2020-text-as-policy
+    title: 'Text as policy: measuring policy similarity through bill text reuse'
+    authors: Fridolin Linder, Bruce A. Desmarais, Matthew Burgess, Eugenia Giraudy
+    year: 2020
+    venue: Policy Studies Journal 48(2)
+    kind: paper
+    challenges: [c03-influence-graph]
+    url: https://onlinelibrary.wiley.com/doi/abs/10.1111/psj.12257
+    finding: Alignment-based reuse on 500,000 state bills tracks ideology, NCSL policy categories and diffusion networks.
+    relevance: Validates alignment scores against ground truth; code at github.com/desmarais-lab/text_reuse.
+    confidence: read
+  - id: furnas-semantic-smith-waterman
+    title: Text reuse and paraphrase detection with semantical Smith-Waterman local alignment
+    authors: Alexander Furnas
+    year: 2019
+    kind: method
+    challenges: [c03-influence-graph]
+    url: https://static1.squarespace.com/static/59e25521b7411c07ef1410fa/t/5d499af08dc10f0001ab7e1d/1565104881203/Furnas_SemanticSmithWaterman.pdf
+    finding: >-
+      Replaces Smith-Waterman's fixed mismatch penalty with a word-embedding similarity,
+      so substituted synonyms still align; notes "shall" to "may" is small in embedding
+      space but legally decisive.
+    relevance: The direct method for "reworded text"; add a legal-modal penalty for shall/may/must.
+    confidence: read
+  - id: kluever-2009-interest-group-influence
+    title: Measuring interest group influence using quantitative text analysis
+    authors: Heike Klüver
+    year: 2009
+    venue: European Union Politics
+    kind: paper
+    challenges: [c03-influence-graph]
+    url: https://journals.sagepub.com/doi/10.1177/1465116509346782
+    finding: >-
+      Wordfish positions of consultation submissions versus final policy measure who
+      wins; extended in a 2013 book to 56 issues and 2,696 groups.
+    relevance: "Precedent for the adoption-prediction step: compare each proposal's position with the final law."
+    confidence: read
+  - id: gava-2021-rubber-stamping
+    title: 'Legislating or rubber-stamping? Assessing parliament''s influence on law-making with text reuse'
+    authors: Roy Gava and co-authors
+    year: 2021
+    venue: European Journal of Political Research
+    kind: paper
+    challenges: [c03-influence-graph, c02-bill-to-law]
+    url: https://onlinelibrary.wiley.com/doi/abs/10.1111/1475-6765.12395
+    finding: Uses text reuse between draft and final law to measure how much parliament changes bills.
+    relevance: Method for the Challenge 02 bonus (article survives, changes or disappears).
+    confidence: cited
+  - id: policy-plagiarism-2022
+    title: Copy, paste, legislate, succeed? The effect of policy plagiarism on policy success
+    year: 2022
+    venue: Policy and Politics 50(4)
+    kind: paper
+    challenges: [c03-influence-graph]
+    url: https://bristoluniversitypressdigital.com/view/journals/pp/50/4/article-p605.xml
+    finding: Studies whether copied policy text is more likely to succeed.
+    relevance: Possible feature for adoption prediction; full text not read.
+    confidence: cited
+  - id: lobbyplag-data-repo
+    title: LobbyPlag data (amendments, proposals and verified plags)
+    authors: OpenDataCity and contributors
+    year: 2014
+    venue: github.com/lobbyplag/lobbyplag-data
+    kind: dataset
+    challenges: [c03-influence-graph]
+    url: https://github.com/lobbyplag/lobbyplag-data
+    finding: >-
+      1,976 candidate matches between GDPR lobby proposals and MEP amendments, each with
+      an algorithmic match score; 175 checked and verified by humans (match score median
+      1.00, minimum 0.52).
+    relevance: >-
+      The only public labelled set of real lobby-to-amendment pairs found; use it to tune
+      and test before 19:00. Unchecked candidates include real copies (for example ITRE
+      615 and LIBE 1774 contain Amazon's Article 26(1) phrase), so review before using
+      them as negatives.
+    confidence: read
+  - id: parllawspeech-2025
+    title: ParlLawSpeech
+    authors: Jan Schwalbach, Lukas Hetzer, Sven-Oliver Proksch, Christian Rauh, Miklós Sebők
+    year: 2025
+    venue: GESIS, Cologne (data file version 1.0.0)
+    kind: dataset
+    challenges: [c02-bill-to-law, c03-influence-graph, open-track]
+    url: https://parllawspeech.org/
+    finding: >-
+      3.09 million speeches, 43,582 bills and 28,124 laws across eight legislatures, Spain
+      and the European Parliament included, linked by a common procedure ID.
+    relevance: Ready-made bill-to-law text pairs for Spain (1996-2023) and EU final texts.
+    confidence: read
+  # Open track
+  - id: schwarz-2017-speeches-vs-votes
+    title: 'Estimating intra-party preferences: comparing speeches to votes'
+    authors: Daniel Schwarz, Denise Traber, Kenneth Benoit
+    year: 2017
+    venue: Political Science Research and Methods 5(2)
+    kind: paper
+    challenges: [open-track]
+    url: https://eprints.lse.ac.uk/62295/
+    finding: Speeches reveal much wider intra-party disagreement than disciplined votes do.
+    relevance: Academic basis for a "what a group says versus how it votes" detector.
+    confidence: read
+  - id: li-2025-political-actor-agent
+    title: 'Political Actor Agent: simulating legislative system for roll call votes prediction with large language models'
+    authors: Hao Li, Ruoyuan Gong, Hao Jiang
+    year: 2025
+    venue: AAAI
+    kind: paper
+    challenges: [open-track, c02-bill-to-law]
+    url: https://arxiv.org/abs/2412.07144
+    finding: LLM agents role-playing US House members predict roll-call votes and explain their reasoning; reported gains over embedding baselines.
+    relevance: The "virtual parliament, one agent per group" idea from the brief, already demonstrated.
+    confidence: read
+  - id: jlevy-2026-madrid-open-research
+    title: 'Research: The Madrid Open (Vol.1) and the Reversa real-time parliamentary record challenge'
+    authors: Joshua Levy
+    year: 2026
+    venue: github.com/jlevy/thinking
+    kind: paper
+    challenges: [open-track]
+    url: https://github.com/jlevy/thinking/blob/main/docs/project/research/research-2026-09-02-madrid-open-reversa-challenge.md
+    finding: >-
+      Profiles of Reversa (founded 2025; Legislative Twins product tracking EU
+      procedures, rapporteurs, votes and amendments) and its founders, including Tomás
+      Burgaleta (CRO); notes the event is partly a hiring funnel.
+    relevance: Written for the original audio track; useful for understanding the judges and the pitch.
+    confidence: read
