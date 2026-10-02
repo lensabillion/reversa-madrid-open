@@ -1,0 +1,1387 @@
+softschema:
+  contract: reversa.research:DatasetCatalog/v1
+  schema: datasets.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+datasets:
+  # Official EU and civic-tech sources: votes, adopted texts, consultations, meetings
+  - id: aia-four-column-mandates
+    name: AI Act four-column document (Commission proposal | EP mandate | Council mandate |
+      draft agreement), 20 June 2023, and later trilogue texts
+    url: https://artificialintelligenceact.eu/wp-content/uploads/2023/08/AI-Mandates-20-June-2023.pdf
+    provider: artificialintelligenceact.eu (Future of Life Institute), hosting a leaked or shared
+      EU working document
+    year: 2023
+    kind: corpus
+    access: download
+    licence: unknown
+    scope: AI Act 2021/0106(COD) only. The same documents page also links AIA-Trilogue-Coreper.pdf
+      and AIA-Trilogue-Committee.pdf (Feb 2024), the CZ general approach (Nov 2022) and the
+      FR consolidated version (Jun 2022).
+    contents: '681-page PDF table with numbered rows: Commission Proposal | EP Mandate | Council
+      Mandate | Draft Agreement. The draft-agreement column is sparse at this date.'
+    labels: row-aligned positions of the three institutions. This is the ground truth for which
+      institution's wording won when compared with the final act.
+    steps: [won, match]
+    fit: high
+    fit_reason: Row alignment removes the hardest matching step for the 'won' test on the AI
+      Act.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded the 4.99 MB PDF (681 pages) and extracted page text from compressed
+      streams, which shows the column headers and row numbers. Other file links were seen on
+      https://artificialintelligenceact.eu/documents/ but not downloaded.
+    caveats: Not an official publication. The licence is unclear. No equivalent was found for
+      GDPR, DSA, DMA or the Data Act. Text extraction needs a proper PDF table parser.
+  - id: cellar-ep-first-reading-texts
+    name: CELLAR / EUR-Lex texts of the Parliament's first-reading positions and adopted amendments
+      (CELEX 5yyyyAPnnnn)
+    url: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52023AP0236
+    provider: Publications Office of the EU (CELLAR)
+    year: 2026
+    kind: corpus
+    access: api
+    licence: EUR-Lex reuse (Commission Decision 2011/833/EU), not re-checked
+    scope: GDPR 52014AP0212 (P7_TA(2014)0212, consolidated EP position of 12 Mar 2014, OJ C
+      378 9.11.2017). AI Act 52023AP0236 (amendments of 14 Jun 2023, OJ C/2024/506) and 52024AP0138
+      (legislative resolution of 13 Mar 2024). DSA 52022AP0014 (20 Jan 2022). DMA 52021AP0499
+      (15 Dec 2021). Data Act 52023AP0069 (14 Mar 2023).
+    contents: 'Full text as XHTML. AI Act: 771 numbered amendments in ''Text proposed by the
+      Commission | Amendment'' format, for example ''Amendment 1 Proposal for a regulation Citation
+      4 a (new)''. DSA has about 660 ''Amendment N'' markers and DMA about 304. The GDPR text
+      is the consolidated ''Position of the European Parliament adopted at first reading'' (331
+      K chars), not in amendment format. 52024AP0138 returns only a 3.4 K-char stub in XHTML.'
+    labels: final text (Parliament's adopted position), used to measure whether amendments 'won'
+      between EP and final act
+    steps: [won, passed, match]
+    fit: high
+    fit_reason: Official text of what Parliament adopted, keyed by amendment number for the
+      AI Act, DSA and DMA. It aligns with committee report and plenary amendment numbers, and
+      can be diffed against the final act.
+    status: verified
+    checked: '2026-10-02'
+    evidence: 'GET with Accept: application/xhtml+xml returned HTTP 200 for all 6 CELEX ids
+      (14 KB to 2.7 MB). Read the titles and counted amendment markers. Samples are in cellar/.'
+    caveats: 'Use the CELLAR URI over plain http (http://publications.europa.eu/resource/celex/<CELEX>),
+      because the https form returned 400 and eur-lex.europa.eu blocks scripts. Formats differ:
+      GDPR is consolidated, the AI Act, DSA and DMA are in amendment format, and the Data Act
+      had only 1 ''Amendment N'' marker, so check its structure. The consolidated AI Act position
+      of 13 Mar 2024 (52024AP0138) is not in XHTML (PDF or corrigendum not checked). Amendment
+      numbers in TA texts follow the plenary renumbering.'
+  - id: cellar-final-acts-and-proposals
+    name: CELLAR final acts (CELEX 3yyyyRnnnn) and Commission proposals (5yyyyPCnnnn)
+    url: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689
+    provider: Publications Office of the EU (CELLAR)
+    year: 2026
+    kind: corpus
+    access: api
+    licence: EUR-Lex reuse (Commission Decision 2011/833/EU), not re-checked
+    scope: 'Final acts: GDPR 32016R0679, DMA 32022R1925, DSA 32022R2065, Data Act 32023R2854,
+      AI Act 32024R1689. Proposals: 52012PC0011, 52020PC0825, 52020PC0842, 52021PC0206, 52022PC0068.'
+    contents: 'Final acts are OJ XHTML (518 KB to 1.26 MB). Proposals are served as PDF items:
+      for 52021PC0206, the 300 Multiple-Choice response lists DOC_1 ''1_EN_ACT_part1_v7.pdf''
+      and DOC_2 (annexes). XML notices are available with Accept: application/xml;notice=branch.'
+    labels: final text
+    steps: [won, match]
+    fit: high
+    fit_reason: The endpoint of the 'won' measure (EP or stakeholder text -> final law) and
+      the baseline (Commission proposal).
+    status: verified
+    checked: '2026-10-02'
+    evidence: 5 final acts returned HTTP 200 as XHTML with OJ titles checked. Proposals returned
+      400 for XHTML, 300 for PDF (listing read) and 200 for the XML notice.
+    caveats: Use the CELLAR URI over plain http (http://publications.europa.eu/resource/celex/<CELEX>),
+      because https returned 400. Proposals have no XHTML and need PDF or DOC extraction. The
+      AI Act proposal text is also attached in Have Your Say.
+  - id: ep-plenary-results-of-votes-xml
+    name: European Parliament plenary minutes annex "Results of votes" (PV-...-VOT) in XML
+    url: https://data.europarl.europa.eu/api/v2/plenary-session-documents/PV-9-2023-06-14-VOT?format=application%2Fld%2Bjson
+    provider: European Parliament (Open Data Portal)
+    year: 2026
+    kind: api
+    access: api
+    licence: unknown
+    scope: Every plenary sitting with votes. XML found for 2009-03-12, the 2014-03-12 GDPR vote,
+      the 2021-12-15 DMA vote, the 2022-01-20 DSA vote, the 2023-03-14 Data Act vote and the
+      2023-06-14 AI Act vote.
+    contents: 'One table per report listing every amendment put to the vote: subject (article
+      or recital), Am No, Author (committee, political group, ''MEPs'', or the committee giving
+      an opinion such as ''LIBE committee''), method (RCV, EV, show of hands, split or separate
+      vote) and outcome (''+'' adopted, ''-'' rejected, ''↓'' lapsed), with tallies for roll-call
+      and electronic votes. The AI Act table lists the block vote on committee amendments 1-771
+      and individual amendments 774, 792, 775, 804, 772, 773, 229D, 777 and others. Files are
+      about 90-260 KB per sitting.'
+    labels: plenary amendment vote outcome (adopted, rejected or lapsed) with author. This includes
+      votes taken without roll call.
+    steps: [passed, won, graph]
+    fit: high
+    fit_reason: The only official source that gives the outcome of every plenary amendment,
+      including show-of-hands votes, with amendment numbers and authors. It closes the gap left
+      by roll-call-only data.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Fetched API metadata for 5 sittings. Downloaded https://data.europarl.europa.eu/distribution/doc/PV-9-2023-06-14-VOT-FNL_en.xml
+      (92,593 bytes) and PV-7-2014-03-12-VOT and PV-9-2022-01-20-VOT XML, and parsed the AI
+      Act, GDPR and DSA tables.
+    caveats: GDPR plenary 2014-03-12 was a 'single vote' (621-10-22) with no individual amendment
+      votes. For GDPR, use the committee-stage inclusion test instead. The XML is presentation
+      markup (TABLE, TR, TD) and needs a parser for merged cells and split votes. The file path
+      is under distribution/doc/ and must be read from the API metadata, because guessed paths
+      return 404. The licence was not checked.
+  - id: howtheyvote-plenary-rollcalls
+    name: HowTheyVote.eu weekly data export (plenary roll-call votes, amendment authors and
+      amendment URLs)
+    url: https://github.com/HowTheyVote/data/releases/latest
+    provider: HowTheyVote.eu (civic tech)
+    year: 2026
+    kind: dataset
+    access: download
+    licence: open licence; terms at https://howtheyvote.eu/about#license (exact licence name
+      not checked)
+    scope: European Parliament plenary roll-call votes from 2019-07-15 to 2026-09-17 (9th and
+      10th terms). Includes AI Act (2021/0106(COD)), DSA (2020/0361(COD)), DMA (2020/0374(COD))
+      and Data Act (2022/0047(COD)). GDPR 2014 is not covered.
+    contents: 'votes.csv: 25,204 votes with procedure_reference, description (for example ''Article
+      5, § 1, après le point d - Am 772''), count_for/against/abstention/did_not_vote and texts_adopted_reference.
+      The result field is filled for 7,613 votes from 2024 on (3,562 ADOPTED, 4,051 REJECTED).
+      amendment_number is filled for 6,624 votes from 2024 on. member_votes.csv.gz (68.5 MB)
+      holds MEP x vote positions. amendment_authors_votes.csv: 6,999 rows (GROUP 4,489, ORIGINAL_TEXT
+      1,710, COMMITTEE 453, MEMBERS 342) from 2024 on. amendment_urls.csv: 4,613 rows linking
+      vote_id and amendment_number to EP amendment PDFs. Coverage: AI Act 30 votes (28 on 2023-06-14
+      including amendments 774, 792, 804 and 772), DSA 126, DMA 39, Data Act 10.'
+    labels: plenary amendment vote outcome. From 2024 there is an explicit result field. Before
+      2024 the outcome comes from comparing count_for and count_against, and the amendment number
+      comes from parsing description.
+    steps: [passed, graph, predict, demo]
+    fit: high
+    fit_reason: Ready-made CSV of plenary amendment votes with amendment numbers, tallies and
+      per-MEP positions for the AI Act, DSA, DMA and Data Act. It links to Parltrack ep_plenary_amendments
+      by report reference and amendment number.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded votes, amendment_authors_votes, amendment_urls and responsible_committee_votes
+      (.csv.gz) from release 2026-09-26. Counted rows and listed all 30 AI Act votes with tallies.
+      A linked amendment PDF (A-9-2023-0048-AM-189-189_en.pdf) downloaded with HTTP 200 after
+      a redirect.
+    caveats: 'Roll-call votes only: amendments decided by show of hands or by electronic vote
+      without roll call are missing. Use the EP Results-of-votes XML for those. Descriptions
+      are in French. Before 2024 there is no result or author field. ''Vote en bloc'' rows cover
+      hundreds of committee amendments at once. A block with a majority of ''for'' votes is
+      not proof that a split or qualified-majority vote passed.'
+  - id: hys-feedback-api
+    name: Have Your Say (Better Regulation portal) feedback API (groupInitiatives, allFeedback,
+      download)
+    url: https://ec.europa.eu/info/law/better-regulation/brpapi/groupInitiatives/12527
+    provider: European Commission
+    year: 2026
+    kind: api
+    access: api
+    licence: unknown (Commission reuse policy not checked here)
+    scope: 'Feedback on the adopted proposal: AI Act initiative 12527, publication 14488, 304
+      items (2021-04-26 to 2021-08-06). DSA 12417/13971, 138 items. DMA 12418/13970, 90 items.
+      Data Act 13045/15717, 163 items. Roadmap or inception impact assessment feedback: AI 133,
+      DSA 110, DMA 85, Data Act 91. GDPR (2012) is not on the portal under these searches.'
+    contents: 'allFeedback returns id, organization, userType, country, companySize, language,
+      dateFeedback, feedback text, publicationId and attachments (documentId, file name, size).
+      Attachments download from /api/download/<documentId>. Publication records also list Commission
+      documents: proposal, annexes, impact assessment parts 1-2, executive summary and the Regulatory
+      Scrutiny Board opinion.'
+    labels: none
+    steps: [match, heard, graph]
+    fit: high
+    fit_reason: Gives organization-level text and position papers to match against amendments
+      and final text, for all four post-2020 laws.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Fetched groupInitiatives 12527, 12417, 12418 and 13045, and allFeedback for 14488
+      (totalElements 304), 13971 (138), 13970 (90) and 15717 (163). Downloaded attachment 090166e5e1cd1796
+      (Equinet, PDF, 7 pages).
+    caveats: Feedback is 'heard' evidence, not proof of uptake. A Transparency Register number
+      is not in allFeedback (it is in the OPC CSV). The attachment size in the listing did not
+      match the downloaded size (80,083 vs 654,526 bytes).
+  - id: integritywatch-mep-meetings
+    name: Integrity Watch EU, MEP meetings with interest representatives (JSON behind integritywatch.eu/mepmeetings)
+    url: https://www.integritywatch.eu/data/mepmeetings/legislature_9/mepmeetings.json
+    provider: Transparency International EU (Integrity Watch EU)
+    year: 2025
+    kind: dataset
+    access: download
+    licence: unknown
+    scope: 'Meetings declared by MEPs on EP pages. legislature_9 file: 64,151 meetings from
+      2019-06-07 to 2024-06-04. legislature_10 file: 61,262 meetings dated 2019-07-02 to 2025-04-29.'
+    contents: 'Fields: mep, epid (EP MEP id), group, country, role (Member, Rapporteur 8,448,
+      Shadow rapporteur 9,575, Committee chair), date, title (meeting subject), lobbyists and
+      lobbyistsArray, location, committees, dossier. A separate mepmeetings_lobbysts_tr_match.json
+      maps 40,844 lobbyist name strings to Transparency Register ids (many empty).'
+    labels: none
+    steps: [graph, heard, match]
+    fit: high
+    fit_reason: Direct organization-MEP edges with rapporteur or shadow roles. 523 legislature_9
+      meeting titles mention artificial intelligence, so a meeting can be joined to amendment
+      authors through epid.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Found the paths in static/mepmeetings.js. Downloaded both JSON files (32.5 MB
+      and 31.3 MB) and the TR-match file (1.8 MB), then counted records, roles and the date
+      range.
+    caveats: The dossier field is empty in all records, so linking to a procedure needs text
+      matching on title or committee. Org names are free text. The data looks last updated around
+      April 2025. Undocumented endpoint with no stated licence. EP-side declarations are only
+      mandatory for rapporteurs, shadows and chairs.
+  - id: commission-ia-synopsis-reports
+    name: Commission impact assessments, including the stakeholder consultation synopsis annex
+    url: https://ec.europa.eu/info/law/better-regulation/api/download/090166e5dc33a54a
+    provider: European Commission
+    year: 2021
+    kind: corpus
+    access: download
+    licence: unknown
+    scope: AI Act IA SWD(2021) parts 1-2 (3.29 MB and 1.43 MB). DSA IA parts 1-2. DMA and Data
+      Act equivalents are on their publication records.
+    contents: Impact assessment PDFs. The synopsis of stakeholder consultation is normally Annex
+      2. The RSB opinion and executive summary are separate files.
+    labels: Commission's own summary of who argued what (proposal-stage uptake narrative)
+    steps: [heard, match]
+    fit: medium
+    fit_reason: Official mapping of consultation inputs to policy options. Useful to label 'heard'
+      and the stance of stakeholder categories.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Attachment ids and titles seen in groupInitiatives 12527 and 12417 JSON. The PDFs
+      were not opened, so the presence of the synopsis annex was not confirmed.
+    caveats: Not organization-level and not linked to final-law text.
+  - id: ep-committee-rollcall-results-pdf
+    name: EP committee "Results of roll-call votes" PDFs (committee Votes pages, 9th-term archive
+      and current)
+    url: https://www.europarl.europa.eu/committees/en/archives/9/imco/votes
+    provider: European Parliament committee secretariats
+    year: 2026
+    kind: dataset
+    access: scrape
+    licence: unknown
+    scope: 'IMCO votes pages: 9th-term archive from 2019-01 to 2024, and the current page from
+      2024-09 to 2026-09. Other committees have the same page pattern (for example the EMPL
+      file seen on the IMCO page). Sessions from 2021 split into ''Final vote'' and ''Amendments
+      vote'' PDFs.'
+    contents: Per-vote roll calls with MEP names grouped by political group and +/-/0 totals.
+      The DSA IMCO amendments file for 13-14 Dec 2021 (22 pages) has at least 30 roll calls
+      on compromise amendments CA 1-16 and CA A-H, on opinion-committee amendments LIBE 94,
+      LIBE 101, LIBE 147, JURI 281 and ITRE 222, and on individual amendments 1464, 1806 and
+      1810. The AI Act IMCO-LIBE file for 11 May 2023 (3 pages) has only the final vote (+83).
+      The current-term page also publishes 'Voting lists' (for example 'Final VL_...pdf').
+    labels: committee vote outcome per compromise or amendment (roll-call items only) with per-MEP
+      votes
+    steps: [passed, graph]
+    fit: medium
+    fit_reason: The only official committee-stage amendment vote results found. They show which
+      compromise amendments passed and who voted for them for the DSA, but not for the AI Act,
+      whose committee vote was published as a final vote only.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Listed the index with WebFetch. curl gets HTTP 202 (bot challenge) and WebFetch
+      on a PDF gets 403. Inside the in-app browser on europarl.europa.eu, fetched /telastatic/cmsdata/243660/IMCO
+      Voting Session 13-14 December 2021 (amendments)_rollcall.htm.pdf and /telastatic/cmsdata/269933/RCV
+      IMCO-LIBE 11.05.23.pdf, then extracted the text with pdf.js.
+    caveats: These are PDFs, and scripted fetches are blocked, so a real browser session is
+      needed. Most amendments fall without a roll call when a compromise amendment is adopted,
+      so voting lists or the committee report text are needed to label every amendment. Nothing
+      was found for GDPR LIBE 2013 (the 7th-term archive was not checked).
+  - id: ep-committee-voting-lists
+    name: EP committee voting lists (Final VL) on committee Votes pages
+    url: https://www.europarl.europa.eu/committees/en/imco/meetings/votes
+    provider: European Parliament committee secretariats
+    year: 2026
+    kind: dataset
+    access: scrape
+    licence: unknown
+    scope: Current term (from 2024-09). There is a 'Voting list' section in the 9th-term archive,
+      but no DSA or AI Act voting list was identified there.
+    contents: 'Voting lists show which compromise amendment replaces which numbered amendments,
+      and which amendments fall. Example: ''Final VL_Chemical Omnibus VI_Provisional agreement.pdf''.'
+    labels: mapping from amendment to compromise amendment (which tabled amendments fall when
+      a CA passes)
+    steps: [passed, match]
+    fit: medium
+    fit_reason: Needed to turn compromise-amendment outcomes into outcomes for individual tabled
+      amendments. Mostly available only for recent files.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Link titles and URLs seen through WebFetch of the IMCO votes page. No voting-list
+      PDF was opened.
+    caveats: Probably not available for the AI Act, DSA, DMA, Data Act or GDPR committee votes.
+      Not verified.
+  - id: ep-opendata-api-plenary-decisions
+    name: EP Open Data Portal API v2, plenary roll-call decisions (meetings/{id}/decisions and
+      vote-results)
+    url: https://data.europarl.europa.eu/api/v2/meetings/MTG-PL-2023-06-14/decisions?format=application%2Fld%2Bjson
+    provider: European Parliament (Open Data Portal)
+    year: 2026
+    kind: api
+    access: api
+    licence: unknown
+    scope: Plenary sittings. The 2023-06-14 sitting was tested.
+    contents: 'One record per roll-call vote. Fields: activity_label (for example ''... A9-0188/2023
+      ... Article 5, § 1, après le point d - Am 772''), decision_method (VOTE_ELECTRONIC_ROLLCALL),
+      number_of_votes_favor/against/abstention, had_voter_favor/against/abstention (MEP person
+      ids), had_voter_intended_* (vote corrections) and notation_votingId. The test sitting
+      returned 58 decisions, 29 of them on the AI Act. The vote-results endpoint links each
+      item to its report (A-9-2023-0188) and procedure.'
+    labels: plenary roll-call outcome with per-MEP votes (official source for HowTheyVote and
+      Parltrack)
+    steps: [passed, graph]
+    fit: medium
+    fit_reason: Official and machine-readable, but HowTheyVote already packages the same data.
+      Useful for checking HowTheyVote or for MEP vote corrections.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Fetched decisions for MTG-PL-2023-06-14 (728 KB JSON-LD) and vote-results. Listed
+      all 29 AI Act roll-call decisions, whose tallies match HowTheyVote.
+    caveats: Roll-call votes only. Pagination appeared to have no effect (offset 58 returned
+      the same 58 records). The amendment number has to be parsed from the label.
+  - id: ep-opendata-api-procedures
+    name: EP Open Data Portal API v2, procedures, adopted texts and provisional agreements
+    url: https://data.europarl.europa.eu/api/v2/procedures/2021-0106?format=application%2Fld%2Bjson
+    provider: European Parliament (Open Data Portal)
+    year: 2026
+    kind: api
+    access: api
+    licence: unknown
+    scope: All EP procedures. AI Act 2021/0106 was tested. Related endpoints are adopted-texts,
+      plenary-documents, committee-documents and plenary-session-documents.
+    contents: 'Procedure events with typed activities: COMMITTEE_ADOPTING_REPORT (2023-05-11),
+      PLENARY_AMEND (2023-06-14 -> TA-9-2023-0236), PLENARY_REFER_COMMITTEE_INTERINSTITUTIONAL_NEGOTIATIONS,
+      COMMITTEE_APPROVE_PROVISIONAL_AGREEMENT (2024-02-13 -> CJ40-AG-758862), PLENARY_AMEND_PROPOSAL
+      (2024-03-13 -> TA-9-2024-0138), SIGNATURE and PUBLICATION_OFFICIAL_JOURNAL. Committee
+      opinions are linked too. committee-documents uses only 5 work types: draft report, opinion,
+      draft opinion, opinion letter and AGREEMENT_PROVISIONAL. The provisional agreement CJ40-AG-758862
+      (2024-02-02) is downloadable as PDF and DOCX.'
+    labels: procedure stage timeline; links from report to adopted text to provisional agreement
+    steps: [match, won, graph]
+    fit: medium
+    fit_reason: Joins the documents of each stage (report A9, text adopted TA, provisional agreement
+      AG and final act) for every target law without scraping OEIL.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Fetched procedures/2021-0106 (23 KB) and committee-documents/CJ40-AG-758862 metadata,
+      and sampled 3,155 committee-documents and adopted-texts.
+    caveats: Committee amendment documents (AM) and committee vote results are not exposed through
+      committee-documents. List endpoints need specific parameters (plenary-session-documents?year=
+      returned 400). There is no OpenAPI file at /api/v2/openapi.json.
+  - id: ep-provisional-agreement-texts
+    name: EP provisional agreement texts (AGREEMENT_PROVISIONAL committee documents)
+    url: https://data.europarl.europa.eu/api/v2/committee-documents/CJ40-AG-758862?format=application%2Fld%2Bjson
+    provider: European Parliament (Open Data Portal)
+    year: 2026
+    kind: api
+    access: api
+    licence: unknown
+    scope: 'Trilogue outcomes voted in committee. 177 AGREEMENT_PROVISIONAL documents were in
+      the sampled list. AI Act: CJ40-AG-758862 (2024-02-02).'
+    contents: Provisional agreement text in PDF and DOCX (AI Act about 227 KB as listed). Titles
+      look like 'PROVISIONAL AGREEMENT RESULTING FROM INTERINSTITUTIONAL NEGOTIATIONS ... 2021/0106(COD)'.
+    labels: compromise (trilogue) text
+    steps: [won]
+    fit: medium
+    fit_reason: Official compromise text before lawyer-linguist revision. Useful when the four-column
+      trilogue table is not available.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Fetched the metadata record with its EN PDF and DOCX distribution paths. The file
+      itself was not downloaded.
+    caveats: Not a column-by-column comparison. The text is close to the final act, so CELLAR
+      final acts may be enough.
+  - id: hys-opc-bulk-contributions
+    name: Have Your Say public consultation (OPC) bulk exports (contributions CSV and attachments
+      ZIP)
+    url: https://ec.europa.eu/info/law/better-regulation/api/download/local-7639546-contributions
+    provider: European Commission
+    year: 2020
+    kind: dataset
+    access: download
+    licence: unknown
+    scope: OPC on the AI White Paper (publication 25429, 1,216 replies, 2020-02-20 to 2020-06-14).
+      The DSA/DMA OPC (13127 and 25545, 2,863 replies) lists contributions-Digital_Services_Act.zip
+      (9.0 MB) and an attachments ZIP (114.7 MB). The Data Act OPC (14627) has 449 replies.
+      The AI attachments ZIP is 132.7 MB.
+    contents: 'contributions-AIConsult2020.csv (cp1252, '';''-separated): 1,216 rows x 73 columns.
+      Columns: Reference, Feedback date, Language, User type, Organisation name, Transparency
+      register number, Organisation size, Country, and Likert or free-text answers on the six
+      White Paper actions and regulatory options.'
+    labels: none (stated preferences; the Likert answers can serve as stance labels)
+    steps: [heard, match, predict]
+    fit: medium
+    fit_reason: Structured stances with Transparency Register ids. They join to lobby-meeting
+      graphs and LobbyFacts. Fit is medium because they predate the proposal.
+    status: verified
+    checked: '2026-10-02'
+    evidence: 'Downloaded the AI contributions ZIP (772,527 bytes) and parsed the CSV: 1,216
+      rows and 73 columns. The DSA and attachments ZIPs were seen only in groupInitiatives metadata.'
+    caveats: The 100+ MB attachment ZIPs were not downloaded. The CSV needs cp1252 decoding
+      and multi-line field handling. User type is empty in 460 rows of the naive parse.
+  - id: integritywatch-commission-meetings
+    name: Integrity Watch EU, Commission meetings with interest representatives
+    url: https://www.integritywatch.eu/data/ecmeetings/ecmeetings_vonderleyen1.json
+    provider: Transparency International EU (Integrity Watch EU)
+    year: 2025
+    kind: dataset
+    access: download
+    licence: unknown
+    scope: 'Commissioners, cabinets and DGs. Von der Leyen I: 26,174 meetings from 2019-12-02
+      to 2024-11-29. Juncker file 19.6 MB. Von der Leyen II file 6.4 MB.'
+    contents: 'Fields: Org, OrgId (Transparency Register id, present in all 26,174 records),
+      Cat and Cat2 (register category), Host (person and role), cabinet, portfolio, date, location,
+      subject, type. 205 subjects mention artificial intelligence.'
+    labels: none
+    steps: [graph, heard]
+    fit: medium
+    fit_reason: Edges from organizations to the Commission, keyed by TR id, for the proposal
+      stage of the AI Act, DSA, DMA and Data Act. They complement LobbyFacts.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded ecmeetings_vonderleyen1.json (27.3 MB) and parsed it. The Juncker and
+      von der Leyen II files returned HTTP 200 (sizes noted) but were not parsed.
+    caveats: Covers the Commission side only (not MEPs). No dossier field. Overlaps with LobbyFacts.
+  - id: parltrack-ep-votes
+    name: Parltrack ep_votes dump (plenary roll-call votes)
+    url: https://parltrack.org/dumps/ep_votes.json.zst
+    provider: Parltrack
+    year: 2026
+    kind: dataset
+    access: download
+    licence: ODbL v1.0
+    scope: EP plenary roll-call votes 2004-2026. The dump was last updated 2026-03-28.
+    contents: '44,648 roll-call votes with ts, voteid, title (French, including the amendment
+      number, for example ''... A9-0188/2023 ... Am 774''), doc (report reference), epref (procedure),
+      and votes {+,-,0} with totals and per-group MEP ids. 25,264 titles mention amendments.
+      GDPR 2014 has a single vote: ''A7-0402/2013 - Jan Philipp Albrecht - Vote unique''.'
+    labels: plenary roll-call outcome (from the tallies)
+    steps: [passed, graph]
+    fit: medium
+    fit_reason: Covers 2004-2019, which HowTheyVote lacks, in the same ecosystem as Parltrack
+      ep_amendments and ep_plenary_amendments. Still roll-call only.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded ep_votes.json.zst (11.25 MB, 651 MB uncompressed, deleted after a streaming
+      parse). Counted records by year and inspected the AI Act and GDPR votes.
+    caveats: There is no explicit result field and no structured amendment number, so the number
+      must be parsed from the title. Records use a JSON-lines array format.
+  - id: council-votes-legislative-acts
+    name: Council of the EU "Council votes on legislative acts" linked open data
+    url: https://data.europa.eu/euodp/data/dataset/council-votes-on-legislative-acts
+    provider: Council of the European Union
+    year: 2016
+    kind: dataset
+    access: unavailable
+    licence: unknown
+    scope: Member-state votes on adopted legislative acts. RDF and SPARQL, per a 2016 description.
+    contents: Act number, interinstitutional number, adoption date, Council configuration, voting
+      rule and member-state votes (as reported).
+    labels: Council final-adoption vote
+    steps: [graph]
+    fit: low
+    fit_reason: Covers the Council only, at final adoption, not amendments.
+    status: reported
+    checked: '2026-10-02'
+    evidence: A search result titles the dataset '[DISCONTINUED]'. https://data.consilium.europa.eu/sparql
+      returned 404. A public 'Results of public votes' page exists on consilium.europa.eu but
+      was not fetched.
+    caveats: Discontinued as open data. Treat the Council register as manual-scrape only.
+  - id: parltrack-ep-com-votes
+    name: Parltrack ep_com_votes dump (committee roll-call final votes)
+    url: https://parltrack.org/dumps/ep_com_votes.json.zst
+    provider: Parltrack
+    year: 2026
+    kind: dataset
+    access: download
+    licence: ODbL v1.0
+    scope: 89 committee votes from 2016-05 to 2018-12 (LIBE 32, ECON 9, ITRE 6, IMCO 2 and others).
+    contents: 'Final committee votes on reports parsed from the report annex: doc, ep_ref, committee,
+      ts, and +/-/0 with totals and MEP names and ids by group.'
+    labels: committee final-vote outcome (whole report only, not individual amendments)
+    steps: [graph]
+    fit: low
+    fit_reason: Too small and covers whole reports only. It does not answer whether an amendment
+      passed, and none of the target laws are included.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded ep_com_votes.json.zst (28.8 KB) and parsed all 89 records.
+    caveats: No amendment-level data. Effectively stale since 2018.
+  # Hugging Face, GitHub and Kaggle
+  - id: eu-lobbying-influence-maxpieter
+    name: EU_LOBBYING_INFLUENCE (MSc thesis pipeline and per-procedure alignment outputs)
+    url: https://github.com/maxpieter/EU_LOBBYING_INFLUENCE
+    provider: maxpieter (GitHub user; MSc thesis on EU lobbying influence)
+    year: 2026
+    kind: replication-data
+    access: download
+    licence: unknown (no LICENSE file; GitHub default = all rights reserved)
+    scope: 'EP/Commission, 9 COD procedures: 2020/0361 (DSA), 2020/0374 (DMA), 2021/0106 (AI
+      Act), 2022/0051 (CSDDD), 2022/0277 (EMFA), 2022/0396 (PPWR), 2023/0212 (digital euro),
+      2023/0284, 2025/0102; sources dated ~2020-2025'
+    contents: 'analysis_results/<procedure>/ per procedure: amendment_*.csv (e.g. CSDDD: 568
+      rows; cols id, procedure_id, source_type=hys_feedback, organisation, transparency_reg_id,
+      source_date, source_text chunk + context_before/after, meetings_total/commission/ep, amendment_number,
+      target_element, target_type, committee, original_text, amended_text, justification, similarity_score,
+      provision_effect, label, reasoning); amendment_*_dyads.csv (AI Act: 530 org x amendment
+      dyads, committee CJ40, 11 orgs); preproposal_*_dyads.csv (HYS feedback -> Commission proposal
+      article; CSDDD 127 rows); LLM caches and embedding .npy caches. scripts/03_prompt_evaluation/ground_truth_combined.csv:
+      242 labelled preproposal->article pairs (AI Act 166, 2025/0102 76). scripts/04_matcher_evaluation/gold_procedure.csv:
+      200 meetings labelled with the procedure they concern (132 no_match). Also Dagster pipeline
+      code (OEIL, HYS feedback, Commission meetings, amendments, org resolution) and schema.sql.'
+    labels: '4-way ALIGNED / OPPOSING / NOISE / UNDETECTABLE for lobby-source -> amendment and
+      source -> proposal-article pairs. Pipeline labels are LLM-generated (silver; repo uses
+      ANTHROPIC_API_KEY); ground_truth_combined.csv is the evaluation gold set (242 rows: NOISE
+      100, ALIGNED 64, UNDETECTABLE 54, OPPOSING 24) - annotator not documented. gold_procedure.csv:
+      meeting->procedure gold (200). No adoption/vote outcome columns seen.'
+    steps: [match, graph, heard, predict, demo]
+    fit: high
+    fit_reason: 'Closest thing to the challenge found: real MEP amendments (old/new text + justification)
+      paired with named lobby HYS feedback chunks and transparency-register IDs, with alignment
+      labels and meeting counts, across AI Act, DSA, DMA, CSDDD. Directly usable as silver training
+      pairs, hard negatives (NOISE/UNDETECTABLE) and a small gold eval set.'
+    status: verified
+    checked: '2026-10-02'
+    evidence: Read README and full git tree via GitHub API; downloaded ground_truth_combined.csv,
+      gold_procedure.csv, 2021:0106COD amendment dyads, 2022:0051COD amendment and preproposal
+      CSVs and counted rows/labels; last commit 2026-05-31.
+    caveats: No licence - ask the author before redistribution. Labels are mostly LLM output;
+      'ALIGNED' means position alignment, not proven textual copying, so it is weaker than the
+      challenge's 'written from' notion. Gold set is preproposal->article (consultation->Commission
+      proposal), not amendment-level. Committee coverage per procedure is partial (one lead
+      committee each). Raw data/ is gitignored; repo is ~130 MB incl. embedding caches.
+  - id: cjeu-paragraph-to-paragraph
+    name: coastalcph/paragraph_to_paragraph (CJEU paragraph citation pairs)
+    url: https://huggingface.co/datasets/coastalcph/paragraph_to_paragraph
+    provider: CoAStaL NLP group, University of Copenhagen
+    year: 2024
+    kind: dataset
+    access: download
+    licence: unknown (no card/licence)
+    scope: Court of Justice of the EU judgments citing paragraphs of earlier judgments (e.g.
+      1970s-1990s cases seen)
+    contents: 110,609 rows; cols CELEX_FROM, TITLE_FROM, NUMBER_FROM, DATE_FROM, TEXT_FROM,
+      CELEX_TO, TITLE_TO, NUMBER_TO, TEXT_TO, DATE_TO; citing paragraph often quotes or paraphrases
+      the cited paragraph. ~160 MB CSV.
+    labels: Implicit positive pairs (citing paragraph -> cited paragraph); no negatives.
+    steps: [match]
+    fit: medium
+    fit_reason: 'Only EU-legal text-reuse pair set found on HF: verbatim-to-paraphrased quotation
+      of EU legal text, good for fine-tuning/evaluating bi-encoders or cross-encoders with mined
+      hard negatives.'
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API metadata (no README) and datasets-server first-rows + size endpoints.
+    caveats: No documentation or licence; case-law register differs from amendment/lobby prose;
+      negatives must be constructed.
+  - id: do-me-eur-lex
+    name: do-me/EUR-LEX (EUR-LEX Miner, weekly CELLAR export)
+    url: https://huggingface.co/datasets/do-me/EUR-LEX
+    provider: do-me (Dominik Weckmüller); tool https://github.com/do-me/eur-lex
+    year: 2026
+    kind: corpus
+    access: download
+    licence: cc-by-4.0
+    scope: EUR-Lex/CELLAR documents 1973 - Sept 2026, English
+    contents: 330,323 rows (~2.3 GB parquet, one file per day); cols url, celex, eli, title,
+      date, lang, institutions, work_types, procedure_ids, directory_codes, formats, eurovoc_concepts,
+      eurovoc_concepts_ids, text (line breaks kept).
+    labels: none (EuroVoc concepts as metadata)
+    steps: [graph, predict]
+    fit: medium
+    fit_reason: Ready-made, weekly-updated full texts with procedure_ids, so Commission proposals
+      and final acts can be joined per procedure to build proposal->final-law diffs for adoption
+      labels.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API metadata, README, datasets-server first-rows (schema) and size.
+    caveats: English only; procedure_ids empty for many (older) docs; overlaps CELLAR which
+      the team already uses - value is convenience.
+  - id: euinaction-trilogues-classifier
+    name: EUINACTION Trilogues - four-column provision texts and gold pairs
+    url: https://github.com/Norface-EUINACTION/Trilogues
+    provider: NORFACE EUINACTION project
+    year: 2022
+    kind: replication-data
+    access: download
+    licence: unknown (no LICENSE file)
+    scope: EU ordinary legislative procedures with trilogue four-column tables; identifiers
+      seen from 2010/0054(COD) to 2016/0393(COD)
+    contents: data/classifier/all_train_clean_new.csv 7,651 provision texts (COM 3,132 / Council
+      3,037 / EP 1,482); all_test_clean.csv 1,855; all_test_clean_pairs_gold.csv 1,671 aligned
+      text pairs (text_1 vs text_2, column COM-Council 1,050 / COM-EP 621, identifier = procedure_row).
+      Plus training.py and scaling_inference.py.
+    labels: Integration-scaling labels (single texts 0/1, 2 = unlabelled '999'; pairs 0-3) -
+      semantics not documented in the README; not copy/influence labels.
+    steps: [match, won]
+    fit: medium
+    fit_reason: Real aligned Commission text vs EP-position text (amendment-like old->new pairs)
+      and vs Council text from four-column documents; usable as amendment-pair corpus, decoy
+      source, and for 'which institution's wording won' features.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Read README and tree via GitHub API; downloaded the three CSVs (3.3 MB) and tabulated
+      columns/labels.
+    caveats: No final-compromise column in these files; label meaning must be taken from EUINACTION
+      papers; no licence; last push 2025-04.
+  - id: lepard
+    name: LePaRD - Legal Passage Retrieval Dataset
+    url: https://huggingface.co/datasets/rmahari/LePaRD
+    provider: Robert Mahari et al. (arXiv 2311.09356)
+    year: 2024
+    kind: benchmark
+    access: download
+    licence: cc-by-nc-sa-4.0
+    scope: US federal judicial opinions quoting precedent
+    contents: 'Rows = (destination opinion context, quoted source passage): dest_id, source_id,
+      dates, courts, names, cites, passage_id, quote, destination_context; parquet export 3.99M
+      rows (~1.9 GB); top_10000/20000/50000 subsets and passage_dict.json.'
+    labels: Gold passage_id per citing context (retrieval qrels).
+    steps: [match]
+    fit: medium
+    fit_reason: Largest public legal text-reuse/quotation benchmark; good for stress-testing
+      retrieval + reranking of reused legal language at scale.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card/file list; datasets-server size and first-rows.
+    caveats: US case law, English only, NC licence; quote is removed from context, so it is
+      retrieval-from-context rather than pairwise paraphrase scoring.
+  - id: ai-act-structured-text
+    name: laredoyin/eu-ai-act (AI Act text as CSV tables)
+    url: https://huggingface.co/datasets/laredoyin/eu-ai-act
+    provider: laredoyin
+    year: 2024
+    kind: dataset
+    access: download
+    licence: apache-2.0 (as declared)
+    scope: Final AI Act (Regulation (EU) 2024/1689)
+    contents: ai_act_articles.csv, ai_act_annex.csv, ai_act_chapters.csv, ai_act_sections.csv,
+      ai_act_references.csv, ai_act_regulations.csv, ai_act_guide.csv.
+    labels: none
+    steps: [won, predict]
+    fit: low
+    fit_reason: Pre-split final AI Act articles for checking whether a lobby request survived
+      into the final law.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API file list (no card text).
+    caveats: No card; provenance/version unverified - prefer CELLAR text as ground truth.
+  - id: an-amendements-17e-legislature
+    name: Amendements discussion commune (Assemblée nationale, 17th legislature)
+    url: https://huggingface.co/datasets/dmntrd/amendements_discussion_commune_17
+    provider: dmntrd
+    year: 2026
+    kind: dataset
+    access: download
+    licence: apache-2.0 (as declared; source is Assemblée nationale open data)
+    scope: French National Assembly amendments, 17th legislature
+    contents: 25,821 amendments; uid, numero, texte_ref, article, alinea, groupe_politique,
+      auteur, sort (outcome, e.g. Retiré), dispositif (amendment text), expose (justification),
+      identical-amendment group ids.
+    labels: Outcome 'sort' (adopted/rejected/withdrawn/etc.); identical-amendment groups
+    steps: [passed, match]
+    fit: low
+    fit_reason: Non-EU analogue for training an amendment-adoption classifier; identical-amendment
+      groups are a natural copy signal (often lobby-drafted).
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API metadata, datasets-server first-rows and size.
+    caveats: French national parliament, not EP; no lobby source texts; no card.
+  - id: demokratis-consultations
+    name: Demokratis consultation documents (Swiss Vernehmlassungen)
+    url: https://huggingface.co/datasets/demokratis/consultation-documents
+    provider: Demokratis.ch
+    year: 2026
+    kind: corpus
+    access: download
+    licence: unknown (not stated on card)
+    scope: Swiss federal and cantonal consultations, de/fr/it, weekly updates
+    contents: 'Parquet: preprocessed documents (drafts, explanatory reports, letters, synoptic
+      tables), PDF features, OpenAI embeddings; 100k-1M rows.'
+    labels: document-type classes
+    steps: [predict]
+    fit: low
+    fit_reason: Consultation drafts that could be linked to enacted Swiss law; mainly a pattern
+      for a consultation pipeline.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF README and file list.
+    caveats: Not EU; stakeholder responses not clearly included.
+  - id: eu-debates
+    name: EU Debates (EP plenary speeches)
+    url: https://huggingface.co/datasets/coastalcph/eu_debates
+    provider: CoAStaL, University of Copenhagen
+    year: 2024
+    kind: corpus
+    access: download
+    licence: cc-by-nc-sa-4.0
+    scope: European Parliament plenary debates 2009-2023, 23 languages + MT English
+    contents: ~87k speeches with speaker name, euro-party, role, debate date and title.
+    labels: none
+    steps: [graph]
+    fit: low
+    fit_reason: MEP stance text per file for MEP nodes; not amendments or lobby texts.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list.
+    caveats: NC licence; loader script + zip format.
+  - id: eur-lex-sum
+    name: EUR-Lex-Sum
+    url: https://huggingface.co/datasets/dennlinger/eur-lex-sum
+    provider: Aumiller, Chouhan, Gertz
+    year: 2022
+    kind: benchmark
+    access: download
+    licence: cc-by-4.0
+    scope: EU legal acts with official human summaries, 24 languages
+    contents: Per-language train/validation/test JSON of (act text, summary).
+    labels: Reference summaries
+    steps: [demo]
+    fit: low
+    fit_reason: Useful for plain-language explanations of laws in the demo; abstractive pairs
+      are weak paraphrase signals.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list.
+    caveats: Summaries are much shorter than sources.
+  - id: eurlex-resources-proposals
+    name: EurlexResources (incl. Commission proposals)
+    url: https://huggingface.co/datasets/joelniklaus/eurlex_resources
+    provider: Joel Niklaus
+    year: 2022
+    kind: corpus
+    access: download
+    licence: cc-by-4.0
+    scope: EUR-Lex in 24 languages; resources caselaw, decision, directive, intagr, proposal,
+      recommendation, regulation
+    contents: ~179 GB of jsonl.xz per language/resource (e.g. data/en/proposal.jsonl.xz).
+    labels: none
+    steps: [predict]
+    fit: low
+    fit_reason: Multilingual proposal + final-act texts for building proposal->law alignment
+      or pretraining; heavy.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API metadata and file listing (172 files).
+    caveats: Snapshot ~2022 (last update 2023-05); no procedure linkage fields confirmed; very
+      large.
+  - id: eurovoc-ep
+    name: EuropeanParliament/EuroVoc
+    url: https://huggingface.co/datasets/EuropeanParliament/EuroVoc
+    provider: European Parliament (HF org)
+    year: 2025
+    kind: corpus
+    access: download
+    licence: eupl-1.2
+    scope: EU publications 1996-2026 with EuroVoc labels
+    contents: 5,937,976 documents with EuroVoc labels (7,062 classes), monthly jsonl.gz files.
+    labels: EuroVoc topic labels
+    steps: [graph]
+    fit: low
+    fit_reason: Topic tags to cluster files/organizations; also the source for do-me/EUR-LEX.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list (377 files).
+    caveats: do-me/EUR-LEX notes aggressive preprocessing and infrequent updates here.
+  - id: isaacus-gdpr-holdings-retrieval
+    name: GDPR Holdings Retrieval (part of MLEB)
+    url: https://huggingface.co/datasets/isaacus/gdpr-holdings-retrieval
+    provider: Isaacus (arXiv 2510.19365)
+    year: 2025
+    kind: benchmark
+    access: download
+    licence: cc-by-nc-sa-4.0
+    scope: EU GDPR decisions from GDPRHub (DPAs and courts)
+    contents: 500 fact-pattern queries, 500 holdings corpus docs, 500 qrels (query-id, corpus-id,
+      score).
+    labels: Gold query->holding relevance.
+    steps: [match]
+    fit: low
+    fit_reason: Small EU-law embedding benchmark (MTEB-style) to sanity-check legal embedding
+      models; not paraphrase/copy detection.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card, datasets-server size and first-rows.
+    caveats: Task is semantic retrieval, not text reuse; other MLEB sets (isaacus/*) are mostly
+      non-EU.
+  - id: legalbench-corporate-lobbying
+    name: LegalBench corporate_lobbying (MTEB retrieval version)
+    url: https://huggingface.co/datasets/mteb/legalbench_corporate_lobbying
+    provider: MTEB / LegalBench (Guha et al.)
+    year: 2024
+    kind: benchmark
+    access: download
+    licence: cc-by-4.0
+    scope: US Congress bills vs company descriptions
+    contents: 'corpus.jsonl, queries.jsonl, qrels/test.jsonl (<1k items): bill titles/summaries
+      relevant to a company.'
+    labels: bill relevance to company
+    steps: [match]
+    fit: low
+    fit_reason: Tiny proxy for 'is this law relevant to this organization'; US-only.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card and file list.
+    caveats: Relevance, not text reuse.
+  - id: mep-lobby-travels
+    name: MEPs travels (lobby-paid trips)
+    url: https://www.kaggle.com/datasets/naelopode/meps-travels
+    provider: naelopode (Kaggle); site meptravel.nael.foo
+    year: 2026
+    kind: dataset
+    access: download
+    licence: CC BY 4.0
+    scope: EP Members' declarations of third-party-paid travel, to 2026-04
+    contents: mep_trips.json (2.3 MB), mep_trip_04_2026.json (2.5 MB); LLM-extracted from declaration
+      PDFs.
+    labels: none
+    steps: [graph, heard]
+    fit: low
+    fit_reason: Extra org->MEP edges (who paid for whose trip) for the influence graph.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Kaggle public API file list and description.
+    caveats: LLM-extracted, author says to fact-check against source PDFs; field schema not
+      inspected.
+  - id: multi-eurlex
+    name: MultiEURLEX
+    url: https://huggingface.co/datasets/coastalcph/multi_eurlex
+    provider: Chalkidis et al. (CoAStaL)
+    year: 2021
+    kind: benchmark
+    access: download
+    licence: cc-by-sa-4.0
+    scope: 65k EU laws in 23 languages
+    contents: Law texts with EuroVoc labels; MTEB version mteb/eurlex-multilingual.
+    labels: EuroVoc multi-label
+    steps: [match]
+    fit: low
+    fit_reason: Parallel multilingual EU legal text for cross-lingual matching tests (same law,
+      different language); classification benchmark otherwise.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list.
+    caveats: Not a paraphrase/reuse benchmark.
+  - id: parltrack-kaggle-mirror
+    name: European Parliament activity (Kaggle mirror of Parltrack dumps)
+    url: https://www.kaggle.com/datasets/konradb/european-parliament-activity
+    provider: konradb (Kaggle) mirroring Parltrack
+    year: 2024
+    kind: dataset
+    access: download
+    licence: 'ODbL (Kaggle: Open Database / Database Contents)'
+    scope: EP MEPs, dossiers, amendments, votes from Parltrack, snapshot 2024-04
+    contents: '8 files: ep_amendments.json 1.40 GB, ep_dossiers.json 1.30 GB, ep_votes.json
+      588 MB, ep_mep_activities.json 448 MB, ep_meps.json 143 MB, ep_plenary_amendments.json
+      59 MB, ep_comagendas.json 20 MB, ep_com_votes.json 1 MB.'
+    labels: none (vote outcomes inside ep_votes)
+    steps: [graph, passed]
+    fit: low
+    fit_reason: Same data as known Parltrack dumps; only useful as a frozen, Kaggle-hosted fallback
+      if parltrack.org is slow.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Kaggle public API dataset list + file list + metadata description.
+    caveats: Stale (2024-04); duplicate of known source; Kaggle download needs login.
+  - id: republique-numerique-consultation
+    name: Consultation sur le projet de loi République numérique
+    url: https://huggingface.co/datasets/Data-Gouv-ML/consultation-sur-le-projet-de-loi-republique-numerique
+    provider: Data-Gouv-ML mirror of data.gouv.fr (DGE)
+    year: 2026
+    kind: dataset
+    access: download
+    licence: Licence Ouverte v2 (lov2) per data.gouv.fr
+    scope: French 2015 online consultation on the Digital Republic bill
+    contents: ~100k rows of contributions (proposals, article modifications, arguments, votes)
+      with profile type (citizen / institution / for-profit / non-profit), title, content, linked
+      article, vote counts.
+    labels: none for adoption (vote counts only)
+    steps: [predict]
+    fit: low
+    fit_reason: Consultation proposals with organization type and support; adoption into the
+      final law would have to be labelled by diffing with the enacted text.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF README and datasets-server info (columns, 100,000 rows in one config).
+    caveats: National, not EU; one config has broken header parsing; no 'integrated into law'
+      flag.
+  - id: super-eurlex
+    name: SuperEURLEX
+    url: https://huggingface.co/datasets/ddrg/super_eurlex
+    provider: ddrg
+    year: 2023
+    kind: corpus
+    access: download
+    licence: mit
+    scope: EUR-Lex documents, multiple languages and sectors
+    contents: Text + HTML per document with sector-specific metadata parquet files (546 files).
+    labels: metadata-derived classification labels
+    steps: [graph]
+    fit: low
+    fit_reason: Alternative EUR-Lex corpus with richer metadata; redundant with CELLAR.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list.
+    caveats: Snapshot 2023.
+  - id: uk-consultation-corpus
+    name: UK Government Consultation Corpus
+    url: https://huggingface.co/datasets/fabsssss/uk-consultation-corpus
+    provider: fabsssss
+    year: 2026
+    kind: dataset
+    access: download
+    licence: other
+    scope: 6,260 GOV.UK consultations with published outcome
+    contents: consultations.csv + corpus_summary.json; policy-area coding (98%), flag for published
+      response documents (77%).
+    labels: outcome-published flag
+    steps: [predict]
+    fit: low
+    fit_reason: Consultation-level metadata only; no submission texts or adoption per proposal.
+    status: verified
+    checked: '2026-10-02'
+    evidence: HF API card summary and file list.
+    caveats: Not EU; licence 'other'.
+  # Research-paper replication data and academic datasets
+  - id: war-of-words-2-ep-amendments
+    name: 'War of Words II: EP committee amendment edits with adoption labels (EP7, EP8)'
+    url: https://zenodo.org/record/4525015
+    provider: Kristof, Suresh, Grossglauser, Thiran (EPFL INDY lab); code at https://github.com/indy-lab/war-of-words-2
+    year: 2021
+    kind: dataset
+    access: download
+    licence: CC BY 4.0
+    scope: European Parliament committees, 7th and 8th terms (2009-2019); all ordinary-procedure
+      reports and opinions that had amendments tabled
+    contents: JSON-lines files war-of-words-2-ep7.txt (449 MB) and war-of-words-2-ep8.txt (607
+      MB). Each line is a 'conflict' (one or more competing edits to the same article). Each
+      edit has edit_id, edit_type (insert/delete/replace), accepted (bool), dossier_ref, dossier_type
+      (report/opinion), vote date, legal_act, committee, outsider flag, article_type, source
+      amendment document (COMM-AM(YEAR)PENUMBER), justification text, tokenised text_original
+      and text_amended plus diff indices, and authors (MEP id, name, gender, nationality, political
+      group, rapporteur flag). Paper reports 449,493 edits from 237,177 amendments; Suresh et
+      al. 2023 cite 104,996 EP8 amendments on 347 laws. A 3 MB sample of EP8 held 325 conflicts
+      / 960 edits / 135 accepted.
+    labels: amendment (edit) adopted or rejected in the committee vote; at most one accepted
+      edit per conflict
+    steps: [passed, graph, match, predict]
+    fit: high
+    fit_reason: Only open, labelled dataset found of MEP amendments as old-text/new-text pairs
+      with whether they passed in committee, linked to MEP ids and groups. Directly usable to
+      train or calibrate a 'passed' model and as a large pool of realistic amendment texts (negatives/decoys)
+      for matching.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Opened Zenodo record API (files, licence, schema); range-downloaded first 3 MB
+      of EP8 file and parsed records (fields, labels, diff indices, MEP metadata).
+    caveats: Ends in 2019 (no AI Act, DSA, 2024+ files). Committee stage only, not plenary or
+      final law. Text is lower-cased and tokenised. Files are large (0.45-0.6 GB each). No lobby
+      link. Raw v1 (Zenodo 3757714) has labels but no text.
+  - id: demotrans-mep-meetings
+    name: 'Lobbying in Europe Dataset (DemoTrans): MEP-lobby meetings'
+    url: https://zenodo.org/records/17940935
+    provider: Emilie Wojcieszynski (Utrecht), Vitezslav Titl (VUB/KU Leuven); Horizon project
+      DemoTrans
+    year: 2025
+    kind: dataset
+    access: download
+    licence: CC BY 4.0
+    scope: European Parliament, MEP published meetings since 2019 (9th and 10th terms)
+    contents: 'dataset_mep_meetings.csv (17.3 MB): mep_link, present, name, raw text, Date,
+      Place, Capacity (e.g. Shadow rapporteur), MeetingWith (organisation), Subject (e.g. ''Revision
+      of RED II''); plus ReformTransparency.xlsx, PDF documentation, Read me.'
+    labels: none (records who met whom, in which capacity, on which file)
+    steps: [heard, graph]
+    fit: medium
+    fit_reason: Ready-made, cleaned academic version of MEP meeting disclosures with rapporteur/shadow
+      capacity and dossier subject, for organisation-MEP edges.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Zenodo record API (licence, files) and first 4 KB of dataset_mep_meetings.csv
+      (header and first row).
+    caveats: Overlaps with Integrity Watch / EP meeting pages (covered by another agent); subjects
+      are free text and need mapping to procedure ids; organisation names not linked to Transparency
+      Register ids.
+  - id: intereuro-eu-interest-groups
+    name: INTEREURO project data (EU interest groups on Commission proposals 2008-2010)
+    url: https://www.intereuro.eu/data/
+    provider: INTEREURO consortium (Beyers, Dür, Berkhout, Hanegraaff, Rasch, De Bruycker, Marshall,
+      Bernhagen et al.)
+    year: 2024
+    kind: dataset
+    access: download
+    licence: Free for academic purposes only; users must consult project leaders in advance
+      and cite key references (RULESONTHEUSEOFTHEINTEREURODATA.pdf)
+    scope: European Commission legislative proposals 2008-2010 (stratified sample) and their
+      outcomes in EP/Council
+    contents: 'INTEREURO_SAMPLE_ONLINE_ARCHIVE.xlsx: 164 proposals x 47 vars (COM code, Prelex
+      no., consultation status/year, IG_submission = number of interest-group consultation documents
+      (79 coded, median 73, max 602), adoption flag/date, recitals/articles counts, consultation-results
+      URL). CommissionInterviews_anonymous.xlsx: 115 controversial issues on 72 proposals; per
+      issue the 0-100 issue scale ends, positions of up to 28 interest groups (type codes only),
+      Commission, EP majority, Council majority, member states and EP groups, plus Outcome and
+      ReversionPoint, group knowledge/importance and lobbying-strategy codes. statement_dataset.xlsx:
+      4,259 coded media statements (actor type, position, goal, arguments). Rasch framing/information
+      dataset (data_full_RASCH.xls, 202 rows). Population CSV of EU-level groups. ESF_COMBINED_DATASET_Final.xlsx:
+      sampling frame (459 regulations, 144 directives, 32 green/white papers).'
+    labels: position-vs-outcome on 0-100 issue scales (interest groups, Commission, EP, Council);
+      proposal adopted or not
+    steps: [predict, won, heard]
+    fit: medium
+    fit_reason: Gives labelled 'how close did each side's position end up to the final outcome'
+      for 115 EU issues, the classic preference-attainment design for the predict step; consultation-result
+      URLs allow re-collecting submission texts. No texts and group identities are anonymised
+      to type codes.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded the xlsx/xls files from intereuro.eu/wp-content/uploads/2024/06 and
+      inspected sheets, columns, row counts and sample rows.
+    caveats: Old cases (2008-2010); issue positions come from expert interviews, not from text;
+      academic-use-only terms; some linked files (data_full_RASCH.dta, Rasch appendix) return
+      404.
+  - id: james-pagliari-young-2020-eu-finance-consultations
+    name: EU financial-regulation consultation responses corpus with text-reuse and co-signing
+      ties
+    url: https://doi.org/10.7910/DVN/FBG7I4
+    provider: Scott James, Stefano Pagliari, Kevin Young (Review of International Political
+      Economy 2020)
+    year: 2020
+    kind: replication-data
+    access: download
+    licence: CC0 1.0
+    scope: European Commission financial-services consultations (DG FISMA era; sampled entries
+      dated 2017-2018)
+    contents: 'Corpus.tab (123 MB): full text of consultation responses with respondent ID,
+      name, consultation, file name, word count. Respondents.tab: respondent characteristics
+      (category, headquarters). Consultation.tab: 70 consultations with title, dates, page and
+      response links, number of responses (sum 17,792) and objective. Ties.tab: 3,539 dyads
+      between respondents (2,347 ''Text Reuse'', 1,192 ''Coauthorship'') with sentences_overlap
+      count and consultation.'
+    labels: algorithm-detected text-reuse ties and co-signing between lobby submissions (not
+      human-verified; no outcome)
+    steps: [match, graph, heard]
+    fit: medium
+    fit_reason: Real EU lobby consultation texts plus detected copy relations between organisations;
+      usable as weak positives and hard negatives for a paraphrase/copy matcher and for organisation-coalition
+      edges.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Dataverse API metadata; downloaded Ties.tab and Consultation.tab and the first
+      200 KB of Corpus.tab; counted edge types and consultations.
+    caveats: Ties are lobby-to-lobby, not lobby-to-law. Finance policy only. Labels come from
+      the authors' text-reuse algorithm.
+  - id: who-gets-heeded-epa-comment-obligation
+    name: Who Gets Heeded? EPA comment-to-obligation matches and proposed-to-final outcomes
+    url: https://github.com/brucefjn/who-gets-heeded
+    provider: Jianing Fan, Yue Yao (EAAMO '26; arXiv 2608.10329)
+    year: 2026
+    kind: replication-data
+    access: download
+    licence: CC BY 4.0 (data and docs); MIT (code)
+    scope: US EPA notice-and-comment rulemaking, 36 rulemakings, regulations.gov comments 2010-2022
+    contents: 'data/processed: 70,075 public comments matched to regulatory obligations extracted
+      from proposed and final rules; stage4_matches.csv.gz with 398,509 candidate comment-obligation
+      pairs carrying LLM ''addressed'' and stance labels; obligation_outcomes.csv (12,730 proposed-side
+      obligations with outcome_state such as SURVIVED-unchanged / MODIFIED / removed, matched
+      final obligation id, best cosine); stage4_validation_audit_*.csv (100 pairs double-coded
+      by two humans: addressed + stance, with obligation text and notes); outcome_audit_reconciled.csv
+      (150 obligations, two raters plus adjudicated outcome label); commenter-type labels per
+      comment.'
+    labels: human-audited comment-obligation 'addresses' + stance pairs (100); human-adjudicated
+      proposed-to-final outcome labels (150); LLM labels for 398,509 pairs
+    steps: [match, won, predict]
+    fit: medium
+    fit_reason: Closest open analogue of 'submission -> did the final text change as asked',
+      with human-audited pair labels and outcome labels; good for designing and validating the
+      match and won/predict pipeline (rubrics, prompts and audit protocol are in docs/). Domain
+      is US regulation, not EU law.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Read README and LICENSE-DATA via GitHub API; downloaded and inspected stage4_validation_audit_KEY/bruce.csv,
+      outcome_audit_reconciled.csv, obligation_outcomes.csv (column names, row counts, sample
+      rows).
+    caveats: Comment text is not redistributed (regulations.gov IDs only, re-fetchable). Most
+      labels are LLM (GPT-5) outputs; only small human-audited subsets. US federal rulemaking.
+  - id: bunea-wuest-lipcean-2024-consultation-policy-space
+    name: Mapping the policy space of public consultations (42 Commission consultations)
+    url: https://doi.org/10.1080/13501763.2024.2320836
+    provider: Adriana Bunea, Reto Wüest, Sergiu Lipcean (JEPP 2024)
+    year: 2024
+    kind: replication-data
+    access: request
+    licence: unknown
+    scope: 42 European Commission public consultations 2013-2018 across 21 policy domains
+    contents: 'Reported: closed-question responses per stakeholder (34 to 66,579 respondents
+      per consultation; 9 to 143 issues per consultation), respondent types.'
+    labels: none for outcomes (positions only; no link to final policy)
+    steps: [predict]
+    fit: low
+    fit_reason: Issue-level stakeholder positions could serve as features, but the paper does
+      not link them to final law.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Read the PMC full text; only 'supplemental data' on the publisher site is mentioned,
+      no repository URL.
+    caveats: Bunea's earlier environmental-consultation success data (about 8,000 policy recommendations
+      from 693 stakeholders, reported in IGA 2016) has no public release found either.
+  - id: cpi-copycat-religious-freedom-bills
+    name: 'Copy, Paste, Legislate: religious-freedom copycat bills'
+    url: https://github.com/PublicI/religious-freedom-bills-data
+    provider: Center for Public Integrity (with USA TODAY and The Arizona Republic)
+    year: 2019
+    kind: dataset
+    access: download
+    licence: unknown
+    scope: US state legislatures, 49 states, 2015-2019
+    contents: 'bills.csv: 548 bills (state, session year, bill number, description, status,
+      LegiScan url, type) flagged as copies of Project Blitz model language.'
+    labels: algorithm-flagged copy of a model bill; bill status (e.g. Dead / passed)
+    steps: [match, passed]
+    fit: low
+    fit_reason: Only positives from one model-bill family, no bill text, no non-copy decoys;
+      the wider 10,000-bill dataset was not released.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Read README and downloaded bills.csv (548 lines incl. header).
+    caveats: Status last updated 2019-06-05.
+  - id: debruycker-colli-2023-climate-lobbying-success
+    name: 'Replication material: Affluence, congruence and lobbying success in EU climate policy'
+    url: https://doi.org/10.7910/DVN/EBNE9Q
+    provider: Iskander De Bruycker, Francesca Colli (Journal of Public Policy 2023)
+    year: 2023
+    kind: replication-data
+    access: download
+    licence: CC BY-NC 4.0
+    scope: EU climate policy issues (INTEREURO-style design)
+    contents: '157 group-issue rows: IssueID, media, mobilisation, salience, coalition, IG support,
+      congruence with public opinion, group type, business flag, perceived influence, prefattainment,
+      EU level, budget/staff bins; Stata do-file.'
+    labels: binary preference attainment (did the group get what it wanted on the issue)
+    steps: [predict, won]
+    fit: low
+    fit_reason: Real 'lobby success' labels with predictor variables, but anonymised (no names,
+      no text) and tiny.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded the .tab file and .do script from Dataverse and read header and rows.
+    caveats: Useful only as a feature-design reference for the predict step.
+  - id: deu-iii-decision-making-eu
+    name: 'DEU III: Decision-making in the European Union dataset'
+    url: https://doi.org/10.34810/data53
+    provider: Javier Arregui, Clément Perarnaud (JEPP, online 2021-10-27), building on Thomson,
+      Stokman, Achen, König (DEU I/II)
+    year: 2021
+    kind: dataset
+    access: download
+    licence: unknown (reported as open access)
+    scope: 'EU legislative proposals 1999-2019: 141 proposals, 363 controversial issues'
+    contents: 'Reported: CSV dataset + CSV codebook + DOCX policy scales (~195 KB zip); positions
+      and salience of member states, Commission and EP on each issue, plus the decision outcome.'
+    labels: actor position vs final decision outcome per issue (no interest groups)
+    steps: [predict, won]
+    fit: low
+    fit_reason: Useful for an EP/Commission 'who wins' prior and for issue-level outcome scaling,
+      but no lobby actors and no text.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Web search result describing the CSUC Dataverse record; the CSUC Dataverse page
+      and API are behind anti-bot protection and could not be opened.
+    caveats: Open in a normal browser to confirm files and licence. DEU I/II are older (1996-2008).
+  - id: ep-committee-roll-call-votes-2014-2019
+    name: Roll call votes in the committees of the European Parliament (2014-2019)
+    url: https://doi.org/10.1177/14651165241271064
+    provider: Lukas Obholzer, Moritz Wiesenthal (European Union Politics 2024)
+    year: 2024
+    kind: dataset
+    access: unavailable
+    licence: unknown
+    scope: EP committees, 8th term (2014-2019)
+    contents: 'Reported: 3,669 committee roll-call decisions in 20 standing committees and joint
+      meetings; more than 140,000 individual MEP votes.'
+    labels: committee vote result per decision; individual MEP votes
+    steps: [passed, graph]
+    fit: low
+    fit_reason: Complements War of Words for committee 'passed' labels, but is pre-2019 and
+      the data location could not be confirmed.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Article abstract via search. A web-search summary claimed DataverseNL DOI 10.34894/GYSBK0,
+      but doi.org returns 404 and the DataverseNL API denies guest access; treat that DOI as
+      unconfirmed.
+    caveats: Ask the authors for the data. Newer committee roll calls (2019+) are published
+      by the EP directly (covered elsewhere).
+  - id: kim-2025-lobbying-position-lda
+    name: 'Replication data for ''Measuring Interest Group Positions on Legislation: An AI-Driven
+      Analysis of Lobbying Reports'''
+    url: https://doi.org/10.7910/DVN/D0QWM2
+    provider: Jiseon Kim et al.; code at https://github.com/hikoseon12/lobbying-position
+    year: 2025
+    kind: replication-data
+    access: download
+    licence: CC0 1.0
+    scope: US Congress bills and Lobbying Disclosure Act (LDA) reports
+    contents: LLM inputs/outputs for bill-position classification (llm_input 179 MB, llm_output
+      197 MB), GNN inputs (1.46 GB), and human_validation.tgz with about 400 hand-labelled LDA
+      report paragraphs linked to bill ids (about 100 each for Support, Oppose, Amend, Monitor).
+    labels: human ground-truth stance of a lobbying text toward a specific bill (support/oppose/amend/monitor)
+    steps: [match]
+    fit: low
+    fit_reason: Labelled lobby-text-to-bill stance pairs; useful as a small out-of-domain check
+      for stance prompts, not for copy detection.
+    status: verified
+    checked: '2026-10-02'
+    evidence: 'Dataverse metadata and file list; downloaded and read human_validation.tgz (4
+      CSVs: paragraph, bill_id, titles, final_ground_truth).'
+    caveats: US-only; stance, not text reuse; most files are large.
+  - id: lepard-legal-passage-reuse
+    name: 'LePaRD: Legal Passage Retrieval Dataset (US judicial quotations of precedent)'
+    url: https://huggingface.co/datasets/rmahari/LePaRD
+    provider: Mahari et al. (arXiv 2311.09356, ACL 2024)
+    year: 2024
+    kind: benchmark
+    access: download
+    licence: CC BY-NC-SA 4.0
+    scope: US federal court opinions
+    contents: 'Rows: passage_id, destination_context, quote, court, date; passage_dict.json
+      maps ids to source passages; top_10000 / 20000 / 50000 / all subsets (10M-100M rows).'
+    labels: true source passage for each quotation context (positive pairs; negatives by sampling)
+    steps: [match]
+    fit: low
+    fit_reason: Legal-domain reuse/retrieval pairs for pre-training a retriever, but it is citation
+      retrieval, not lobby-to-amendment paraphrase.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Opened the Hugging Face API and dataset card (fields, files, licence); data files
+      not downloaded.
+    caveats: Non-commercial licence; US case law.
+  - id: pan-pc-11-plagiarism-corpus
+    name: PAN Plagiarism Corpus 2011 (PAN-PC-11)
+    url: https://zenodo.org/record/3250095
+    provider: Webis / PAN (Potthast, Stein et al.)
+    year: 2011
+    kind: benchmark
+    access: download
+    licence: CC BY 4.0
+    scope: English (and translated) books from Project Gutenberg; general domain
+    contents: Suspicious and source documents with annotated plagiarism cases including obfuscated
+      (paraphrased, translated) passages; about 1.7 GB on Zenodo. PAN-PC-09 and PAN-PC-10 are
+      also on Zenodo.
+    labels: human/synthetic-labelled plagiarised passage alignments with obfuscation type; non-plagiarised
+      documents
+    steps: [match]
+    fit: low
+    fit_reason: Standard labelled copy/paraphrase-alignment benchmark to sanity-check a matcher
+      on obfuscated reuse; not legal text.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Zenodo search API (title, licence, total file size); contents not opened.
+    caveats: Many obfuscations are synthetic; domain mismatch with legislative text.
+  - id: pritoni-2023-italy-nrrp-preference-attainment
+    name: Interest groups' preference attainment in Italy's National Recovery and Resilience
+      Plan
+    url: https://doi.org/10.7910/DVN/OX77DM
+    provider: Andrea Pritoni (Italian Political Science Review 2023)
+    year: 2023
+    kind: replication-data
+    access: download
+    licence: CC0 1.0
+    scope: Italy, NRRP drafting under Conte and Draghi governments, 2021
+    contents: 'One xlsx: 473 coded group statements (Conte), 296 (Draghi) with group type and
+      theme positions; 97 plan components comparing Conte vs Draghi objectives with a preference-attainment
+      code.'
+    labels: preference attainment per plan component
+    steps: [predict, won]
+    fit: low
+    fit_reason: Small, Italian, coded positions without the underlying texts.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Downloaded the xlsx from Dataverse and read the three sheets.
+    caveats: Italian-language codes; national, not EU legislative procedure.
+  - id: rasch-spohr-eising-ress-2020-german-statements
+    name: Written statements of interest groups to German federal ministries and Bundestag committees
+    url: https://doi.org/10.1057/s41309-020-00099-5
+    provider: Daniel Rasch, Florian Spohr, Rainer Eising, Simon Ress (Interest Groups & Advocacy
+      2020)
+    year: 2020
+    kind: corpus
+    access: scrape
+    licence: unknown
+    scope: 'Germany: four federal ministries and matching Bundestag committees, 2015-2016'
+    contents: 'Reported: web collection of written statements (Stellungnahmen) on draft bills;
+      describes how to collect actors, positions and coalitions from ministry and parliament
+      websites.'
+    labels: none
+    steps: [match, heard]
+    fit: low
+    fit_reason: Method for building a national 'statement -> draft bill' corpus; no released
+      labelled data found.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Crossref metadata and search-result abstract only.
+    caveats: Not EU-level; German-language; data release not confirmed.
+  - id: suresh-2024-lobby-mep-alignments-release
+    name: Data release for 'Discovering Lobby-Parliamentarian Alignments through NLP' (NAACL
+      2024)
+    url: https://github.com/indy-lab/lobby
+    provider: Suresh, Radojevic, Salvi, Magron, Kristof, Grossglauser (EPFL)
+    year: 2024
+    kind: replication-data
+    access: unavailable
+    licence: unknown
+    scope: EP 8th term (2014-2019); lobby position papers crawled from Transparency Register
+      websites; MEP speeches and amendments
+    contents: Paper promises GPT summaries and URLs (plus Internet Archive links) of about 49,000
+      lobby position papers, MEP speeches, retweet tweet-IDs (8,754 MEP-lobby links) and meetings.
+      The GitHub repo contains only a README (single 'Initial commit', 2024-04-01, repo size
+      0).
+    labels: none released; paper uses proxy labels (retweets, Integrity Watch meetings), not
+      ground-truth lobby-amendment links
+    steps: [match, graph, heard]
+    fit: low
+    fit_reason: Would be valuable if released, but nothing is downloadable; amendments come
+      from War of Words II anyway.
+    status: verified
+    checked: '2026-10-02'
+    evidence: Read the NAACL PDF (footnote 7 points to github.com/indy-lab/lobby); GitHub API
+      shows one commit, only README.md.
+    caveats: Ask the authors (EPFL INDY lab) for the summaries/URL list if needed; no copy/non-copy
+      ground truth exists in this work.
+  - id: war-of-words-1-ep-amendments
+    name: 'War of Words: conflicting EP amendment edits with adoption labels (v1, no text)'
+    url: https://zenodo.org/record/3757714
+    provider: Kristof, Grossglauser, Thiran (EPFL)
+    year: 2020
+    kind: dataset
+    access: download
+    licence: CC BY 4.0
+    scope: European Parliament committees, EP7 and EP8 (2009-2019)
+    contents: 'war-of-words-ep7.txt (38 MB) and war-of-words-ep8.txt (60 MB); per edit: edit_id,
+      accepted, dossier_ref, authors (MEP id, name, rapporteur flag).'
+    labels: edit adopted in committee or not
+    steps: [passed, graph]
+    fit: low
+    fit_reason: Superseded by War of Words II, which adds the amendment text and metadata.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Opened Zenodo record API description and file list; did not download the data.
+    caveats: No text, no timestamps; use v2 instead.
+  - id: webis-cpc-11-paraphrase-corpus
+    name: Webis Crowd Paraphrase Corpus 2011 (Webis-CPC-11)
+    url: https://zenodo.org/record/3251771
+    provider: Webis (Burrows, Potthast, Stein)
+    year: 2013
+    kind: benchmark
+    access: download
+    licence: CC BY 4.0
+    scope: General-domain passages derived from PAN-PC-10 sources
+    contents: 'Crowd-written paraphrases of source passages (19 MB). Reported (search snippet
+      on the related P4P annotation): 7,859 source/paraphrase pairs of which 4,067 judged true
+      paraphrases.'
+    labels: human-judged paraphrase vs non-paraphrase pairs
+    steps: [match]
+    fit: low
+    fit_reason: Small labelled paraphrase/non-paraphrase set useful as a generic calibration
+      check for the 0-1 match score.
+    status: reported
+    checked: '2026-10-02'
+    evidence: Zenodo search API (title, licence, size); counts from a search snippet, not verified.
+    caveats: Verify counts after download; general domain.
