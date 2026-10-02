@@ -1,0 +1,126 @@
+# Frozen semantic-agreement diagnostic
+
+The current lexical scorer prefers the intended match in **2 of 10 synthetic triplets**.
+One frozen Qwen reranker experiment prefers it in **8 of 10**. This is a useful signal
+for further work, **not measured influence accuracy**, a production replacement, or a
+calibrated probability. Production scoring and API behavior are unchanged.
+
+## What was measured
+
+`diagnostics.json` contains ten agent-authored examples, each with an amendment, a
+preferred submission, and a decoy. “Preferred” means the closer requested legal outcome
+in that illustrative example; it does not assert historical borrowing. The examples
+cover paraphrases, contrary requests, quantities, common wording, shared deletions,
+negation scope, legal obligations, literal equality, and unchanged law. No hidden test
+inputs were used. These are designed failure probes, not a representative random sample.
+
+The fixture was frozen before model inference, SHA-256
+`9723ea195124bb81a78df8e5cb69a3d347557bfc4243d7bdbf7230b8368d800a`.
+No model training, prompt search, threshold tuning, score blending, or fixture revision
+followed the results. The model receives only each pair's wording, not its label or
+category. One task instruction compares requested legal outcomes, while preserving
+known originals and explicitly marking unknown originals. The exact prompt is retained
+in `qwen-results.json` and `runtime/run_qwen.py`.
+
+| Case | Lexical preferred / decoy | Qwen preferred / decoy | Preferred ranked first: lexical / Qwen |
+| --- | --- | --- | --- |
+| Paraphrase | 0.000 / 0.067 | 0.983 / 0.253 | No / Yes |
+| Permit versus prohibit | 0.214 / 0.727 | 0.886 / 0.070 | No / Yes |
+| 24 versus 72 hours | 0.313 / 0.769 | 0.766 / 0.838 | No / No |
+| 2% versus 20% | 0.150 / 0.842 | 0.993 / 0.987 | No / Yes |
+| Shared boilerplate | 0.045 / 0.889 | 0.985 / 0.315 | No / Yes |
+| Shared deletion | 0.753 / 0.914 | 0.986 / 0.892 | No / Yes |
+| Negation scope | 0.000 / 0.700 | 0.938 / 0.910 | No / Yes |
+| Mandatory versus permitted | 0.385 / 0.727 | 0.967 / 0.995 | No / No |
+| Literal control | 1.000 / 0.077 | 0.995 / 0.196 | Yes / Yes |
+| Unchanged-law control | 1.000 / 0.000 | 0.993 / 0.929 | Yes / Yes |
+
+Each metric is one strict `preferred_score > decoy_score` comparison. Ties count
+separately; neither run had a tie. These ten comparisons are not precision@20, recall
+on 30 real pairs, AUC, or evidence of generalization. Numeric score scales differ.
+Qwen's score normalizes the next-token “yes” and “no” logits, following its model card;
+that transformation does not calibrate it to influence.
+
+The remaining failures are material. A conflicting deadline and a weaker obligation
+rank above the intended match. Several other decoys score above 0.89, including one
+with no change at all. Even the correctly ordered percentage example has a tiny margin.
+A threshold of 0.5 would not make these scores reliable decisions. The model is a
+[relevance reranker](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B), not a model trained
+to establish who influenced legislation.
+
+## Reproduce
+
+Run these commands from the repository root, with uv and Python 3.14:
+
+```sh
+uv run --directory backend --locked python tests/diagnostics_lexical.py
+make check-evaluation-runtime
+uv run --directory backend/evaluation/runtime --locked python run_qwen.py
+make audit-evaluation-runtime
+```
+
+The lexical command prints deterministic JSON; `lexical-results.json` records this run.
+The semantic command downloads only the pinned model's JSON/text/safetensors files
+under ignored `data/models/`, verifies its weights, then atomically replaces
+`qwen-results.json` after all 20 scores succeed. It rejects a changed fixture, a weight
+checksum mismatch, inputs above 2,048 model tokens, and nonfinite outputs; it never
+silently truncates, invokes remote model code, calls a paid API, or generates labels.
+Network/setup/model exceptions fail the run. The optional heavyweight command is an
+experiment, not an online endpoint or hardened untrusted-input service. Keep the
+published result file if retaining the first timing measurement matters.
+
+The isolated runtime has its own generated `uv.lock`, separate from production:
+
+- Python 3.14.7; `torch==2.14.0`, official arm64 cp314 wheel published 2026-09-02.
+- `transformers==5.17.0`, universal wheel published 2026-09-09.
+- All transitive releases resolved before the fixed cutoff 2026-09-18T00:00:00Z;
+  source builds disabled. No age exception was used.
+- Official model `Qwen/Qwen3-Reranker-0.6B`, revision
+  `e61197ed45024b0ed8a2d74b80b4d909f1255473`, Apache-2.0 model license.
+- Weights: 1,191,588,280 bytes; SHA-256
+  `27cd75a405b9c1b46b59abfd88aaa209e6fed2a1972cde9b70e7659537c5e65b`.
+- Seed 0, CPU float32, four PyTorch threads, evaluation/inference modes; no sampling.
+  Third-party missing annotations have narrow documented type-check suppressions.
+
+The first run on Apple M5 (10 CPU cores, 24 GiB RAM), macOS 26.6.2, measured 17.47 s
+for download, 0.79 s for model loading, and **3.97 s for 20 scored pairs**. The largest
+prompt was 217 model tokens. Startup/import/checksum time is outside those measurements.
+These short inputs do not establish throughput for long documents or a complete 60-pair,
+20-proposal pipeline. Attention has quadratic sequence-length cost; 2,048 is a protective
+experiment limit, not evidence that all such inputs meet the short-case timing.
+
+Validation: runtime Ruff and strict basedpyright pass. The isolated dependency audit
+reported “Found no known vulnerabilities and no adverse project statuses in 54 packages”.
+The default unit tests validate the lexical diagnostic loader/ordering contracts without
+requiring model downloads; actual semantic inference is the explicit outer-tier check.
+`make check` and backend CI audit both dependency locks. The optional runtime quality
+target installs the heavyweight environment and checks its types; it does not download
+model weights or run inference. The model experiment is intentionally outside the
+default test gate.
+The model itself has not been unit-tested for arbitrary legal correctness.
+
+## Public labels and next decision
+
+The available public LobbyPlag snapshot has 1,976 raw candidate rows, 1,957 unique
+candidate IDs, 172 unique verified links, and 172 checked links (zero checked-but-unverified).
+Source: local public `data/lobbyplag/plags.json`, SHA-256
+`fb21f05cc0c372fdc60a2117219262cb7b00d52196ebbb118b29fc786dfb9a3c`.
+Unverified rows have no
+trusted negative label. Consequently this experiment cannot report real-world precision,
+calibration, or influence AUC from that snapshot. No candidate was converted to a
+negative merely because it was unverified.
+
+Before promoting a scorer, obtain independently justified public negatives, freeze a
+held-out evaluation split grouped by organization and overlapping/duplicate amendment
+passages, and evaluate the same examples with both scorers. Measure passage retrieval
+recall separately when submissions are long. A new model must improve held-out top-20
+precision without materially reducing the organizer-defined recall, while reporting
+uncertainty from the small number of independent groups. Resolve the organizer's recall
+threshold definition before choosing a decision threshold. Preserve quoted evidence
+and original offsets; relevance logits alone provide neither.
+
+For this candidate, quantities, obligation strength, and unchanged-law rejection need
+further independent diagnostics and domain evidence before any production adoption.
+An additional prompt chosen after inspecting these ten cases would be development,
+not a new held-out result. Adoption of proposals into final law remains a separate
+prediction target and is not implemented or assessed here.

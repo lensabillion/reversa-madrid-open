@@ -55,13 +55,14 @@ rehearsal. See [the retained measurement](../backend/validation/rehearsal-2026-1
 
 ## Next Work in Competition Order
 
-Accuracy must be measured on unseen examples before changing the displayed score's
-meaning. The next experiment should freeze the current lexical baseline and compare it
-with one pretrained semantic reranker, using identical examples, splits and seeds.
-[BGE reranker](https://huggingface.co/BAAI/bge-reranker-v2-m3) and
-[Qwen3 Reranker 0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B) are candidates;
-their relevance scores are not calibrated probabilities of borrowing. No model is
-selected until measured quality and runtime support it.
+`rev-6i5t` establishes a reproducible starting measurement: the lexical scorer ranks the
+preferred submission first in 2/10 frozen synthetic triplets; a pinned local Qwen3
+reranker does so in 8/10. The remaining deadline and obligation failures, and high
+scores on contradictory submissions, prevent promotion to production. These are
+diagnostics, not held-out influence accuracy. See the [complete experiment and raw
+results](../backend/evaluation/README.md). The production API still uses the lexical
+baseline. The experiment is on `feat/pair-evaluation`; its heavyweight runtime is
+isolated and its dependency lock is audited by the normal gate.
 
 Practice data needs independently justified negatives, including same-article proposals
 that ask for different changes. Unverified links remain unknown. Keep organizations,

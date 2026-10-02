@@ -1,0 +1,85 @@
+{
+  "aggregate": {
+    "decoy_above_preferred": 8,
+    "preferred_above_decoy": 2,
+    "ties": 0,
+    "total": 10
+  },
+  "cases": [
+    {
+      "category": "paraphrase",
+      "decoy_score": 0.06666666666666667,
+      "id": "paraphrase",
+      "ordering": "decoy",
+      "preferred_score": 0.0
+    },
+    {
+      "category": "contradictory_request",
+      "decoy_score": 0.7272727272727273,
+      "id": "antonym",
+      "ordering": "decoy",
+      "preferred_score": 0.21428571428571427
+    },
+    {
+      "category": "quantity",
+      "decoy_score": 0.7692307692307693,
+      "id": "quantity",
+      "ordering": "decoy",
+      "preferred_score": 0.3125
+    },
+    {
+      "category": "quantity",
+      "decoy_score": 0.8421052631578947,
+      "id": "percentage",
+      "ordering": "decoy",
+      "preferred_score": 0.15
+    },
+    {
+      "category": "boilerplate",
+      "decoy_score": 0.8888888888888888,
+      "id": "boilerplate",
+      "ordering": "decoy",
+      "preferred_score": 0.045454545454545456
+    },
+    {
+      "category": "shared_deletion",
+      "decoy_score": 0.9142857142857143,
+      "id": "shared-deletion",
+      "ordering": "decoy",
+      "preferred_score": 0.7529411764705882
+    },
+    {
+      "category": "negation_scope",
+      "decoy_score": 0.7,
+      "id": "negation-scope",
+      "ordering": "decoy",
+      "preferred_score": 0.0
+    },
+    {
+      "category": "legal_modality",
+      "decoy_score": 0.7272727272727273,
+      "id": "legal-modality",
+      "ordering": "decoy",
+      "preferred_score": 0.38461538461538464
+    },
+    {
+      "category": "literal_control",
+      "decoy_score": 0.07692307692307693,
+      "id": "identical",
+      "ordering": "preferred",
+      "preferred_score": 1.0
+    },
+    {
+      "category": "unchanged_control",
+      "decoy_score": 0.0,
+      "id": "unchanged-law",
+      "ordering": "preferred",
+      "preferred_score": 1.0
+    }
+  ],
+  "fixture_sha256": "9723ea195124bb81a78df8e5cb69a3d347557bfc4243d7bdbf7230b8368d800a",
+  "fixture_version": "synthetic-diagnostics-v1",
+  "kind": "synthetic-semantic-agreement-diagnostic",
+  "scope_note": "Synthetic semantic agreement only; not influence accuracy or top-20 precision.",
+  "scorer": "lexical"
+}

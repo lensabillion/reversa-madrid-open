@@ -12,6 +12,9 @@ two competition CSVs, a trained influence probability, or an adoption forecast.
 See the [primer](../docs/explainer/influence-graph-primer.md) for the broader design.
 See [implementation status](../docs/implementation-status.md) for verified capabilities,
 remaining competition work and handoff instructions.
+The [frozen semantic experiment](evaluation/README.md) records the lexical baseline's
+failure cases and a local reranker comparison, including why it is not ready to replace
+production scoring.
 
 ## Run With Public Data
 
