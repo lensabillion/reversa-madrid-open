@@ -16,7 +16,7 @@ from influence.repositories.lobbyplag import (
     DemoRepository,
     EntityNotFoundError,
 )
-from influence.routers import demo, health, scoring
+from influence.routers import comparison, demo, documents, health, scoring
 from influence.services.demo import DemoService
 
 # Installed metadata makes pyproject.toml the single source for the API version.
@@ -54,6 +54,8 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(demo.router)
     app.include_router(scoring.router)
+    app.include_router(documents.router)
+    app.include_router(comparison.router)
 
     @app.exception_handler(DatasetUnavailableError)
     async def unavailable(_request: Request, _error: DatasetUnavailableError) -> JSONResponse:
