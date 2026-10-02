@@ -28,11 +28,19 @@ test("maps Unicode insertion and deletion evidence to its exact source column", 
       submission={submission}
       evidence={evidence}
       mode="edits"
+      sourceMetadata={null}
     />,
   );
-  const original = screen.getByRole("region", { name: "Original law" });
-  const proposed = screen.getByRole("region", { name: "Proposed amendment" });
-  const lobby = screen.getByRole("region", { name: "Lobby submission" });
+  const original = screen.getByRole("region", { name: "Before the amendment" });
+  const proposed = screen.getByRole("region", { name: "Lawmaker's proposal" });
+  const lobby = screen.getByRole("region", { name: "Lobby's proposal" });
+  expect(
+    within(original).getByText("The draft wording the lawmaker wants to change."),
+  ).toBeDefined();
+  expect(within(proposed).getByText("The wording the lawmaker proposes instead.")).toBeDefined();
+  expect(
+    within(lobby).getByText("The wording supplied in the lobby submission or comment."),
+  ).toBeDefined();
   expect(original.querySelector("mark")?.textContent).toBe("may");
   expect(original.querySelector("mark")?.className).toContain("line-through");
   expect(proposed.querySelector("mark")?.textContent).toBe("shall");
@@ -55,9 +63,10 @@ test("keeps a complete supplied excerpt and no-source column without manufacturi
       submission={null}
       evidence={[]}
       mode="edits"
+      sourceMetadata={null}
     />,
   );
-  expect(screen.getByRole("region", { name: "Proposed amendment" }).textContent).toContain(
+  expect(screen.getByRole("region", { name: "Lawmaker's proposal" }).textContent).toContain(
     fullText,
   );
   expect(screen.getByText("No lobby submission available")).toBeDefined();
@@ -74,9 +83,10 @@ test.each([
       submission={submission}
       evidence={[]}
       mode="edits"
+      sourceMetadata={null}
     />,
   );
   expect(
-    within(screen.getByRole("region", { name: "Original law" })).getByText(message),
+    within(screen.getByRole("region", { name: "Before the amendment" })).getByText(message),
   ).toBeDefined();
 });

@@ -5,11 +5,17 @@ compare a lobby proposal with an amendment, and inspect verified source and auth
 Historical verification and lexical similarity remain separate; neither proves causation
 or adoption.
 
-Evidence appears in three columns: **Original law**, **Proposed amendment**, and
-**Lobby submission**. The original is the amendment's supplied starting wording, not the
-final adopted law. Desktop shows the three passages together; narrow screens stack them
-in that order. Source organization, document and page remain visible. The score is
-secondary to the wording.
+Evidence appears in three columns, with a short explanation under each heading:
+
+| Column | Meaning |
+| --- | --- |
+| **Before the amendment** | The draft wording the lawmaker wants to change; this is not a final adopted law. |
+| **Lawmaker's proposal** | The wording the lawmaker proposes instead. |
+| **Lobby's proposal** | The wording the organization requested; its name, document and page identify the source. |
+
+Desktop shows the three passages together; narrow screens stack them in that order.
+The score is secondary to the wording. Supplied-text comparisons use the same labels;
+they do not invent an organization or document reference for pasted text.
 
 In edit comparisons, teal marks shared added wording and amber strike-through marks
 shared removed wording. The lobby column also offers **Original lobby wording**, which
@@ -83,7 +89,7 @@ remained 390 pixels with the network open. No browser warnings/errors were obser
 exhaustive device and screen-reader testing remains unverified. For the three-column
 follow-up, production-browser checks measured equal 270-pixel columns at a 1280-pixel
 viewport; at 390 pixels they stacked in order and document width stayed 390 pixels.
-A live deletion-only comparison displayed removed wording in Original law and the
+A live deletion-only comparison displayed removed wording in the starting draft and the
 automatically opened Original lobby wording disclosure. Independent source review found
 no remaining issue in offset routing, missing-data handling or deletion visibility.
 
@@ -92,3 +98,7 @@ Work and review evidence are tracked in **rev-oze0** and **rev-8mwe**; extractio
 [implementation status](../docs/implementation-status.md) for the architecture assessment
 and remaining competition work.
 The three-column comparison follow-up is tracked in **rev-q24c**.
+The role-label clarification is tracked in **rev-foxs**.
+Its full `make check` also passes 106 backend and 38 frontend tests, build and audits.
+Browser inspection confirmed the three explanatory captions and Amazon's filename/page
+inside its own column. Model accuracy is unchanged by this display clarification.

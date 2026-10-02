@@ -112,11 +112,11 @@ test("submits pure deletions when both original texts are present", async () => 
   });
   fireEvent.click(screen.getByRole("button", { name: "Compare" }));
   const result = await screen.findByLabelText("Comparison result");
-  expect(within(result).getByRole("region", { name: "Original law" })).toBeDefined();
-  expect(within(result).getByRole("region", { name: "Proposed amendment" }).textContent).toContain(
+  expect(within(result).getByRole("region", { name: "Before the amendment" })).toBeDefined();
+  expect(within(result).getByRole("region", { name: "Lawmaker's proposal" }).textContent).toContain(
     "No proposed wording (deletion)",
   );
-  const lobby = within(result).getByRole("region", { name: "Lobby submission" });
+  const lobby = within(result).getByRole("region", { name: "Lobby's proposal" });
   expect(lobby.querySelector("details")?.open).toBe(true);
   expect(lobby.querySelector("mark")?.textContent).toBe("remove");
   expect(screen.queryByRole("button", { name: "Original text" })).toBeNull();
@@ -295,7 +295,7 @@ test("shows simultaneous columns and missing originals in passage comparisons", 
   enterPair();
   fireEvent.click(screen.getByRole("button", { name: "Compare" }));
   const result = await screen.findByLabelText("Comparison result");
-  for (const name of ["Original law", "Proposed amendment", "Lobby submission"]) {
+  for (const name of ["Before the amendment", "Lawmaker's proposal", "Lobby's proposal"]) {
     expect(within(result).getByRole("heading", { name })).toBeDefined();
   }
   expect(within(result).getByText("Original wording not supplied")).toBeDefined();

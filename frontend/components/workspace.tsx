@@ -19,7 +19,13 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
         <p className="mb-8 text-sm text-stone-500">
           No source candidates recorded for this amendment.
         </p>
-        <EvidenceColumns amendment={detail.text} submission={null} evidence={[]} mode="edits" />
+        <EvidenceColumns
+          amendment={detail.text}
+          submission={null}
+          evidence={[]}
+          mode="edits"
+          sourceMetadata={null}
+        />
       </div>
     );
   }
@@ -46,9 +52,6 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
               </option>
             ))}
           </select>
-          <p className="mt-2 break-all text-xs leading-5 text-stone-500">
-            {source.document} · p. {source.page}
-          </p>
           {detail.sources.length < detail.total_sources && (
             <p className="mt-1 text-xs text-stone-500">
               Showing {detail.sources.length} of {detail.total_sources}; verified first.
@@ -82,6 +85,11 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
         submission={source.text}
         evidence={source.score?.evidence ?? []}
         mode="edits"
+        sourceMetadata={{
+          organization: source.organization,
+          document: source.document,
+          page: source.page,
+        }}
       />
       {source.score?.negation_conflict && (
         <p role="note" className="border-l-2 border-amber-500 pl-3 text-sm text-amber-900">

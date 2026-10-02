@@ -218,6 +218,7 @@ export function CompareTexts() {
             }}
             evidence={result.evidence}
             mode={result.mode}
+            sourceMetadata={null}
           />
           {result.negation_conflict && (
             <p className="text-sm text-amber-900">Negation differs between these edits.</p>

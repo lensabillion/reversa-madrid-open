@@ -165,9 +165,11 @@ test("loads evidence, changes amendment and source, then opens the network on de
   expect(screen.getByText("1.00")).toBeDefined();
   expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/graph"))).toBe(false);
   const evidence = screen.getByRole("region", { name: "Source evidence" });
-  const original = within(evidence).getByRole("region", { name: "Original law" });
-  const proposed = within(evidence).getByRole("region", { name: "Proposed amendment" });
-  const lobby = within(evidence).getByRole("region", { name: "Lobby submission" });
+  const original = within(evidence).getByRole("region", { name: "Before the amendment" });
+  const proposed = within(evidence).getByRole("region", { name: "Lawmaker's proposal" });
+  const lobby = within(evidence).getByRole("region", { name: "Lobby's proposal" });
+  expect(within(lobby).getByText("The wording requested by Civic Group.")).toBeDefined();
+  expect(within(lobby).getByText("civic.pdf · p. 3")).toBeDefined();
   expect(original.querySelector("mark")?.textContent).toBe("may");
   expect(proposed.querySelector("mark")?.textContent).toBe("shall");
   expect(lobby.querySelector("mark")?.textContent).toBe("shall");
@@ -176,6 +178,9 @@ test("loads evidence, changes amendment and source, then opens the network on de
   fireEvent.change(screen.getByRole("combobox", { name: "Source · 2 candidates" }), {
     target: { value: "c2" },
   });
+  expect(
+    within(screen.getByRole("region", { name: "Lobby's proposal" })).getByText("trade.pdf · p. 8"),
+  ).toBeDefined();
   expect(screen.getByText("Only English text can be scored.")).toBeDefined();
   expect(
     within(screen.getByRole("region", { name: "Source evidence" })).getByText("—"),
