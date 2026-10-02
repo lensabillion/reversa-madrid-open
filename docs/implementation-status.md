@@ -28,7 +28,7 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 
 The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
 historical evidence/network views, pasted text and PDF/TXT/MD page review. Combined
-`make check` passes 106 backend and 33 frontend tests, the production build and audits.
+`make check` passes 106 backend and 38 frontend tests, the production build and audits.
 Browser verification covers actual PDF upload/page selection/comparison, historical
 evidence and a 390-pixel network layout; details are in the
 [frontend README](../frontend/README.md). Backend extraction belongs to `rev-i2v8`
@@ -64,6 +64,22 @@ results](../backend/evaluation/README.md). The production API still uses the lex
 baseline. The experiment is on `feat/pair-evaluation`; its heavyweight runtime is
 isolated and its dependency lock is audited by the normal gate.
 
+Practice data needs independently justified negatives, including same-article proposals
+that ask for different changes. Unverified links remain unknown. Keep organizations,
+duplicate amendments and duplicate source passages from leaking across evaluation
+boundaries. Synthetic paraphrases, opposite requests, changed quantities and boilerplate
+are diagnostic cases, not proof of real-world precision. Compare original and proposed
+wording with the relevant lobby passage and surrounding context; for whole documents,
+measure whether passage selection retains the evidence before evaluating the scorer.
+
+Accept a candidate only with improved top-20 precision and no material recall regression
+on the frozen held-out set, reporting counts and per-group results. Choose any recall
+threshold on development data under the organizer's scoring contract. Verify source
+quotations, report failures and truncation, and time a complete 60-pair run on available
+hardware; under ten minutes is a proposed target, not a measurement. Fine-tuning and
+probability calibration require adequate independent labels. Adoption remains a separate
+target with separate labels and AUC evaluation.
+
 1. `rev-p2rd`: establish practice labels with provenance and lobbyist-grouped folds;
    compare lexical and pretrained semantic candidates using top-20 precision and recall.
    Do not use unverified candidates as known negatives or hand-label hidden test pairs.
@@ -82,7 +98,10 @@ isolated and its dependency lock is audited by the normal gate.
 Run `tbd prime`, `tbd sync --pull`, and read the relevant bead before claiming it.
 Read `AGENTS.md`, the brief, this file and the implementation README. Check Git/PR state
 before editing; keep one concern per PR and leave beads open until merge. The active
-ingestion branch is `feat/document-ingestion`; the separate frontend branch is
-`feat/evidence-workspace`. The original checkout's `feat/law-loader` belongs to other
+ingestion and frontend foundations are merged in PRs #11 and #12. The three-column
+comparison follow-up is `feat/three-column-evidence`, tracked as `rev-q24c`, with behavior
+documented in the frontend README; column-role clarification is `rev-foxs`. Backend
+semantic evaluation is isolated on `feat/pair-evaluation` under `rev-6i5t`; no semantic
+model has yet replaced the production lexical score. The original checkout's `feat/law-loader` belongs to other
 ongoing work. Load data and start services using README commands; never depend on a
 previous chat's running server, temporary log or browser state.

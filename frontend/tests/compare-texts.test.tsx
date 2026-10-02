@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { CompareTexts } from "../components/compare-texts";
@@ -112,9 +112,14 @@ test("submits pure deletions when both original texts are present", async () => 
   });
   fireEvent.click(screen.getByRole("button", { name: "Compare" }));
   const result = await screen.findByLabelText("Comparison result");
-  expect(screen.getByRole("button", { name: "Original text" }).getAttribute("aria-pressed")).toBe(
-    "true",
+  expect(within(result).getByRole("region", { name: "Before the amendment" })).toBeDefined();
+  expect(within(result).getByRole("region", { name: "Lawmaker's proposal" }).textContent).toContain(
+    "No proposed wording (deletion)",
   );
+  const lobby = within(result).getByRole("region", { name: "Lobby's proposal" });
+  expect(lobby.querySelector("details")?.open).toBe(true);
+  expect(lobby.querySelector("mark")?.textContent).toBe("remove");
+  expect(screen.queryByRole("button", { name: "Original text" })).toBeNull();
   expect(result.querySelector("mark")?.textContent).toBe("remove");
   const [, options] = fetchMock.mock.calls[0] ?? [];
   expect(JSON.parse(String(options?.body))).toEqual({
@@ -279,4 +284,21 @@ test("editing clears a score and an old reply cannot replace newer input", async
   });
   await Promise.resolve(completion);
   expect(screen.queryByLabelText("Comparison result")).toBeNull();
+});
+
+test("shows simultaneous columns and missing originals in passage comparisons", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => reply({ ...score, mode: "passages", method: "lexical-passage-v1" })),
+  );
+  render(<CompareTexts />);
+  enterPair();
+  fireEvent.click(screen.getByRole("button", { name: "Compare" }));
+  const result = await screen.findByLabelText("Comparison result");
+  for (const name of ["Before the amendment", "Lawmaker's proposal", "Lobby's proposal"]) {
+    expect(within(result).getByRole("heading", { name })).toBeDefined();
+  }
+  expect(within(result).getByText("Original wording not supplied")).toBeDefined();
+  expect(within(result).getByText("Shared wording")).toBeDefined();
+  expect(within(result).queryByText("Shared added wording")).toBeNull();
 });
