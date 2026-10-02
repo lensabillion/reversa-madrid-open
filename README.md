@@ -21,6 +21,8 @@ turn raw inputs into both CSVs with one command.
 - [AGENTS.md](AGENTS.md): how we work, for humans and AI agents alike: the four project
   rules, the PR format, testing and evaluation, and the commands.
 - [SUPPLY-CHAIN-SECURITY.md](SUPPLY-CHAIN-SECURITY.md): rules for adding dependencies.
+- [Backend guide](backend/README.md): run the evidence API, obtain the public snapshot,
+  understand the layers and scoring limits, and verify the implementation.
 - [The explainer](docs/explainer/influence-graph-primer.md): the challenge explained from
   first principles. A styled version is
   [published separately](https://claude.ai/artifact/HL1KzDHpMWYerESyy3pLje) (private; the

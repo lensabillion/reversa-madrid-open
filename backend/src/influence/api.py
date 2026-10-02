@@ -1,36 +1,82 @@
-"""
-HTTP API that the Next.js frontend calls.
+"""Assemble the HTTP API while keeping dataset loading scoped to each app instance."""
 
-`create_app` builds a new application on each call, so a test can construct its own
-instance; `app` is the instance uvicorn serves (`uvicorn influence.api:app`).
-"""
-
+import logging
+import os
 from importlib.metadata import version
-from typing import Literal
+from pathlib import Path
+from threading import Lock
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-# Installed metadata, so `[project].version` in pyproject.toml is the only source. Raises
-# PackageNotFoundError at import if the package is not installed, rather than guessing.
+from influence.repositories.lobbyplag import (
+    DatasetInvalidError,
+    DatasetUnavailableError,
+    DemoRepository,
+    EntityNotFoundError,
+)
+from influence.routers import demo, health, scoring
+from influence.services.demo import DemoService
+
+# Installed metadata makes pyproject.toml the single source for the API version.
 VERSION = version("influence")
+LOCAL_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
+LOGGER = logging.getLogger(__name__)
 
 
-class Health(BaseModel):
-    """
-    Liveness response. `version` lets a caller confirm which build answered.
-    """
-
-    status: Literal["ok"]
-    version: str
-
-
-def create_app() -> FastAPI:
+def create_app(data_dir: Path | None = None) -> FastAPI:
+    """Build an app whose dataset is loaded once, on its first data request."""
     app = FastAPI(title="Influence Graph API", version=VERSION)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=LOCAL_ORIGINS,
+        allow_methods=("GET", "POST"),
+        allow_headers=("Content-Type",),
+    )
+    source_dir = data_dir or Path(
+        os.environ.get(
+            "INFLUENCE_DATA_DIR",
+            Path(__file__).resolve().parents[3] / "data" / "lobbyplag",
+        )
+    )
+    lock = Lock()
+    service: DemoService | None = None
 
-    @app.get("/health")
-    def health() -> Health:
-        return Health(status="ok", version=VERSION)
+    def demo_service() -> DemoService:
+        nonlocal service
+        with lock:
+            if service is None:
+                service = DemoService(DemoRepository.load(source_dir))
+            return service
+
+    app.state.demo_service_provider = demo_service
+    app.include_router(health.router)
+    app.include_router(demo.router)
+    app.include_router(scoring.router)
+
+    @app.exception_handler(DatasetUnavailableError)
+    async def unavailable(_request: Request, _error: DatasetUnavailableError) -> JSONResponse:
+        LOGGER.error("Demo dataset unavailable", exc_info=_error)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": {"code": "dataset_unavailable", "message": "Dataset unavailable"}},
+        )
+
+    @app.exception_handler(DatasetInvalidError)
+    async def invalid(_request: Request, _error: DatasetInvalidError) -> JSONResponse:
+        LOGGER.error("Demo dataset invalid", exc_info=_error)
+        return JSONResponse(
+            status_code=503,
+            content={"detail": {"code": "dataset_invalid", "message": "Dataset invalid"}},
+        )
+
+    @app.exception_handler(EntityNotFoundError)
+    async def missing(_request: Request, _error: EntityNotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": {"code": "entity_not_found", "message": "Entity not found"}},
+        )
 
     return app
 
