@@ -1,7 +1,15 @@
 import type { TextSpan } from "../lib/api";
 
 /** Merge overlapping evidence spans and retain the original text and Unicode offsets. */
-export function HighlightedText({ text, spans }: { text: string; spans: readonly TextSpan[] }) {
+export function HighlightedText({
+  text,
+  spans,
+  tone = "added",
+}: {
+  text: string;
+  spans: readonly TextSpan[];
+  tone?: "added" | "removed";
+}) {
   const characters = Array.from(text);
   const ranges: { start: number; end: number }[] = [];
   for (const span of [...spans].sort((a, b) => a.start - b.start)) {
@@ -22,7 +30,13 @@ export function HighlightedText({ text, spans }: { text: string; spans: readonly
     return (
       <span key={`${range.start}-${range.end}`}>
         {before}
-        <mark className="rounded-sm bg-teal-100 px-0.5 text-teal-950 decoration-teal-300 underline decoration-2 underline-offset-4">
+        <mark
+          className={
+            tone === "removed"
+              ? "rounded-sm bg-amber-100 px-0.5 text-amber-950 line-through decoration-amber-600"
+              : "rounded-sm bg-teal-100 px-0.5 text-teal-950 decoration-teal-300 underline decoration-2 underline-offset-4"
+          }
+        >
           {characters.slice(range.start, range.end).join("")}
         </mark>
       </span>

@@ -28,7 +28,7 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 
 The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
 historical evidence/network views, pasted text and PDF/TXT/MD page review. Combined
-`make check` passes 106 backend and 33 frontend tests, the production build and audits.
+`make check` passes 106 backend and 38 frontend tests, the production build and audits.
 Browser verification covers actual PDF upload/page selection/comparison, historical
 evidence and a 390-pixel network layout; details are in the
 [frontend README](../frontend/README.md). Backend extraction belongs to `rev-i2v8`
@@ -73,7 +73,8 @@ rehearsal. See [the retained measurement](../backend/validation/rehearsal-2026-1
 Run `tbd prime`, `tbd sync --pull`, and read the relevant bead before claiming it.
 Read `AGENTS.md`, the brief, this file and the implementation README. Check Git/PR state
 before editing; keep one concern per PR and leave beads open until merge. The active
-ingestion branch is `feat/document-ingestion`; the separate frontend branch is
-`feat/evidence-workspace`. The original checkout's `feat/law-loader` belongs to other
+ingestion and frontend foundations are merged in PRs #11 and #12. The three-column
+comparison follow-up is `feat/three-column-evidence`, tracked as `rev-q24c`, with behavior
+documented in the frontend README. The original checkout's `feat/law-loader` belongs to other
 ongoing work. Load data and start services using README commands; never depend on a
 previous chat's running server, temporary log or browser state.

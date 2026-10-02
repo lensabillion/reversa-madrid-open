@@ -2,8 +2,22 @@
 
 The light workspace reads the [backend API](../backend/README.md). Search amendments,
 compare a lobby proposal with an amendment, and inspect verified source and author links.
-Green highlights mark shared changed wording. Historical verification and lexical
-similarity remain separate; neither proves causation or adoption.
+Historical verification and lexical similarity remain separate; neither proves causation
+or adoption.
+
+Evidence appears in three columns: **Original law**, **Proposed amendment**, and
+**Lobby submission**. The original is the amendment's supplied starting wording, not the
+final adopted law. Desktop shows the three passages together; narrow screens stack them
+in that order. Source organization, document and page remain visible. The score is
+secondary to the wording.
+
+In edit comparisons, teal marks shared added wording and amber strike-through marks
+shared removed wording. The lobby column also offers **Original lobby wording**, which
+opens automatically for deletion-only evidence. Whole-passage comparisons label marks
+as shared wording, because an edit cannot be inferred without both originals. Missing
+originals are explicit; a known empty original is distinct from unavailable text.
+Highlights identify matching evidence, not every edit. Full supplied excerpts remain
+available; the view does not infer aligned paragraphs or shorten the source text.
 
 **Explore** uses the historical dataset. **Compare texts** accepts your own amendment
 and lobby submission or consultation comment. Paste text or upload a searchable PDF,
@@ -38,6 +52,7 @@ There is no sample-data fallback: unavailable services show an error with Retry.
 - `components/workspace.tsx`: search, pagination, selection, source comparison and view controls
 - `components/influence-network.tsx`: small interactive SVG graph, without a graph library
 - `components/compare-texts.tsx`: user inputs, comparison request and result evidence
+- `components/evidence-columns.tsx`: shared original/amendment/submission layout and evidence routing
 - `components/document-input.tsx`: extraction, page review and provenance for uploaded text
 - `components/highlighted-text.tsx`: merges overlapping spans using Unicode code-point offsets
 - `lib/use-resource.ts`: loading, errors, retries and cancellation shared by API consumers
@@ -57,17 +72,23 @@ production build. `make check` includes backend validation and dependency audits
 use synthetic API responses; the running demo uses the downloaded public data.
 
 October 2 validation: combined `make check` exited 0 with 106 backend tests (100% branch
-coverage), 33 frontend tests, a successful production build and clean dependency audits.
-Independent review regressions cover deletion-only results opening on original evidence,
+coverage), 38 frontend tests, a successful production build and clean dependency audits.
+Independent review regressions cover deletion-only results exposing original evidence,
 non-JSON upload errors and overlapping graph targets. In the production browser, the
 organizers' PDF uploaded as 16 pages; selecting page 12 and comparing it with a supplied
 excerpt returned highlighted evidence and retained page provenance. This is a transport
 check, not a model-quality evaluation. ITRE 616 displayed Amazon's historical verified
 link separately from its 0.71 lexical score. At a 390-pixel viewport, document width
 remained 390 pixels with the network open. No browser warnings/errors were observed;
-exhaustive device and screen-reader testing remains unverified.
+exhaustive device and screen-reader testing remains unverified. For the three-column
+follow-up, production-browser checks measured equal 270-pixel columns at a 1280-pixel
+viewport; at 390 pixels they stacked in order and document width stayed 390 pixels.
+A live deletion-only comparison displayed removed wording in Original law and the
+automatically opened Original lobby wording disclosure. Independent source review found
+no remaining issue in offset routing, missing-data handling or deletion visibility.
 
 Work and review evidence are tracked in **rev-oze0** and **rev-8mwe**; extraction is
 **rev-i2v8**. The foundation is **rev-ic1h** (merged PR #10). See
 [implementation status](../docs/implementation-status.md) for the architecture assessment
 and remaining competition work.
+The three-column comparison follow-up is tracked in **rev-q24c**.

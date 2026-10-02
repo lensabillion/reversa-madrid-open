@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ComparisonResult } from "../lib/api";
 import { DocumentInput } from "./document-input";
-import { HighlightedText } from "./highlighted-text";
+import { EvidenceColumns } from "./evidence-columns";
 
 type Side = "amendment" | "submission";
 interface InputText {
@@ -43,7 +43,6 @@ export function CompareTexts() {
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [operation, setOperation] = useState<"insert" | "delete">("insert");
   const request = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -106,13 +105,6 @@ export function CompareTexts() {
       const score: ComparisonResult = await response.json();
       if (!controller.signal.aborted) {
         setResult(score);
-        setOperation(
-          score.mode === "edits" &&
-            score.evidence.some((item) => item.operation === "delete") &&
-            !score.evidence.some((item) => item.operation === "insert")
-            ? "delete"
-            : "insert",
-        );
       }
     } catch (failure: unknown) {
       if (!controller.signal.aborted) {
@@ -125,7 +117,6 @@ export function CompareTexts() {
       }
     }
   }
-  const evidence = result?.evidence.filter((item) => item.operation === operation) ?? [];
   return (
     <main id="comparison" className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
       <h1 className="font-serif text-3xl tracking-tight sm:text-4xl">Compare texts</h1>
@@ -206,53 +197,33 @@ export function CompareTexts() {
               <h2 className="text-xs font-medium uppercase tracking-wider text-stone-500">
                 {result.mode === "edits" ? "Edit overlap" : "Text overlap"}
               </h2>
-              <p className="mt-2 font-mono text-4xl tracking-tight">{result.score.toFixed(2)}</p>
+              <p className="mt-2 font-mono text-xl tracking-tight text-stone-700">
+                {result.score.toFixed(2)}
+              </p>
             </div>
             <p className="max-w-md text-xs leading-5 text-stone-500">
               Lexical similarity, not a probability of influence. Paraphrases may be missed.
             </p>
           </div>
-          <fieldset
-            aria-label="Result text version"
-            className="mt-6 flex gap-5 border-b border-stone-200"
-          >
-            <button
-              type="button"
-              aria-pressed={operation === "insert"}
-              onClick={() => setOperation("insert")}
-              className={`border-b-2 pb-3 text-sm ${operation === "insert" ? "border-teal-800 text-teal-900" : "border-transparent text-stone-500"}`}
-            >
-              Proposed text
-            </button>
-            {result.mode === "edits" && (
-              <button
-                type="button"
-                aria-pressed={operation === "delete"}
-                onClick={() => setOperation("delete")}
-                className={`border-b-2 pb-3 text-sm ${operation === "delete" ? "border-teal-800 text-teal-900" : "border-transparent text-stone-500"}`}
-              >
-                Original text
-              </button>
-            )}
-          </fieldset>
-          <div className="grid gap-8 py-6 md:grid-cols-2">
-            {sides.map((side) => (
-              <div key={side} className="min-w-0">
-                <h3 className="mb-3 text-xs font-medium text-stone-500">{labels[side]}</h3>
-                <p className="max-h-80 overflow-auto whitespace-pre-wrap break-words font-serif text-base leading-8">
-                  <HighlightedText
-                    text={inputs[side][operation === "insert" ? "new" : "old"]}
-                    spans={evidence.map((item) => item[side])}
-                  />
-                </p>
-              </div>
-            ))}
-          </div>
+          <EvidenceColumns
+            amendment={{
+              ...inputs.amendment,
+              old: inputs.amendment.old.trim() ? inputs.amendment.old : null,
+              language: "en",
+            }}
+            submission={{
+              ...inputs.submission,
+              old: inputs.submission.old.trim() ? inputs.submission.old : null,
+              language: "en",
+            }}
+            evidence={result.evidence}
+            mode={result.mode}
+          />
           {result.negation_conflict && (
             <p className="text-sm text-amber-900">Negation differs between these edits.</p>
           )}
-          {evidence.length === 0 && (
-            <p className="text-xs text-stone-500">No shared wording in this view.</p>
+          {result.evidence.length === 0 && (
+            <p className="text-xs text-stone-500">No shared wording found.</p>
           )}
         </section>
       )}

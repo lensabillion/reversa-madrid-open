@@ -165,9 +165,13 @@ test("loads evidence, changes amendment and source, then opens the network on de
   expect(screen.getByText("1.00")).toBeDefined();
   expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("/graph"))).toBe(false);
   const evidence = screen.getByRole("region", { name: "Source evidence" });
-  expect(evidence.querySelectorAll("mark")[0]?.textContent).toBe("shall");
-  fireEvent.click(screen.getByRole("button", { name: "Original text" }));
-  expect(evidence.querySelectorAll("mark")[0]?.textContent).toBe("may");
+  const original = within(evidence).getByRole("region", { name: "Original law" });
+  const proposed = within(evidence).getByRole("region", { name: "Proposed amendment" });
+  const lobby = within(evidence).getByRole("region", { name: "Lobby submission" });
+  expect(original.querySelector("mark")?.textContent).toBe("may");
+  expect(proposed.querySelector("mark")?.textContent).toBe("shall");
+  expect(lobby.querySelector("mark")?.textContent).toBe("shall");
+  expect(screen.queryByRole("button", { name: "Original text" })).toBeNull();
 
   fireEvent.change(screen.getByRole("combobox", { name: "Source · 2 candidates" }), {
     target: { value: "c2" },
