@@ -3,9 +3,9 @@ type: is
 id: is-01m3yycrvm5f1setsgemhpa8pm
 title: Audit Challenge 03 repository, prototype evaluation, and research claims
 kind: task
-status: in_progress
+status: closed
 priority: 1
-version: 15
+version: 17
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -25,11 +25,15 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-02T18:35:29.523Z
-updated_at: 2026-10-02T18:45:17.893Z
+updated_at: 2026-10-02T18:51:11.077Z
 started_at: 2026-10-02T18:35:48.645Z
+closed_at: 2026-10-02T18:51:11.077Z
+close_reason: Detailed repo review completed, original headline metrics reproduced with cached embeddings, full make check and GitHub CI verified green, targeted feature/data probes run, independent Astra and Sol checks incorporated. Findings R1-R12 tracked separately and left open; report and reproduction logs saved in outputs/review-2026-10-02. No fixes claimed.
+resolution: null
+duplicate_of: null
 ---
 Review the full current repository and local prototype against the organizer brief; explain the pasted metric analysis, reproduce important claims, and report concrete overlooked defects and gaps. Report findings without implementing fixes.
 
 ## Notes
 
-User steering 2026-10-02: subagents may be used whenever necessary; use Astra for high-engineering tasks and Sol for mechanical tasks; document findings and consult tbd regularly. Applied in this review: Astra independently challenges statistical/engineering findings, Sol verifies evidence references and bead coverage. R1-R12 tracked as child tasks. Full make check passes at 18fffb2 (5 backend tests, 19 frontend tests, 6 catalogs, production build and audits); original headline prototype metrics reproduced with cached embeddings. Awaiting independent checks before final verdict.
+Review completed with Astra independent statistical/engineering challenge and Sol mechanical reference/tbd verification. Detailed local report: outputs/review-2026-10-02/repository-review.txt; logs, probes and machine-readable findings alongside it. All 12 follow-ups remain open; independent corrections applied. Main metrics reproduced; key defects are provisional negative provenance, synthetic label contradictions, reconstructed-paper benchmark, overlapping/pooled OOF evaluation, false prior-work description, legal-polarity and retrieval bugs, unsupported calibration, non-reproducible committed evidence, missing adoption/inference path, and gate/dependency scope gaps. No tracked source changes. User preference: Astra for high-engineering tasks, Sol for mechanical tasks; subagents authorized as needed; document and use tbd regularly.
