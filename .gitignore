@@ -13,3 +13,11 @@ outputs/
 attic/
 # Agent worktrees created by Claude Code; each is a separate checkout of this repository.
 .claude/worktrees/
+# Frontend (Next.js): installed packages, build output, and generated files.
+node_modules/
+.next/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+# Left behind only if a gate-probe test run is killed before it cleans up.
+frontend/tests/gate-probe-tmp-*/

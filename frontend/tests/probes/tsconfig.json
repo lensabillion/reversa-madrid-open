@@ -1,0 +1,7 @@
+{
+  // Type-checks only the deliberate errors in type-errors.ts, with every compiler option
+  // inherited from the real ../../tsconfig.json. Used by tests/gate-probes.test.ts.
+  "extends": "../../tsconfig.json",
+  "include": ["type-errors.ts"],
+  "exclude": []
+}

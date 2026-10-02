@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    // The floor from `tbd guidelines typescript-lint-format-rules`.
+    // tests/gate-probes.test.ts proves the first six are in effect.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // SWC (Next.js) and Oxc (Vitest) compile one file at a time, so every type-only
+    // import must be marked as one and no file may depend on another's types to compile.
+    "verbatimModuleSyntax": true,
+
+    // `next build` and `next typegen` rewrite this file unless these options are present.
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "plugins": [{ "name": "next" }],
+    // ES2022 is the newest language level that every browser Next.js 16 supports by
+    // default implements (Chrome, Edge and Firefox 111, Safari 16.4).
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "incremental": false
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.mts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  // Deliberate type errors that only the gate probes compile.
+  "exclude": ["node_modules", "tests/probes"]
+}

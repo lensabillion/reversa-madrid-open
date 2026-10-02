@@ -5,6 +5,9 @@
 # See SUPPLY-CHAIN-SECURITY.md.
 export UV_EXCLUDE_NEWER := 14 days
 
+# Next.js sends anonymous usage data to Vercel unless this is set. Gates make no such calls.
+export NEXT_TELEMETRY_DISABLED := 1
+
 PYTHON := 3.14
 # Ruff is pinned once, in backend/uv.lock. --project keeps the working directory at the
 # repository root, so paths stay `scripts` and Ruff reads the root ruff.toml for them.
@@ -13,11 +16,16 @@ SOFTSCHEMA_VERSION := 0.8.1
 # Runs a command in backend/. --locked fails instead of rewriting uv.lock when it no
 # longer matches pyproject.toml.
 BACKEND := uv run --directory backend --locked
+# Every npm command runs inside frontend/, so frontend/.npmrc (cool-off, no install
+# scripts) always applies.
+FRONTEND := frontend
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
 	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend
+.PHONY: install-frontend check-frontend lint-frontend typecheck-frontend test-frontend
+.PHONY: build-frontend audit-frontend fix-frontend dev-frontend
 
-check: check-scripts check-docs check-backend audit-backend  ## Run every gate.
+check: check-scripts check-docs check-backend audit-backend check-frontend  ## Run every gate.
 
 check-scripts:  ## Ruff format and lint check of repository scripts.
 	$(RUFF) format --check scripts
@@ -55,3 +63,30 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+
+install-frontend:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
+	cd $(FRONTEND) && npm ci
+
+# Ordered cheapest first. Each gate is also a target of its own, for the CI jobs.
+check-frontend: lint-frontend typecheck-frontend test-frontend build-frontend audit-frontend  ## Run every frontend gate.
+
+lint-frontend: install-frontend  ## Biome format, lint and import-order check (verify only).
+	cd $(FRONTEND) && npm run check:lint
+
+typecheck-frontend: install-frontend  ## Generate Next.js route types, then type-check with tsc.
+	cd $(FRONTEND) && npm run check:types
+
+test-frontend: install-frontend  ## Vitest: component tests and gate probes.
+	cd $(FRONTEND) && npm test
+
+build-frontend: install-frontend  ## Production build with next build (type-checks again).
+	cd $(FRONTEND) && npm run build
+
+audit-frontend:  ## Fail on any known advisory of moderate or higher severity in the lockfile.
+	cd $(FRONTEND) && npm audit --audit-level=moderate
+
+fix-frontend: install-frontend  ## Apply Biome formatting and fixes, including unsafe ones.
+	cd $(FRONTEND) && npm run fix
+
+dev-frontend: install-frontend  ## Start the Next.js development server.
+	cd $(FRONTEND) && npm run dev

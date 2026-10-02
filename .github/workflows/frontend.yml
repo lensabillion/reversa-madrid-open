@@ -1,0 +1,72 @@
+name: Frontend
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only token: these jobs only check files.
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  quality:
+    name: Biome and TypeScript pass
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Actions are pinned to full commit SHAs: a tag can be moved to other code, a SHA cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make lint-frontend typecheck-frontend
+      # `next typegen` rewrites tsconfig.json when a setting Next.js requires is missing;
+      # fail instead of checking a configuration that is not the committed one.
+      - run: git diff --exit-code
+
+  test:
+    name: Vitest passes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make test-frontend
+
+  build:
+    name: Next.js production build succeeds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make build-frontend
+      # `next build` rewrites tsconfig.json when a setting Next.js requires is missing.
+      - run: git diff --exit-code
+
+  audit:
+    name: No known vulnerable dependency
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make audit-frontend
