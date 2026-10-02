@@ -3,9 +3,9 @@ type: is
 id: is-01m3z1ex69d9rs01yhh46s2zcc
 title: Build a polished interactive evidence frontend for the GDPR demo
 kind: feature
-status: in_progress
+status: closed
 priority: 1
-version: 7
+version: 8
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -15,8 +15,12 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-02T19:29:05.224Z
-updated_at: 2026-10-02T20:20:54.505Z
+updated_at: 2026-10-02T20:32:23.569Z
 started_at: 2026-10-02T19:29:47.462Z
+closed_at: 2026-10-02T20:32:23.569Z
+close_reason: "Frontend PR #12 merged 2026-10-02T20:24:49Z: https://github.com/lensabillion/reversa-madrid-open/pull/12. All nine CI checks passed, combined make check passed with 106 backend and 33 frontend tests, browser PDF upload-to-result verified. Three-column follow-up tracked separately as rev-q24c."
+resolution: null
+duplicate_of: null
 ---
 Build the user-requested creative, high-standard frontend on the typed evidence API: searchable amendments, original and changed text with evidence, sources and provenance, interactive influence graph, organizations and explicit loading/error/limited-score states. Accessible and responsive. Keep historical labels distinct from computed similarity. Deliver documented PR with full checks and CI.
 
