@@ -5,15 +5,17 @@ title: Build a polished interactive evidence frontend for the GDPR demo
 kind: feature
 status: in_progress
 priority: 1
-version: 4
+version: 5
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies: []
 parent_id: is-01m3ygrva6wcq297g7j12g99c2
+child_order_hints:
+  - is-01m3z2nr2scf757wh9128w9t6s
 hold: null
 hold_until: null
 created_at: 2026-10-02T19:29:05.224Z
-updated_at: 2026-10-02T19:46:25.499Z
+updated_at: 2026-10-02T19:50:17.944Z
 started_at: 2026-10-02T19:29:47.462Z
 ---
 Build the user-requested creative, high-standard frontend on the typed evidence API: searchable amendments, original and changed text with evidence, sources and provenance, interactive influence graph, organizations and explicit loading/error/limited-score states. Accessible and responsive. Keep historical labels distinct from computed similarity. Deliver documented PR with full checks and CI.
