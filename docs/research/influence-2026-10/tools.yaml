@@ -1,0 +1,344 @@
+softschema:
+  contract: reversa.research:ToolCatalog/v1
+  schema: tools.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+tools:
+  # Data access
+  - id: have-your-say-api
+    name: Have Your Say API
+    component: data-access
+    provider: European Commission
+    licence: Public data
+    access: api
+    cost: Free
+    fit: Fetch consultation feedback (organization, type, country, text) and PDF attachments by publication or document ID.
+    risks: Undocumented portal API; the substance is often in PDF attachments, many not in English.
+    recommendation: proposed
+    status: verified
+  - id: parltrack-dumps
+    name: Parltrack amendment dumps
+    component: data-access
+    provider: Parltrack
+    licence: ODbL 1.0
+    access: web
+    cost: Free
+    fit: Committee and plenary amendments with old and new text, authors and procedure; downloaded (127 MB compressed).
+    risks: Authors missing on many plenary records; large files must be streamed.
+    recommendation: proposed
+    status: verified
+  - id: cellar
+    name: EUR-Lex texts via the Publications Office (CELLAR)
+    component: data-access
+    provider: Publications Office of the EU
+    licence: Public data
+    access: api
+    cost: Free
+    fit: Final adopted law text by CELEX number (GDPR fetched); EUR-Lex's own site blocks scripts.
+    risks: Article numbering changes between proposal and final law.
+    recommendation: proposed
+    status: verified
+  - id: lobbyfacts
+    name: LobbyFacts and the Transparency Register
+    component: data-access
+    provider: Corporate Europe Observatory and LobbyControl; EU Transparency Register
+    licence: Public data
+    access: web
+    cost: Free
+    fit: Organization type, budget and staff for graph nodes and adoption features.
+    risks: Self-declared data.
+    recommendation: candidate
+    status: verified
+  # PDF extraction
+  - id: pypdf
+    name: pypdf
+    component: pdf-extraction
+    provider: py-pdf
+    version: 6.19.0
+    licence: BSD-3-Clause
+    access: local
+    cost: Free
+    fit: Fast plain-text extraction; already used for the brief.
+    risks: Loses layout, so two-column amendment tables merge.
+    recommendation: proposed
+    status: verified
+  - id: docling
+    name: Docling
+    component: pdf-extraction
+    provider: IBM Research
+    version: 2.132.0
+    licence: MIT
+    access: local
+    cost: Free
+    needs: Model download on first use
+    fit: Layout-aware extraction including tables; keeps the two columns of amendment tables apart.
+    risks: Slower and heavier; untested by us.
+    recommendation: fallback
+    status: verified
+  - id: pymupdf
+    name: PyMuPDF
+    component: pdf-extraction
+    provider: Artifex
+    version: 1.28.2
+    licence: AGPL-3.0 or commercial
+    access: local
+    cost: Free under AGPL
+    fit: Fast with good layout.
+    risks: AGPL would complicate reuse by Reversa.
+    recommendation: avoid
+    status: verified
+  # Language and translation
+  - id: lingua
+    name: Lingua language detector
+    component: language-detection
+    provider: Peter M. Stahl
+    version: 2.2.0
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: Detect submission language to route translation.
+    risks: None significant.
+    recommendation: candidate
+    status: verified
+  - id: opus-mt
+    name: OPUS-MT (MarianMT) translation models
+    component: translation
+    provider: University of Helsinki
+    licence: Apache-2.0 (checked for the German-English model)
+    access: local
+    cost: Free
+    fit: Translate non-English submissions to English offline, one model per language pair.
+    risks: One download per language pair; legal phrasing quality untested.
+    recommendation: candidate
+    status: verified
+  - id: nllb-200
+    name: NLLB-200 distilled 600M
+    component: translation
+    provider: Meta
+    licence: CC-BY-NC-4.0
+    access: local
+    cost: Free for non-commercial use
+    fit: One model for all EU languages.
+    risks: Non-commercial licence blocks reuse in Reversa's product.
+    recommendation: avoid
+    status: verified
+  # Meaning models
+  - id: paraphrase-multilingual-mpnet
+    name: paraphrase-multilingual-mpnet-base-v2
+    component: embeddings
+    provider: sentence-transformers
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: Multilingual paraphrase embeddings; used in the prototype on extracted changes.
+    risks: Older model; adds little over word features on LobbyPlag redlines.
+    recommendation: proposed
+    status: measured
+  - id: bge-m3
+    name: BGE-M3
+    component: embeddings
+    provider: BAAI
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Strong multilingual embeddings with long inputs (useful for whole papers).
+    risks: Larger (about 570M parameters); untested by us.
+    recommendation: candidate
+    status: verified
+  - id: qwen3-embedding-0-6b
+    name: Qwen3-Embedding-0.6B
+    component: embeddings
+    provider: Alibaba Qwen
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: Recent multilingual embeddings that accept task instructions.
+    risks: Untested by us.
+    recommendation: candidate
+    status: verified
+  - id: bge-reranker-v2-m3
+    name: bge-reranker-v2-m3 (cross-encoder)
+    component: reranker
+    provider: BAAI
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: Reads both texts together and outputs a 0-1 relevance score; multilingual.
+    risks: Trained for search relevance (same topic), the trap decoys exploit; only usable on extracted changes, unmeasured.
+    recommendation: candidate
+    status: verified
+  - id: qwen3-reranker-0-6b
+    name: Qwen3-Reranker-0.6B
+    component: reranker
+    provider: Alibaba Qwen
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: Instruction-following reranker; the instruction can ask whether one edit was copied from the other.
+    risks: Unmeasured; same relevance-training caveat.
+    recommendation: candidate
+    status: verified
+  - id: mdeberta-xnli
+    name: mDeBERTa-v3-base multilingual NLI
+    component: nli
+    provider: MoritzLaurer (Hugging Face)
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Checks whether the amendment's change entails the submission's requested change, catching opposite requests on the same article.
+    risks: Unmeasured on legal text.
+    recommendation: candidate
+    status: verified
+  # LLM judges
+  - id: jev
+    name: Jev (TypeSafe)
+    component: llm-judge
+    provider: TypeSafe AI
+    version: jev-1.13.0
+    licence: Proprietary API
+    access: api
+    cost: 0.042 dollars per million input tokens, output free (60 pairs at about 2,000 tokens is about half a cent)
+    needs: TypeSafe account and TYPESAFE_API_KEY (not on this machine)
+    fit: >-
+      Its Noul primitive returns the probability that a yes/no question is yes, which
+      is exactly a 0-1 influence score; Choice can classify the relation (copied,
+      paraphrased, same topic only, opposite request).
+    risks: >-
+      Documented weaknesses include distraction by long irrelevant context and literal
+      reading; English strongest; no published results on legal text; new service.
+      Feed it only the extracted changes and measure it on LobbyPlag before trusting it.
+    recommendation: candidate
+    status: verified
+  - id: claude-sonnet-5-5
+    name: Claude Sonnet 5.5
+    component: llm-judge
+    provider: Anthropic
+    licence: Proprietary API
+    access: api
+    cost: 2 dollars per million input tokens, 10 per million output
+    needs: Anthropic API key (none on this machine)
+    fit: >-
+      Strong multilingual legal reading; structured outputs give a verdict, a 0-1
+      probability and the matching phrases, which also feed the demo's evidence view.
+    risks: The probability is a stated number, not a calibrated one; must be combined and calibrated on LobbyPlag.
+    recommendation: candidate
+    status: reported
+  - id: claude-opus-5-5
+    name: Claude Opus 5.5
+    component: llm-judge
+    provider: Anthropic
+    licence: Proprietary API
+    access: api
+    cost: 4 dollars per million input tokens, 20 per million output
+    needs: Anthropic API key
+    fit: Highest judgement quality for hard paraphrase and direction cases; 80 items fit easily in the hour.
+    risks: Same calibration caveat; slower than Sonnet.
+    recommendation: candidate
+    status: reported
+  - id: qwen3-4b-instruct-mlx
+    name: Qwen3-4B-Instruct run locally with MLX
+    component: local-llm-runtime
+    provider: Alibaba Qwen; Apple MLX
+    licence: Apache-2.0 (model), MIT (mlx-lm 0.32.0)
+    access: local
+    cost: Free
+    needs: Model download (several GB)
+    fit: Offline yes/no judge whose token probabilities give a real 0-1 score; no API key or network needed on the day.
+    risks: Weaker than hosted models on legal text; unmeasured.
+    recommendation: fallback
+    status: verified
+  # Matching and modelling
+  - id: rapidfuzz
+    name: RapidFuzz
+    component: text-alignment
+    provider: Max Bachmann
+    version: 3.14.6
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Fast character similarity on the extracted changes.
+    risks: None significant.
+    recommendation: proposed
+    status: measured
+  - id: smith-waterman-idf
+    name: Rarity-weighted Smith-Waterman alignment (our own, about 30 lines)
+    component: text-alignment
+    provider: This team
+    licence: Ours
+    access: local
+    cost: Free
+    fit: Finds the best matching stretch with small edits; matches score by phrase rarity, so boilerplate counts little.
+    risks: Exact words only; needs the meaning signals alongside.
+    recommendation: proposed
+    status: measured
+  - id: scikit-learn
+    name: scikit-learn (logistic regression, calibration)
+    component: ml
+    provider: scikit-learn
+    licence: BSD-3-Clause
+    access: local
+    cost: Free
+    fit: Combines all signals into one calibrated 0-1 score trained on LobbyPlag; each weight is explainable in the demo.
+    risks: Practice set is one law (GDPR, 2013).
+    recommendation: proposed
+    status: measured
+  # Graph and demo
+  - id: networkx
+    name: NetworkX
+    component: graph-analysis
+    provider: NetworkX
+    version: '3.7'
+    licence: BSD-3-Clause
+    access: local
+    cost: Free
+    fit: Build the organization-amendment-MEP graph and compute win rates and centrality.
+    risks: None significant.
+    recommendation: proposed
+    status: verified
+  - id: cytoscape-js
+    name: Cytoscape.js
+    component: graph-ui
+    provider: Cytoscape Consortium
+    version: 3.34.3
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Interactive graph in the browser with clickable nodes and edges.
+    risks: None significant.
+    recommendation: candidate
+    status: verified
+  - id: sigma-js
+    name: Sigma.js with Graphology
+    component: graph-ui
+    provider: Sciences Po médialab and others
+    version: 3.0.3
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Fast rendering for large graphs.
+    risks: More setup than Cytoscape.js for a small demo graph.
+    recommendation: fallback
+    status: verified
+  - id: streamlit
+    name: Streamlit
+    component: demo-ui
+    provider: Snowflake
+    version: 1.64.0
+    licence: Apache-2.0
+    access: local
+    cost: Free
+    fit: A Python demo app in hours, using the same code as the pipeline.
+    risks: Less polished than a custom web app.
+    recommendation: candidate
+    status: verified
+  - id: nextjs
+    name: Next.js web app
+    component: demo-ui
+    provider: Vercel
+    licence: MIT
+    access: local
+    cost: Free
+    fit: Polished demo; the team already used it in the ChamberLens repository.
+    risks: Needs a Python API bridge and more build time on the day.
+    recommendation: candidate
+    status: reported

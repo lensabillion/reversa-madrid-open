@@ -1,0 +1,40 @@
+# Ruff configuration shared by every Python file in the repository.
+# backend/pyproject.toml extends this file; scripts/ use it directly.
+
+target-version = "py314"
+line-length = 100
+
+[lint]
+# Rule families, each chosen for a class of defect it prevents.
+select = [
+  "E",    # pycodestyle errors: syntax-level style problems
+  "W",    # pycodestyle warnings: whitespace problems
+  "F",    # Pyflakes: undefined names, unused imports and variables
+  "I",    # isort: one deterministic import order
+  "B",    # flake8-bugbear: likely bugs such as mutable default arguments
+  "UP",   # pyupgrade: syntax current for the target Python version
+  "SIM",  # flake8-simplify: needlessly complex expressions
+  "C4",   # flake8-comprehensions: inefficient or unclear comprehensions
+  "PTH",  # flake8-use-pathlib: pathlib instead of os.path
+  "PERF", # Perflint: common performance mistakes in loops
+  "FURB", # refurb: modern, faster idioms
+  "N",    # pep8-naming: consistent names
+  "S",    # flake8-bandit: security problems
+  "PT",   # flake8-pytest-style: consistent pytest usage
+  "TID",  # flake8-tidy-imports: absolute imports only
+  "ERA",  # eradicate: commented-out code
+  "RUF",  # Ruff's own rules, including unused noqa comments
+]
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.per-file-ignores]
+# pytest checks results with plain assert statements.
+"**/tests/**" = ["S101"]
+# Deliberate exception, not debt: this script runs the pinned validator on the
+# repository's own file paths, never on outside input, so S603 cannot apply.
+"scripts/validate_catalogs.py" = ["S603"]
+
+[format]
+docstring-code-format = true

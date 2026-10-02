@@ -1,0 +1,15 @@
+# Known-bad catalog. scripts/validate_catalogs.py requires the validator to REJECT this
+# file before it trusts any result, so a validator that accepts everything cannot pass
+# the gate. The source_kind value below is deliberately outside the schema's enum.
+softschema:
+  contract: reversa.research:FactCatalog/v1
+  schema: ../../docs/research/influence-2026-10/facts.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+facts:
+  - id: canary
+    topic: data
+    claim: This record must fail validation.
+    source: scripts/fixtures/invalid-catalog.yaml
+    source_kind: rumour
+    status: reported
