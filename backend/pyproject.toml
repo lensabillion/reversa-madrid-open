@@ -1,0 +1,68 @@
+[project]
+name = "influence"
+version = "0.1.0"
+requires-python = ">=3.14"
+# uvicorn is never imported: it is the ASGI server that serves `influence.api:app`.
+dependencies = [
+  "fastapi==0.141.1",
+  "pydantic==2.13.5",
+  "uvicorn==0.53.0",
+]
+
+[dependency-groups]
+dev = [
+  "basedpyright==1.40.1",
+  # Never imported directly: Starlette's TestClient (fastapi.testclient) needs httpx2 and
+  # warns when it falls back to httpx.
+  "httpx2==2.13.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.8",
+]
+
+[build-system]
+# Matches the uv release the repository uses, so uv builds the package in-process instead
+# of downloading a separate build backend that uv.lock does not cover.
+requires = ["uv_build==0.12.8"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Supply-chain cool-off. uv.lock records the span (P14D), not a date, so
+# `uv sync --locked` stays valid as time passes; only a re-lock moves the cutoff.
+exclude-newer = "14 days"
+# Never build a dependency from source: a build runs that package's code on this machine.
+# The project itself is still built in-process by uv.
+no-build = true
+
+[tool.ruff]
+extend = "../ruff.toml"
+
+[tool.basedpyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+# Strict mode reports some rules only as warnings, which exit 0. One is
+# reportMissingModuleSource: an import whose package is not installed.
+failOnWarnings = true
+
+[tool.pytest]
+testpaths = ["tests"]
+strict_config = true
+strict_markers = true
+strict_xfail = true
+filterwarnings = [
+  "error",
+  # Deliberate, temporary exception: Starlette 1.6.0's TestClient uses an alias that
+  # anyio 4.15 deprecates; only that module's use is ignored. Remove on upgrading to
+  # Starlette 1.7.0, which uses the new name and clears the 14-day cool-off on 2026-10-07.
+  'ignore:The anyio\.abc\.BlockingPortal alias:DeprecationWarning:starlette\.testclient',
+]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = ["influence"]
+
+[tool.coverage.report]
+# Every line and branch is covered today, so anything less means code arrived untested.
+fail_under = 100
+# Lists uncovered line numbers, so a threshold failure says where to look.
+show_missing = true
