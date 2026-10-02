@@ -56,6 +56,17 @@ extraction and scoring, so a future batch command can reuse them.
 production build. `make check` includes backend validation and dependency audits. Tests
 use synthetic API responses; the running demo uses the downloaded public data.
 
+October 2 validation: combined `make check` exited 0 with 106 backend tests (100% branch
+coverage), 33 frontend tests, a successful production build and clean dependency audits.
+Independent review regressions cover deletion-only results opening on original evidence,
+non-JSON upload errors and overlapping graph targets. In the production browser, the
+organizers' PDF uploaded as 16 pages; selecting page 12 and comparing it with a supplied
+excerpt returned highlighted evidence and retained page provenance. This is a transport
+check, not a model-quality evaluation. ITRE 616 displayed Amazon's historical verified
+link separately from its 0.71 lexical score. At a 390-pixel viewport, document width
+remained 390 pixels with the network open. No browser warnings/errors were observed;
+exhaustive device and screen-reader testing remains unverified.
+
 Work and review evidence are tracked in **rev-oze0** and **rev-8mwe**; extraction is
 **rev-i2v8**. The foundation is **rev-ic1h** (merged PR #10). See
 [implementation status](../docs/implementation-status.md) for the architecture assessment

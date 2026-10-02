@@ -26,10 +26,14 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 | Supplied-text comparison | Known originals select edit overlap; unknown originals select whole-passage overlap; explicit validation and Unicode evidence offsets | English lexical baseline, 12,000 characters and 800 tokens per supplied text; passage overlap can reward boilerplate |
 | Backend ingestion gate | `make check`: 106 backend tests, 100% coverage (475 statements, 104 branches); baseline frontend 19 tests; both audits clean | Tests establish behavior, not predictive accuracy |
 
-The frontend is being delivered separately under `rev-oze0` and `rev-8mwe`: light
-analytical workspace, historical evidence/network views, pasted text and PDF/TXT/MD
-page review. Its final validation and PR belong in its README and bead. Extraction
-belongs to `rev-i2v8`. Do not infer merge status from files present in a worktree.
+The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
+historical evidence/network views, pasted text and PDF/TXT/MD page review. Combined
+`make check` passes 106 backend and 33 frontend tests, the production build and audits.
+Browser verification covers actual PDF upload/page selection/comparison, historical
+evidence and a 390-pixel network layout; details are in the
+[frontend README](../frontend/README.md). Backend extraction belongs to `rev-i2v8`
+([PR #11](https://github.com/lensabillion/reversa-madrid-open/pull/11), all nine CI checks
+passed). Do not infer merge status from files present in a worktree.
 
 ## Architecture Assessment
 
