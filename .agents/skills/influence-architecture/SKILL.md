@@ -83,9 +83,12 @@ Three design rules come with it:
    practice-loop evidence, reported before and after on the same folds and seeds
    (`AGENTS.md`, "Testing and Evaluation").
 
-In the pull request's first paragraph, say which part the change belongs to, what it
-takes from the part before and what it hands to the part after.
-The reviewer then sees the fit in one line.
+Fill the pull request template's **Architecture and Agreed Decisions** section: for each
+change, its part, what it takes from the part before and hands to the part after, and the
+agreed decision or design rule it follows.
+Name decisions as the Decisions table names them, and quote §11's rules and arrows.
+The reviewer can then check every choice against what was agreed, instead of
+reconstructing it.
 
 ## The Earlier Prototype in attic/
 
