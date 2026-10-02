@@ -5,7 +5,7 @@ title: Audit Challenge 03 repository, prototype evaluation, and research claims
 kind: task
 status: in_progress
 priority: 1
-version: 14
+version: 15
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -25,7 +25,11 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-02T18:35:29.523Z
-updated_at: 2026-10-02T18:44:24.921Z
+updated_at: 2026-10-02T18:45:17.893Z
 started_at: 2026-10-02T18:35:48.645Z
 ---
 Review the full current repository and local prototype against the organizer brief; explain the pasted metric analysis, reproduce important claims, and report concrete overlooked defects and gaps. Report findings without implementing fixes.
+
+## Notes
+
+User steering 2026-10-02: subagents may be used whenever necessary; use Astra for high-engineering tasks and Sol for mechanical tasks; document findings and consult tbd regularly. Applied in this review: Astra independently challenges statistical/engineering findings, Sol verifies evidence references and bead coverage. R1-R12 tracked as child tasks. Full make check passes at 18fffb2 (5 backend tests, 19 frontend tests, 6 catalogs, production build and audits); original headline prototype metrics reproduced with cached embeddings. Awaiting independent checks before final verdict.
