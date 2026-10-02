@@ -464,15 +464,15 @@ flowchart LR
   signals["3 · Signals<br/>rare shared phrases · alignment<br/>character similarity<br/>same edit, same direction<br/>embeddings of changes<br/>legal-word check (shall/may)<br/>optional: LLM or Jev judge"]
   combine["4 · Combine<br/>small trained model,<br/>calibrated 0–1 score<br/>→ pairs.csv"]
   practice["Practice loop<br/>LobbyPlag labelled pairs,<br/>simulated 30 + 30 tests"]
-  graph["5 · Graph<br/>organizations, MEPs,<br/>amendments; win rates"]
+  network["5 · Graph<br/>organizations, MEPs,<br/>amendments; win rates"]
   adoption["6 · Adoption model<br/>support from step 1 links<br/>→ proposals.csv"]
   demo["7 · Demo app<br/>tracer, map, scoreboard"]
   inputs --> load --> extract --> signals --> combine
   practice -->|trains and checks| combine
-  combine --> graph
-  graph --> adoption
+  combine --> network
+  network --> adoption
   inputs --> adoption
-  graph --> demo
+  network --> demo
   classDef io fill:#ffe17a,stroke:#8a5800,color:#2e2400
   classDef out fill:#e7eaf7,stroke:#2a3c9a,color:#161a2c
   class inputs io
