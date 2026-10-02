@@ -1,0 +1,697 @@
+<title>Influence Graph Primer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column of legal-document prose, a sticky contents rail on wide screens,
+   figures (diagrams, two-column amendment tables) allowed wider than the text. */
+:root {
+  --paper: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #161a2c;
+  --muted: #5b6176;
+  --rule: #d8dbe4;
+  --accent: #2a3c9a;
+  --accent-soft: #e7eaf7;
+  --mark: #ffe17a;
+  --mark-ink: #2e2400;
+  --ok: #1d7448;
+  --ok-soft: #e2f2e9;
+  --bad: #b02a20;
+  --bad-soft: #fbe6e3;
+  --warn: #8a5800;
+  --display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f121b; --surface: #171b27; --ink: #e8eaf1; --muted: #a3a9bd; --rule: #2d3344;
+    --accent: #a5b4ff; --accent-soft: #1f2642; --mark: #5c4c0e; --mark-ink: #fff3c4;
+    --ok: #74d3a3; --ok-soft: #16301f; --bad: #ff8e84; --bad-soft: #3a1b19; --warn: #f2c264;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f121b; --surface: #171b27; --ink: #e8eaf1; --muted: #a3a9bd; --rule: #2d3344;
+  --accent: #a5b4ff; --accent-soft: #1f2642; --mark: #5c4c0e; --mark-ink: #fff3c4;
+  --ok: #74d3a3; --ok-soft: #16301f; --bad: #ff8e84; --bad-soft: #3a1b19; --warn: #f2c264;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 16px/1.65 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px;
+  display: grid; grid-template-columns: 1fr; gap: 32px; }
+@media (min-width: 1100px) { .wrap { grid-template-columns: 220px minmax(0, 1fr); gap: 56px; } }
+nav.toc { font-size: 14px; }
+@media (min-width: 1100px) { nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; } }
+nav.toc p { font: 600 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+nav.toc a { color: var(--muted); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+main { min-width: 0; }
+main > section, main > header { max-width: 760px; }
+header .kicker { font: 500 13px/1.2 var(--mono); color: var(--accent); letter-spacing: .02em; }
+h1 { font: 600 clamp(34px, 5vw, 52px)/1.08 var(--display); margin: 10px 0 16px; text-wrap: balance; }
+h2 { font: 600 30px/1.2 var(--display); margin: 72px 0 12px; text-wrap: balance; scroll-margin-top: 24px; }
+h3 { font: 700 17px/1.35 var(--body); margin: 32px 0 6px; }
+p, li { max-width: 68ch; }
+p { margin: 0 0 14px; }
+ul, ol { padding-left: 22px; margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lede { font-size: 19px; color: var(--ink); }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+code, .ref { font-family: var(--mono); font-size: .88em; }
+mark { background: var(--mark); color: var(--mark-ink); padding: 0 2px; border-radius: 2px; }
+.tag { display: inline-block; font: 500 11px/1 var(--mono); padding: 3px 6px; border-radius: 3px;
+  vertical-align: 2px; margin-left: 4px; border: 1px solid var(--rule); color: var(--muted); }
+.tag.v { color: var(--ok); border-color: var(--ok); }
+.tag.m { color: var(--accent); border-color: var(--accent); }
+.tag.r { color: var(--warn); border-color: var(--warn); }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; margin: 18px 0; max-width: 68ch; }
+.note p:last-child { margin: 0; }
+.figure { margin: 24px 0 28px; max-width: 100%; }
+.figure .scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; }
+.figure svg { display: block; min-width: 760px; width: 100%; height: auto; }
+.figure figcaption, .caption { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 68ch; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+.tablebox { overflow-x: auto; margin: 16px 0 24px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-weight: 600; font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.ours td { background: var(--accent-soft); font-weight: 600; }
+/* The European Parliament prints every amendment as two columns. */
+.amend { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); margin: 20px 0 8px; overflow-x: auto; }
+.amend .head { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--rule); font: 500 13px/1.4 var(--mono); }
+.amend .head span:last-child { color: var(--muted); }
+.amend .cols { display: grid; grid-template-columns: 1fr 1fr; min-width: 560px; }
+.amend .cols > div { padding: 12px 14px; font: 15px/1.6 var(--display); min-width: 0; }
+.amend .cols > div + div { border-left: 1px solid var(--rule); }
+.amend .cols h4 { margin: 0 0 6px; font: 600 11.5px/1.2 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.amend ins { text-decoration: none; font-weight: 600; font-style: italic; background: var(--mark); color: var(--mark-ink); }
+.steps { display: grid; gap: 10px; counter-reset: s; list-style: none; padding: 0; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 10px; max-width: 72ch; }
+.steps li::before { content: counter(s); font: 600 14px/28px var(--mono); text-align: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); }
+.cards { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 16px 0 24px; }
+.card { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); padding: 14px 16px; min-width: 0; }
+.card h4 { margin: 0 0 6px; font: 700 15px/1.3 var(--body); }
+.card p { font-size: 14.5px; margin: 0; }
+/* Product mockup */
+.screen { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); overflow: hidden; margin: 18px 0 8px; }
+.screen .bar { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; padding: 10px 16px; border-bottom: 1px solid var(--rule); background: var(--accent-soft); }
+.screen .bar b { font: 600 15px/1.3 var(--display); }
+.screen .bar span { font: 500 12.5px/1.3 var(--mono); color: var(--muted); }
+.screen .body { display: grid; grid-template-columns: 1fr; gap: 0; }
+@media (min-width: 760px) { .screen .body { grid-template-columns: 5fr 6fr; } }
+.screen .pane { padding: 14px 16px; min-width: 0; }
+.screen .pane + .pane { border-top: 1px solid var(--rule); }
+@media (min-width: 760px) { .screen .pane + .pane { border-top: 0; border-left: 1px solid var(--rule); } }
+.screen .label { font: 600 11.5px/1.2 var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.cand { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; }
+.cand .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.cand .who { font-weight: 700; }
+.cand .score { font: 600 18px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.cand .score.hi { color: var(--ok); }
+.cand .score.lo { color: var(--bad); }
+.meter { height: 6px; border-radius: 3px; background: var(--rule); margin: 8px 0; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--ok); }
+.meter i.lo { background: var(--bad); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12.5px; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--rule); color: var(--muted); }
+.chip.yes { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.chip.no { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.example-flag { font: 500 12px/1.4 var(--mono); color: var(--warn); }
+/* SVG diagram styling through theme tokens */
+svg text { font-family: var(--body); fill: var(--ink); }
+svg .t-muted { fill: var(--muted); }
+svg .t-acc { fill: var(--accent); }
+svg .t-bad { fill: var(--bad); }
+svg .t-ok { fill: var(--ok); }
+svg .t-mono { font-family: var(--mono); }
+svg .box { fill: var(--surface); stroke: var(--rule); stroke-width: 1.2; }
+svg .box-acc { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+svg .box-mark { fill: var(--mark); stroke: var(--warn); stroke-width: 1; }
+svg .box-bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.2; }
+svg .box-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.2; }
+svg .ln { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+svg .ln-acc { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+svg .ln-bad { stroke: var(--bad); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
+svg .ln-mark { stroke: var(--warn); stroke-width: 1.6; fill: none; }
+svg .ah { fill: var(--muted); }
+svg .ah-acc { fill: var(--accent); }
+svg .ah-mark { fill: var(--warn); }
+svg .ah-bad { fill: var(--bad); }
+svg .mark-text { fill: var(--mark-ink); }
+.decide { display: grid; gap: 12px; margin: 16px 0; }
+.decide .card h4 span { font: 500 12px/1 var(--mono); color: var(--accent); margin-right: 6px; }
+footer { margin-top: 80px; font-size: 13px; color: var(--muted); max-width: 760px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <p>Contents</p>
+  <ol>
+    <li><a href="#start">Start here</a></li>
+    <li><a href="#law">1. How an EU law is made</a></li>
+    <li><a href="#amendment">2. What an amendment is</a></li>
+    <li><a href="#lobbying">3. What lobbying is</a></li>
+    <li><a href="#trace">4. Tracing an amendment back</a></li>
+    <li><a href="#graph">5. The graph, and who wins</a></li>
+    <li><a href="#predict">6. Predicting adoption</a></li>
+    <li><a href="#product">7. The product</a></li>
+    <li><a href="#existing">8. Existing systems</a></li>
+    <li><a href="#difficulty">9. Why it is 5 out of 5</a></li>
+    <li><a href="#win">10. How we can win</a></li>
+    <li><a href="#architecture">11. Proposed architecture</a></li>
+    <li><a href="#tools">12. Tools, including Jev</a></li>
+    <li><a href="#decisions">13. Decisions for you</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+<header id="start">
+  <div class="kicker">Reversa × Madrid Open · Challenge 03 · Saturday 3 October 2026</div>
+  <h1>Who really wrote this amendment?</h1>
+  <p class="lede">This page explains Challenge 03 from zero: how a law is made in the EU, what amendments and lobbying are, how an amendment can be traced back to the organization that wrote it, what “the graph” and “who wins” mean, what the finished product would look like, and the architecture and tools we propose. Apart from a quick prototype, nothing is built yet; this is the design we agree on before writing code.</p>
+  <p class="muted">Facts carry a tag: <span class="tag v">verified</span> means we read the source today, <span class="tag m">measured</span> means we computed it ourselves from public data, <span class="tag r">reported</span> means it comes from a summary we could not open directly. Every tagged fact is listed with its source in the research catalogs (see <a href="#sources">Sources</a>).</p>
+
+  <h3>Your example, made precise</h3>
+  <p>Your picture is close. Imagine Google wants EU rules that let its self-driving cars operate in Europe (an imagined example). Here is what actually happens, step by step:</p>
+  <ol class="steps">
+    <li><span>The European Commission writes a draft law and asks the public for comments. Google, carmakers, consumer groups and anyone else can send a comment or a position paper. Google is listed in the EU's lobby register.</span></li>
+    <li><span>Google's lawyers write their wishes as <b>ready-made edits</b> to the draft: “in Article 12, after ‘the operator’, insert ‘except where the vehicle is supervised remotely’.” They publish this and send it to many members of the European Parliament (MEPs), usually those on the committee handling the law, often in several political parties. Not to just one.</span></li>
+    <li><span>Some MEPs agree, or are persuaded, and <b>table</b> (formally submit) that edit as an amendment under their own name. Sometimes word for word, sometimes reworded. This is legal. The problem is that the public cannot see who really wrote it.</span></li>
+    <li><span>Our system receives the amendment and a candidate lobby submission, and scores how likely it is that the amendment came from that submission: 1 means “copied or adapted from it”, 0 means “unrelated, even if it looks similar”.</span></li>
+  </ol>
+  <p>Two refinements: lobbies are not only companies. Among the GDPR pairs that volunteers checked, the organization with the most verified copies is a digital-rights NGO. And “who wins” is not “whose text got tabled” but “whose change ended up in the final law”. Amazon got its wording into at least four amendments and still lost, as section 5 shows.</p>
+</header>
+
+<section id="law">
+  <h2>1. How an EU law is made</h2>
+  <p>The European Union is 27 countries that make some laws together, and those laws then apply in all 27. A familiar example is the GDPR, the privacy law behind every cookie banner. Three bodies make EU laws <span class="tag r">reported</span>:</p>
+  <div class="cards">
+    <div class="card"><h4>European Commission</h4><p>The EU's executive and civil service. Writes the first draft, called the <b>proposal</b>. Runs public consultations before and after drafting.</p></div>
+    <div class="card"><h4>European Parliament</h4><p>720 elected members (<b>MEPs</b>), like members of a national parliament. They edit the draft by tabling <b>amendments</b> and vote.</p></div>
+    <div class="card"><h4>Council of the EU</h4><p>Ministers from the 27 national governments. They also edit and vote. Parliament and Council must agree on one final text.</p></div>
+  </div>
+  <figure class="figure">
+    <div class="scroll">
+    <svg viewBox="0 0 980 330" role="img" aria-label="Seven stages from consultation to final law, with the two doors where lobby text enters and the parts of the law-making process that Challenge 03's steps cover">
+      <defs>
+        <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-mark"/></marker>
+      </defs>
+      <text x="20" y="28" class="t-muted" font-size="12" font-weight="600" letter-spacing="1">WHERE LOBBY TEXT ENTERS</text>
+      <rect x="20" y="40" width="390" height="34" rx="5" class="box-mark"/>
+      <text x="215" y="62" text-anchor="middle" font-size="13" class="mark-text">Door 1: public submissions on the Have Your Say portal</text>
+      <rect x="420" y="40" width="280" height="34" rx="5" class="box-mark"/>
+      <text x="560" y="62" text-anchor="middle" font-size="13" class="mark-text">Door 2: papers and meetings with MEPs</text>
+      <path d="M90,74 L90,112" class="ln-mark" marker-end="url(#a2)"/>
+      <path d="M350,74 L350,112" class="ln-mark" marker-end="url(#a2)"/>
+      <path d="M490,74 L490,112" class="ln-mark" marker-end="url(#a2)"/>
+      <g font-size="13">
+        <rect x="20" y="116" width="128" height="78" rx="6" class="box"/>
+        <text x="84" y="140" text-anchor="middle" font-weight="700">Consultation</text>
+        <text x="84" y="160" text-anchor="middle" class="t-muted" font-size="12">Commission asks</text>
+        <text x="84" y="176" text-anchor="middle" class="t-muted" font-size="12">the public</text>
+        <rect x="158" y="116" width="128" height="78" rx="6" class="box"/>
+        <text x="222" y="140" text-anchor="middle" font-weight="700">Proposal</text>
+        <text x="222" y="160" text-anchor="middle" class="t-muted" font-size="12">Commission's</text>
+        <text x="222" y="176" text-anchor="middle" class="t-muted" font-size="12">draft law</text>
+        <rect x="296" y="116" width="128" height="78" rx="6" class="box"/>
+        <text x="360" y="140" text-anchor="middle" font-weight="700">Feedback</text>
+        <text x="360" y="160" text-anchor="middle" class="t-muted" font-size="12">8 weeks to comment</text>
+        <text x="360" y="176" text-anchor="middle" class="t-muted" font-size="12">on the actual text</text>
+        <rect x="434" y="116" width="128" height="78" rx="6" class="box-acc"/>
+        <text x="498" y="140" text-anchor="middle" font-weight="700">Committee</text>
+        <text x="498" y="160" text-anchor="middle" class="t-muted" font-size="12">MEPs table</text>
+        <text x="498" y="176" text-anchor="middle" class="t-muted" font-size="12">amendments, vote</text>
+        <rect x="572" y="116" width="128" height="78" rx="6" class="box"/>
+        <text x="636" y="140" text-anchor="middle" font-weight="700">Plenary</text>
+        <text x="636" y="160" text-anchor="middle" class="t-muted" font-size="12">all MEPs vote</text>
+        <text x="636" y="176" text-anchor="middle" class="t-muted" font-size="12">Parliament's position</text>
+        <rect x="710" y="116" width="128" height="78" rx="6" class="box"/>
+        <text x="774" y="140" text-anchor="middle" font-weight="700">Council + trilogue</text>
+        <text x="774" y="160" text-anchor="middle" class="t-muted" font-size="12">governments, then</text>
+        <text x="774" y="176" text-anchor="middle" class="t-muted" font-size="12">three-way deal</text>
+        <rect x="848" y="116" width="112" height="78" rx="6" class="box-ok"/>
+        <text x="904" y="140" text-anchor="middle" font-weight="700">Final law</text>
+        <text x="904" y="160" text-anchor="middle" class="t-muted" font-size="12">Official Journal,</text>
+        <text x="904" y="176" text-anchor="middle" class="t-muted" font-size="12">EUR-Lex</text>
+      </g>
+      <g>
+        <path d="M148,155 L156,155" class="ln" marker-end="url(#a1)"/>
+        <path d="M286,155 L294,155" class="ln" marker-end="url(#a1)"/>
+        <path d="M424,155 L432,155" class="ln" marker-end="url(#a1)"/>
+        <path d="M562,155 L570,155" class="ln" marker-end="url(#a1)"/>
+        <path d="M700,155 L708,155" class="ln" marker-end="url(#a1)"/>
+        <path d="M838,155 L846,155" class="ln" marker-end="url(#a1)"/>
+      </g>
+      <text x="20" y="232" class="t-muted" font-size="12" font-weight="600" letter-spacing="1">WHAT CHALLENGE 03 ASKS</text>
+      <path d="M296,246 L296,256 L562,256 L562,246" class="ln-acc"/>
+      <text x="429" y="276" text-anchor="middle" font-size="13" class="t-acc" font-weight="700">Step 1 · Match</text>
+      <text x="429" y="294" text-anchor="middle" font-size="12" class="t-muted">did this amendment come from this submission?</text>
+      <path d="M20,246 L20,306 L960,306 L960,246" class="ln-acc"/>
+      <text x="720" y="276" text-anchor="middle" font-size="13" class="t-acc" font-weight="700">Step 3 · Predict</text>
+      <text x="720" y="294" text-anchor="middle" font-size="12" class="t-muted">will this consultation proposal end up in the final law?</text>
+    </svg>
+    </div>
+    <figcaption>The ordinary legislative procedure, simplified. Step 2 (the graph) is built from the links that Step 1 finds.</figcaption>
+  </figure>
+  <p>Three details matter for us:</p>
+  <ul>
+    <li><b>The 8-week feedback window.</b> After the Commission adopts a proposal, anyone has 8 weeks to comment on the actual legal text on the Have Your Say portal, and the Commission summarizes this feedback for Parliament and Council <span class="tag r">reported</span>. Submissions in this window often contain ready-made edits. These are the “submissions” in the hidden test.</li>
+    <li><b>The committee stage.</b> Parliament gives each law to a lead committee and names a <b>rapporteur</b>, the MEP in charge. Committee members table numbered amendments; in plenary, amendments come from the committee, a political group, or at least 36 MEPs <span class="tag r">reported</span>. Thousands of amendments are normal for a big law: LobbyPlag collected 4,867 committee amendments for the GDPR alone <span class="tag m">measured</span>.</li>
+    <li><b>Article numbers move.</b> The GDPR's draft Article 26 became Article 28 in the final law <span class="tag m">measured</span>. Matching across versions has to follow the text, not the number.</li>
+  </ul>
+</section>
+
+<section id="amendment">
+  <h2>2. What an amendment looks like</h2>
+  <p>An amendment is a numbered, proposed edit. Parliament prints it as two columns: the Commission's text on the left, the changed text on the right. Here is a real one from the GDPR, 2012 (procedure <span class="ref">2012/0011(COD)</span>), with the added words highlighted:</p>
+  <div class="amend">
+    <div class="head"><span>Amendment 616 · ITRE committee · Article 26, paragraph 1</span><span>Tabled by Seán Kelly, Adina-Ioana Vălean, Angelika Niebler</span></div>
+    <div class="cols">
+      <div><h4>Text proposed by the Commission</h4>1. Where a processing operation is to be carried out on behalf of a controller, the controller shall choose a processor providing sufficient guarantees to implement appropriate technical and organisational measures and procedures …</div>
+      <div><h4>Amendment</h4>1. Where a processing operation is to be carried out on behalf of a controller <ins>and which involves the processing of data that would permit the processor to reasonably identify the data subject</ins>, the controller shall choose a processor providing sufficient guarantees to implement appropriate technical and organisational measures and procedures …</div>
+    </div>
+  </div>
+  <p class="caption">Text from the LobbyPlag data repository, which holds the committee amendments as published <span class="tag m">measured</span>. The paragraph continues identically on both sides.</p>
+  <p>In plain words: if a company hires another company to handle people's personal data (say, a cloud host storing its files), it must pick one that protects that data properly. The added words narrow the rule to cases where the hired company could actually tell who the person is. That suits a cloud provider storing data it cannot read.</p>
+  <p>Where did those words come from? Amazon's lobby paper proposed exactly this insertion at exactly this place. Section 4 shows how we can tell.</p>
+</section>
+
+<section id="lobbying">
+  <h2>3. What lobbying is</h2>
+  <p><b>Lobbying</b> means organizations trying to shape laws that affect them. Companies, industry associations, consultancies, law firms, NGOs, unions and campaign groups all do it. In the EU it is legal and regulated, not secret by default:</p>
+  <ul>
+    <li><b>17,469 organizations</b> are in the EU Transparency Register as of 1 October 2026 <span class="tag v">verified</span>. The largest declared lobby budget is 12.73 million euros.</li>
+    <li>Tech-sector lobbying of EU institutions rose from 113 million euros a year in 2023 to 151 million in 2025, according to Corporate Europe Observatory and LobbyControl <span class="tag v">verified</span>.</li>
+    <li>Rapporteurs, shadow rapporteurs and committee chairs must publish their meetings with lobbyists for each report <span class="tag r">reported</span>.</li>
+  </ul>
+  <p>Why do MEPs table lobby text? Lobbyists bring expertise and offer ready-written amendments, which saves drafting work, and an MEP who agrees with a position may simply use the wording offered. What the register does not show is <b>which sentences</b> in a law came from whom. That is the gap this challenge fills.</p>
+  <h3>Three real cases</h3>
+  <div class="cards">
+    <div class="card"><h4>Amazon and the GDPR (2012–2016)</h4><p>Amazon's phrase “would permit the processor to reasonably identify the data subject” appeared in four amendments tabled by different MEPs in three committees, each verified by volunteers <span class="tag m">measured</span>. It is absent from the final GDPR <span class="tag m">measured</span>.</p></div>
+    <div class="card"><h4>OpenAI and the AI Act (2022–2023)</h4><p>Documents obtained by TIME show OpenAI argued that general-purpose systems like GPT-3 should not count as “high risk”; several of its proposals appeared in the text Parliament approved in June 2023 <span class="tag v">verified</span>.</p></div>
+    <div class="card"><h4>Big Tech and the Digital Omnibus (2025–2026)</h4><p>In January 2026 Corporate Europe Observatory compared, article by article and by hand, the Commission's Digital Omnibus with Big Tech lobby positions, for example on whether pseudonymised data counts as personal data <span class="tag v">verified</span>.</p></div>
+  </div>
+  <p>The third case is the work this challenge asks us to automate: experts reading papers side by side, slowly, for one law at a time.</p>
+</section>
+
+<section id="trace">
+  <h2>4. How we trace an amendment back</h2>
+  <p>Copying leaves fingerprints. When someone copies an edit, the result shares <b>rare</b> wording with the source, makes the <b>same edit at the same place</b>, and pushes the law in the <b>same direction</b>. Our job is to measure those three things and ignore everything else.</p>
+  <h3>The trap: everyone quotes the same law</h3>
+  <p>An amendment and a lobby paper both repeat the Commission's original sentence, then change a few words. Compared as whole texts, any two edits to the same paragraph look alike. Compare only the words each side changed and the picture flips. Measured on GDPR Article 26(1), comparing Amazon's paper with five amendments to the same paragraph (0 means nothing in common, 1 means identical) <span class="tag m">measured</span>:</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Amendment</th><th>Status</th><th class="n">Whole text</th><th class="n">Changed words only</th></tr></thead>
+      <tbody>
+        <tr><td><span class="ref">ITRE 616</span> (Kelly, Vălean, Niebler)</td><td>Verified copy</td><td class="n">0.96</td><td class="n">0.67</td></tr>
+        <tr><td><span class="ref">ITRE 615</span> (Rohde, Vălean)</td><td>Never checked, contains Amazon's phrase</td><td class="n">1.00</td><td class="n">0.98</td></tr>
+        <tr><td><span class="ref">LIBE 1774</span> (Vălean, Rohde)</td><td>Never checked, contains Amazon's phrase</td><td class="n">0.95</td><td class="n">0.65</td></tr>
+        <tr><td><span class="ref">LIBE 1773</span> (Alvaro)</td><td>Different edit</td><td class="n">0.63</td><td class="n">0.12</td></tr>
+        <tr><td><span class="ref">LIBE 1775</span> (Stadler)</td><td>Different edit</td><td class="n">0.60</td><td class="n">0.06</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Unrelated edits score about 0.6 on whole text because they share the quoted law; on changed words alone they drop to about 0.1. That one idea, <b>compare the edits, not the documents</b>, is the core of our design.</p>
+  <h3>Six traps the hidden decoys can use</h3>
+  <ol>
+    <li><b>Quoted original text.</b> Shared by every edit to the same paragraph.</li>
+    <li><b>Boilerplate.</b> “Member States shall ensure that” appears in thousands of laws. We measured how rare each phrase is across 354,985 EU legal documents: “shall” scores 0.10 on a 0–1 rarity scale, “member states shall” 0.25, Amazon's “reasonably identify” 0.78 <span class="tag m">measured</span>.</li>
+    <li><b>Rewording.</b> Words swapped, sentences reordered; exact matching misses it.</li>
+    <li><b>Translation.</b> Submissions arrive in any of the EU's languages.</li>
+    <li><b>Same topic, opposite request.</b> A consumer group and Amazon can both target Article 26 and ask for opposite changes.</li>
+    <li><b>Tiny words with big meaning.</b> “Shall” (must) becoming “may” (allowed to) is one word that reverses the obligation.</li>
+  </ol>
+  <h3>The signals we combine</h3>
+  <div class="cards">
+    <div class="card"><h4>Rare shared phrases</h4><p>Shared word sequences in the changed text, weighted by rarity, so boilerplate counts for nothing.</p></div>
+    <div class="card"><h4>Alignment</h4><p>The longest matching stretch, allowing small insertions, the way DNA sequences are compared (Smith-Waterman).</p></div>
+    <div class="card"><h4>Same edit, same direction</h4><p>Both insert, or both delete, the same thing; the amendment moves the law toward the submission's wording.</p></div>
+    <div class="card"><h4>Meaning</h4><p>Embeddings or a language model judge paraphrases and translations, applied to the changes only.</p></div>
+  </div>
+  <p>A small model trained on real labelled examples weighs these signals into one score from 0 to 1. Section 10 shows how well a first version of this did.</p>
+</section>
+
+<section id="graph">
+  <h2>5. The graph, and who wins</h2>
+  <p>A <b>graph</b> in this sense is not a chart. It is a set of dots (called <b>nodes</b>) joined by lines (called <b>edges</b>). Each dot is a thing, each line is a relationship. Ours has four kinds of dot: organizations, amendments, MEPs and articles of the law. The lines say “echoes” (an amendment copies an organization's text, with our score as its strength), “tabled by”, “edits” and “became”. Here is the real Amazon example:</p>
+  <figure class="figure">
+    <div class="scroll">
+    <svg viewBox="0 0 980 380" role="img" aria-label="Graph: Amazon's lobby paper echoed by four amendments tabled by six MEPs, all editing GDPR draft Article 26(1), which became final Article 28(1) without Amazon's phrase">
+      <defs>
+        <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-acc"/></marker>
+        <marker id="b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="b3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-bad"/></marker>
+      </defs>
+      <g font-size="11" font-weight="600" letter-spacing="1" class="t-muted">
+        <text x="30" y="24" class="t-muted">ORGANIZATION</text>
+        <text x="258" y="24" class="t-muted">AMENDMENTS</text>
+        <text x="488" y="24" class="t-muted">TABLED BY</text>
+        <text x="760" y="24" class="t-muted">THE LAW</text>
+      </g>
+      <rect x="30" y="160" width="150" height="58" rx="29" class="box-mark"/>
+      <text x="105" y="185" text-anchor="middle" font-weight="700" class="mark-text">Amazon</text>
+      <text x="105" y="203" text-anchor="middle" font-size="11.5" class="mark-text">lobby paper, p. 17</text>
+      <g font-size="12.5">
+        <rect x="258" y="50" width="150" height="44" rx="6" class="box-acc"/><text x="333" y="77" text-anchor="middle" class="t-mono">IMCO 333</text>
+        <rect x="258" y="130" width="150" height="44" rx="6" class="box-acc"/><text x="333" y="157" text-anchor="middle" class="t-mono">ITRE 614</text>
+        <rect x="258" y="210" width="150" height="44" rx="6" class="box-acc"/><text x="333" y="237" text-anchor="middle" class="t-mono">JURI 259</text>
+        <rect x="258" y="290" width="150" height="44" rx="6" class="box-acc"/><text x="333" y="317" text-anchor="middle" class="t-mono">ITRE 616</text>
+      </g>
+      <g class="ln-acc">
+        <path d="M180,180 C220,150 225,80 256,72" class="ln-acc" marker-end="url(#b1)"/>
+        <path d="M180,185 C220,170 225,155 256,152" class="ln-acc" marker-end="url(#b1)"/>
+        <path d="M180,195 C220,205 225,228 256,232" class="ln-acc" marker-end="url(#b1)"/>
+        <path d="M180,200 C220,230 225,300 256,312" class="ln-acc" marker-end="url(#b1)"/>
+      </g>
+      <text x="214" y="118" class="t-acc" font-size="11.5" text-anchor="middle">echoes</text>
+      <g font-size="12.5">
+        <rect x="488" y="54" width="180" height="36" rx="18" class="box"/><text x="578" y="77" text-anchor="middle">Malcolm Harbour</text>
+        <rect x="488" y="134" width="180" height="36" rx="18" class="box"/><text x="578" y="157" text-anchor="middle">Giles Chichester</text>
+        <rect x="488" y="214" width="180" height="36" rx="18" class="box"/><text x="578" y="237" text-anchor="middle">Sajjad Karim</text>
+        <rect x="488" y="294" width="180" height="36" rx="18" class="box"/><text x="578" y="317" text-anchor="middle">Kelly · Vălean · Niebler</text>
+      </g>
+      <g>
+        <path d="M410,72 L486,72" class="ln" marker-end="url(#b2)"/>
+        <path d="M410,152 L486,152" class="ln" marker-end="url(#b2)"/>
+        <path d="M410,232 L486,232" class="ln" marker-end="url(#b2)"/>
+        <path d="M410,312 L486,312" class="ln" marker-end="url(#b2)"/>
+      </g>
+      <text x="448" y="104" class="t-muted" font-size="11.5" text-anchor="middle">tabled by</text>
+      <rect x="760" y="110" width="200" height="58" rx="6" class="box"/>
+      <text x="860" y="134" text-anchor="middle" font-weight="700">Draft Article 26(1)</text>
+      <text x="860" y="153" text-anchor="middle" font-size="11.5" class="t-muted">Commission proposal, 2012</text>
+      <path d="M668,72 C720,72 720,125 758,130" class="ln" marker-end="url(#b2)"/>
+      <path d="M668,152 C712,152 720,142 758,140" class="ln" marker-end="url(#b2)"/>
+      <path d="M668,232 C712,232 720,160 758,150" class="ln" marker-end="url(#b2)"/>
+      <path d="M668,312 C720,312 722,170 758,160" class="ln" marker-end="url(#b2)"/>
+      <text x="712" y="100" class="t-muted" font-size="11.5" text-anchor="middle">edits</text>
+      <rect x="760" y="250" width="200" height="72" rx="6" class="box-bad"/>
+      <text x="860" y="274" text-anchor="middle" font-weight="700">Final Article 28(1)</text>
+      <text x="860" y="293" text-anchor="middle" font-size="11.5" class="t-bad">GDPR, 2016: Amazon's phrase</text>
+      <text x="860" y="309" text-anchor="middle" font-size="11.5" class="t-bad">is not in the law</text>
+      <path d="M860,168 L860,248" class="ln-bad" marker-end="url(#b3)"/>
+      <text x="868" y="212" class="t-bad" font-size="11.5">became</text>
+    </svg>
+    </div>
+    <figcaption>Amendments and authors from LobbyPlag's verified matches; final text from the Publications Office <span class="tag m">measured</span>. Tabling lobby wording is legal; the graph shows text reuse, not wrongdoing.</figcaption>
+  </figure>
+  <h3>What “who wins” means</h3>
+  <p>An organization's request can get three levels far. We measure each one separately:</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Level</th><th>Meaning</th><th>Amazon, Article 26(1)</th></tr></thead>
+      <tbody>
+        <tr><td><b>Heard</b></td><td>At least one MEP tabled its wording</td><td>Yes, four amendments, six MEPs</td></tr>
+        <tr><td><b>Adopted by Parliament</b></td><td>The amendment passed Parliament's vote</td><td>Not measured yet</td></tr>
+        <tr><td><b>Won</b></td><td>The change is in the final law</td><td>No</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Across a whole law, each organization gets a <b>win rate</b>: changes in the final law divided by changes it asked for. Each MEP gets a <b>carry rate</b>: how many of their amendments echo lobby text. LobbyPlag reported that for some MEPs about a quarter of their GDPR amendments contained lobby text <span class="tag r">reported</span>. The demo answers the brief's question, “who wins most often?”, from these numbers.</p>
+  <p>The “heard” level already shows something interesting in the GDPR data. Counting volunteer-verified copies <span class="tag m">measured</span>:</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Organization</th><th class="n">Requests extracted</th><th class="n">Requests echoed</th><th class="n">Amendments echoing them</th><th class="n">Different MEPs</th></tr></thead>
+      <tbody>
+        <tr><td>European Digital Rights (NGO)</td><td class="n">209</td><td class="n">50</td><td class="n">78</td><td class="n">11</td></tr>
+        <tr><td>Bits of Freedom (NGO)</td><td class="n">108</td><td class="n">16</td><td class="n">19</td><td class="n">4</td></tr>
+        <tr><td>American Chamber of Commerce to the EU</td><td class="n">232</td><td class="n">5</td><td class="n">18</td><td class="n">7</td></tr>
+        <tr><td>Amazon</td><td class="n">98</td><td class="n">5</td><td class="n">17</td><td class="n">13</td></tr>
+        <tr><td>European Banking Federation</td><td class="n">113</td><td class="n">6</td><td class="n">13</td><td class="n">11</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">These counts reflect which pairs volunteers had time to check, so they are a lower bound, not a ranking. Our system would score every pair automatically.</p>
+</section>
+
+<section id="predict">
+  <h2>6. Predicting what gets adopted</h2>
+  <p>Step 3 gives us 20 suggestions from a consultation and asks, for each, the probability that it ends up in the final law. It is scored by <b>AUC</b>: pick one suggestion that made it and one that did not; AUC is how often we gave the first a higher probability. 0.5 is coin-flipping, 0.75 is the “excellent” bar.</p>
+  <p>Signals that plausibly predict adoption, all available before the final vote:</p>
+  <ul>
+    <li><b>Did an MEP table it?</b> Step 1's links feed straight in: a suggestion echoed by many amendments, from several parties, has support.</li>
+    <li><b>How many organizations asked for the same thing?</b> A request backed by many different organizations may carry more weight than a lone voice.</li>
+    <li><b>Who asked.</b> Business, NGO, public authority, size and lobby budget (from the Transparency Register).</li>
+    <li><b>What kind of change.</b> Deleting a phrase or clarifying a definition is smaller than adding a new obligation.</li>
+    <li><b>Direction.</b> Whether it goes with or against what Parliament's and Council's positions already say.</li>
+  </ul>
+  <p>Heike Klüver's research measured EU lobbying success this way, comparing consultation positions with final policy across 56 issues and 2,696 groups <span class="tag r">reported</span>. One open question for the organizers: may we compare a suggestion with the final law's text when the law is already adopted? That would be measurement rather than forecasting, and would score far higher. With only 20 suggestions, luck plays a large part either way.</p>
+</section>
+
+<section id="product">
+  <h2>7. What the product looks like</h2>
+  <p>Reversa sells to multinationals, public affairs consultancies, Big Four firms and law firms <span class="tag r">reported</span>. Their question is practical: <b>who shaped the last law, and how do we plan our position on the next one?</b> Our demo would be a small version of the tool they would pay for. Three screens:</p>
+  <div class="screen" aria-label="Mockup of the Influence Tracer screen">
+    <div class="bar"><b>Influence Tracer</b><span>GDPR · 2012/0011(COD) · Article 26(1)</span><span class="example-flag">illustration: scores are examples, not results</span></div>
+    <div class="body">
+      <div class="pane">
+        <p class="label">Amendment</p>
+        <p><span class="ref">ITRE 616</span> · Kelly, Vălean, Niebler</p>
+        <p style="font-family: var(--display)">… on behalf of a controller <mark>and which involves the processing of data that would permit the processor to reasonably identify the data subject</mark>, the controller shall choose …</p>
+        <p class="muted" style="font-size:14px">Changed words are highlighted; the rest is the Commission's text and is ignored when matching.</p>
+      </div>
+      <div class="pane">
+        <p class="label">Likely sources</p>
+        <div class="cand">
+          <div class="top"><span class="who">Amazon · lobby paper p. 17</span><span class="score hi">0.97</span></div>
+          <div class="meter"><i style="width:97%"></i></div>
+          <div class="chips"><span class="chip yes">rare phrase shared: “reasonably identify the data subject”</span><span class="chip yes">same insertion, same place</span><span class="chip yes">same direction: narrows the rule</span></div>
+        </div>
+        <div class="cand">
+          <div class="top"><span class="who">Another submission on Article 26</span><span class="score lo">0.08</span></div>
+          <div class="meter"><i class="lo" style="width:8%"></i></div>
+          <div class="chips"><span class="chip">same article</span><span class="chip no">different edit</span><span class="chip no">only boilerplate shared</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption">Screen 1, the tracer: pick any amendment, see where it most likely came from, and why, in words a lawyer can check.</p>
+  <div class="cards">
+    <div class="card"><h4>Screen 2 · Influence map</h4><p>The graph from section 5 for a whole law: click an organization to see every amendment that echoes it and which survived.</p></div>
+    <div class="card"><h4>Screen 3 · Scoreboard and forecast</h4><p>Organizations ranked by heard, adopted and won; for open consultations, the probability each request makes it into the law.</p></div>
+  </div>
+  <p>The tracer is also the core of the five-minute demo: one real amendment, the evidence highlighted, then the map, then “who wins”.</p>
+</section>
+
+<section id="existing">
+  <h2>8. Existing systems, and how they fail</h2>
+  <p>People have traced copied law text before. Each approach breaks on one of the traps from section 4:</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>System</th><th>How it matches</th><th>How it fails</th></tr></thead>
+      <tbody>
+        <tr><td><b>LobbyPlag</b> (2013, GDPR)</td><td>Word-triplet overlap of whole texts on the same article; volunteers check candidates</td><td>Whole texts share the quoted law, so lookalikes score high (one rejected pair scored 1.00); 1,701 of 1,976 candidates never checked <span class="tag m">measured</span></td></tr>
+        <tr><td><b>Legislative Influence Detector</b> (2016, US states)</td><td>Search engine finds candidates; Smith-Waterman alignment scores them</td><td>Exact words only, so rewording escapes; boilerplate gives false positives; low scores need manual review <span class="tag v">verified</span></td></tr>
+        <tr><td><b>Copy, Paste, Legislate</b> (2019, USA TODAY)</td><td>Shared strings of six or more words, scored 0–100</td><td>In their words, a bill that copied an idea but not the precise language was not flagged; needed 30+ reporters to review <span class="tag v">verified</span></td></tr>
+        <tr><td><b>EPFL study</b> (2023, European Parliament)</td><td>Meaning similarity and entailment between lobby papers and MEP speeches</td><td>Finds who agrees, not who wrote it; no ground truth, checked against retweets and meetings (AUC 0.77) <span class="tag v">verified</span></td></tr>
+        <tr><td><b>Whole-text embeddings</b> (the obvious modern approach)</td><td>Cosine similarity of AI text embeddings</td><td>On the GDPR data, lookalike decoys score higher (0.84) than real copies (0.78) <span class="tag m">measured</span></td></tr>
+        <tr><td><b>NGO and press analyses</b> (CEO, TIME)</td><td>Experts read documents side by side</td><td>Accurate but slow and manual; no scores, one law at a time <span class="tag v">verified</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Reversa's own product does not claim lobby tracing yet <span class="tag v">verified</span>. The brief says these are problems their team is working on now.</p>
+</section>
+
+<section id="difficulty">
+  <h2>9. Why it is rated 5 out of 5</h2>
+  <ol>
+    <li><b>No answer key for the test law.</b> We must find our own labelled practice data. LobbyPlag's GDPR set is the only public one we found: 175 verified copies and 100 rejected lookalikes <span class="tag m">measured</span>.</li>
+    <li><b>The decoys are designed to fool exactly the obvious methods.</b> Same article, same quoted law, same topic.</li>
+    <li><b>Paraphrase and translation.</b> “Paraphrases included” is the brief's bar for excellent.</li>
+    <li><b>Messy data plumbing.</b> Submissions are PDFs in many languages; amendments sit in a 120 MB dump; EUR-Lex and Parliament's own sites block scripts; the Publications Office and Parltrack are working routes around them.</li>
+    <li><b>Three different problems in one.</b> Text matching, network analysis and forecasting.</li>
+    <li><b>Unknown input format, one hour, no hands.</b> At 19:00 we learn whether pairs arrive as text or as IDs, and hand labelling disqualifies.</li>
+    <li><b>Tiny forecasting test.</b> Twenty adoption predictions, so a few lucky or unlucky calls move the AUC a lot.</li>
+  </ol>
+</section>
+
+<section id="win">
+  <h2>10. How we can win</h2>
+  <p>The event score is 60% hidden test, 20% difficulty and 20% demo <span class="tag v">verified</span>. Difficulty is already maximal for this challenge if we deliver all three steps. So the plan is:</p>
+  <h3>The hidden test (60%)</h3>
+  <p>We built a quick prototype before we agreed this design, which you can keep or discard. On simulated hidden tests built from LobbyPlag (30 real copies against 30 rejected lookalikes, each lobby organization kept out of its own training data), it scored <span class="tag m">measured</span>:</p>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Scorer</th><th class="n">Precision in top 20</th><th class="n">Recall</th><th class="n">AUC</th></tr></thead>
+      <tbody>
+        <tr class="ours"><td>Change-based prototype, lobby text as clean edits</td><td class="n">1.00</td><td class="n">0.82</td><td class="n">0.93</td></tr>
+        <tr><td>Same prototype, lobby text as a whole paper</td><td class="n">0.91</td><td class="n">0.65</td><td class="n">0.87</td></tr>
+        <tr><td>LobbyPlag's own matcher</td><td class="n">0.86</td><td class="n">0.68</td><td class="n">0.81</td></tr>
+        <tr><td>Whole-text similarity</td><td class="n">0.86</td><td class="n">0.74</td><td class="n">0.73</td></tr>
+        <tr><td><i>Brief's “excellent” bar</i></td><td class="n">0.90</td><td class="n">0.80</td><td class="n">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Read this with care: the practice set is one law from 2013, mostly word-for-word copies. The real test promises paraphrases, so the whole-paper row is the more realistic one, and recall there is the weak spot. Ways to raise it:</p>
+  <ul>
+    <li>Better passage finding inside long papers, so the system compares the right paragraph.</li>
+    <li>A meaning judge (a language model or Jev, section 12) applied to the extracted changes, to catch paraphrases.</li>
+    <li>Calibration: the test is half real, half decoy, so roughly half our scores should sit above 0.5. We must ask how recall is computed from scores.</li>
+  </ul>
+  <h3>The 19:00 hour</h3>
+  <p>One command turns whatever arrives into both CSV files. We rehearse it tonight against a timer, with inputs as text and as IDs. A model that is not finished at 19:00 is worth nothing; a simpler model that runs is worth 60%.</p>
+  <h3>The demo (20%)</h3>
+  <p>Five minutes, for a non-lawyer: the Amazon amendment with its evidence highlighted, the influence map, the scoreboard, and the punchline that being heard is not winning.</p>
+</section>
+
+<section id="architecture">
+  <h2>11. Proposed architecture</h2>
+  <p>Seven parts. Each box is one module with one job, so three people can build in parallel:</p>
+  <figure class="figure">
+    <div class="scroll">
+    <svg viewBox="0 0 980 470" role="img" aria-label="Pipeline: inputs, load, extract the change, signals, combine and calibrate, pairs CSV; a practice loop trains the combiner; the graph feeds the demo and the adoption model, which writes the proposals CSV">
+      <defs>
+        <marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+        <marker id="c2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah-acc"/></marker>
+      </defs>
+      <g font-size="13">
+        <rect x="20" y="40" width="150" height="90" rx="6" class="box-mark"/>
+        <text x="95" y="66" text-anchor="middle" font-weight="700" class="mark-text">19:00 inputs</text>
+        <text x="95" y="88" text-anchor="middle" font-size="12" class="mark-text">60 pairs</text>
+        <text x="95" y="106" text-anchor="middle" font-size="12" class="mark-text">20 proposals</text>
+        <text x="95" y="122" text-anchor="middle" font-size="11" class="mark-text">text or IDs</text>
+
+        <rect x="200" y="40" width="160" height="90" rx="6" class="box"/>
+        <text x="280" y="62" text-anchor="middle" font-weight="700">1 · Load</text>
+        <text x="280" y="82" text-anchor="middle" font-size="11.5" class="t-muted">fetch by ID, PDF to text,</text>
+        <text x="280" y="98" text-anchor="middle" font-size="11.5" class="t-muted">detect language,</text>
+        <text x="280" y="114" text-anchor="middle" font-size="11.5" class="t-muted">translate if needed</text>
+
+        <rect x="390" y="40" width="170" height="90" rx="6" class="box"/>
+        <text x="475" y="62" text-anchor="middle" font-weight="700">2 · Extract the change</text>
+        <text x="475" y="82" text-anchor="middle" font-size="11.5" class="t-muted">diff against the original law;</text>
+        <text x="475" y="98" text-anchor="middle" font-size="11.5" class="t-muted">find the matching passage</text>
+        <text x="475" y="114" text-anchor="middle" font-size="11.5" class="t-muted">in long papers</text>
+
+        <rect x="590" y="20" width="170" height="210" rx="6" class="box"/>
+        <text x="675" y="42" text-anchor="middle" font-weight="700">3 · Signals</text>
+        <text x="606" y="68" font-size="12">rare shared phrases</text>
+        <text x="606" y="92" font-size="12">alignment</text>
+        <text x="606" y="116" font-size="12">character similarity</text>
+        <text x="606" y="140" font-size="12">same edit, same direction</text>
+        <text x="606" y="164" font-size="12">embeddings of changes</text>
+        <text x="606" y="188" font-size="12">legal-word check (shall/may)</text>
+        <text x="606" y="212" font-size="12" class="t-acc">optional: LLM or Jev judge</text>
+
+        <rect x="790" y="40" width="170" height="90" rx="6" class="box-acc"/>
+        <text x="875" y="64" text-anchor="middle" font-weight="700">4 · Combine</text>
+        <text x="875" y="84" text-anchor="middle" font-size="11.5" class="t-muted">small trained model,</text>
+        <text x="875" y="100" text-anchor="middle" font-size="11.5" class="t-muted">calibrated 0–1 score</text>
+        <text x="875" y="120" text-anchor="middle" font-size="11.5" class="t-acc t-mono">pairs.csv</text>
+
+        <rect x="790" y="172" width="170" height="78" rx="6" class="box"/>
+        <text x="875" y="194" text-anchor="middle" font-weight="700">Practice loop</text>
+        <text x="875" y="213" text-anchor="middle" font-size="11.5" class="t-muted">LobbyPlag labelled pairs,</text>
+        <text x="875" y="229" text-anchor="middle" font-size="11.5" class="t-muted">simulated 30 + 30 tests</text>
+
+        <rect x="590" y="280" width="170" height="74" rx="6" class="box"/>
+        <text x="675" y="304" text-anchor="middle" font-weight="700">5 · Graph</text>
+        <text x="675" y="323" text-anchor="middle" font-size="11.5" class="t-muted">organizations, MEPs,</text>
+        <text x="675" y="339" text-anchor="middle" font-size="11.5" class="t-muted">amendments; win rates</text>
+
+        <rect x="390" y="280" width="170" height="74" rx="6" class="box"/>
+        <text x="475" y="304" text-anchor="middle" font-weight="700">6 · Adoption model</text>
+        <text x="475" y="323" text-anchor="middle" font-size="11.5" class="t-muted">support from step 1 links,</text>
+        <text x="475" y="341" text-anchor="middle" font-size="11.5" class="t-acc t-mono">proposals.csv</text>
+
+        <rect x="590" y="384" width="170" height="66" rx="6" class="box-ok"/>
+        <text x="675" y="410" text-anchor="middle" font-weight="700">7 · Demo app</text>
+        <text x="675" y="430" text-anchor="middle" font-size="11.5" class="t-muted">tracer, map, scoreboard</text>
+      </g>
+      <path d="M170,85 L198,85" class="ln" marker-end="url(#c1)"/>
+      <path d="M360,85 L388,85" class="ln" marker-end="url(#c1)"/>
+      <path d="M560,85 L588,85" class="ln" marker-end="url(#c1)"/>
+      <path d="M760,85 L788,85" class="ln" marker-end="url(#c1)"/>
+      <path d="M875,172 L875,132" class="ln-acc" marker-end="url(#c2)"/>
+      <text x="884" y="158" font-size="11.5" class="t-acc">trains and checks</text>
+      <path d="M800,130 C776,150 776,250 762,300" class="ln" marker-end="url(#c1)"/>
+      <path d="M590,317 L562,317" class="ln" marker-end="url(#c1)"/>
+      <path d="M675,354 L675,382" class="ln" marker-end="url(#c1)"/>
+      <path d="M95,130 C95,250 300,317 388,317" class="ln" marker-end="url(#c1)"/>
+    </svg>
+    </div>
+    <figcaption>Parts 1–4 produce the first CSV and part 6 the second; parts 5 and 7 serve the demo. The practice loop trains the combiner and tells us whether any change helps.</figcaption>
+  </figure>
+  <p>Design rules we propose:</p>
+  <ul>
+    <li><b>Raw model output stays separate from labels.</b> Every score is logged with its signals so the demo can explain it and we can check it.</li>
+    <li><b>Every part degrades gracefully.</b> If translation or the language-model judge fails at 19:30, the score still comes out from the other signals.</li>
+    <li><b>No hand labelling, anywhere.</b> The pipeline writes the CSV; humans only press run.</li>
+  </ul>
+</section>
+
+<section id="tools">
+  <h2>12. Tools, including Jev</h2>
+  <h3>Can Jev score pairs from 0 to 1?</h3>
+  <p>Yes. Jev, from TypeSafe AI, is not a chatbot: you send it a question and it returns a typed answer with probabilities instead of text. Its yes/no question type, called <b>Noul</b>, returns the probability that the answer is yes <span class="tag v">verified</span>. We could ask: “Does the amendment's change copy or adapt the change this submission requests?” and use the probability as a score. It costs 0.042 dollars per million input tokens (word pieces) with free output, so all 60 pairs would cost under one cent <span class="tag v">verified</span>.</p>
+  <p>Four cautions before we rely on it:</p>
+  <ul>
+    <li><b>Its probability is not our score yet.</b> “0.8” from Jev has to be checked against real labels. We would measure it on LobbyPlag's 275 labelled pairs before the event and let the combiner decide its weight.</li>
+    <li><b>Give it the changes, not the documents.</b> Its documentation lists long irrelevant context as a known weakness, and whole texts are exactly where the decoys hide.</li>
+    <li><b>English is its strongest language,</b> and it has no published results on legal text.</li>
+    <li><b>It needs an account and an API key</b>, and your approval to send public text to TypeSafe. There is no key on this machine.</li>
+  </ul>
+  <p>The same applies to Claude (Sonnet 5.5 at 2/10 dollars per million tokens in and out, Opus 5.5 at 4/20) <span class="tag r">reported</span>: strong judgment, multilingual, and can also return the matching phrases the demo shows; but it needs a key too, and its stated probabilities need the same calibration. A free local model is the fallback if we cannot use either.</p>
+  <h3>Proposed tools per part</h3>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Part</th><th>Proposed</th><th>Alternatives</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Load: data</td><td>Have Your Say API, Parltrack dumps, Publications Office (EUR-Lex texts)</td><td>Transparency Register, LobbyFacts</td><td>All public and tested today; the Publications Office route works where EUR-Lex blocks scripts</td></tr>
+        <tr><td>Load: PDFs</td><td>pypdf</td><td>Docling (keeps table columns apart)</td><td>Fast; Docling if two-column amendment PDFs come out merged. PyMuPDF avoided for its AGPL licence</td></tr>
+        <tr><td>Load: language</td><td>Lingua detector, OPUS-MT translation</td><td>Language-model translation</td><td>Offline and free; NLLB avoided because its licence forbids commercial reuse</td></tr>
+        <tr><td>Signals: words</td><td>Rarity table from 355k EU texts, RapidFuzz, our own alignment</td><td>—</td><td>Tested in the prototype; boilerplate-proof</td></tr>
+        <tr><td>Signals: meaning</td><td>Multilingual paraphrase embeddings on changes</td><td>BGE-M3, Qwen3 embeddings, bge-reranker, multilingual entailment model</td><td>Rerankers are trained for “same topic”, the decoys' trick, so they must be measured before use</td></tr>
+        <tr><td>Signals: judge</td><td>Decision needed</td><td>Jev, Claude, local Qwen3 via MLX</td><td>See above</td></tr>
+        <tr><td>Combine</td><td>scikit-learn logistic regression with calibration</td><td>Gradient boosting</td><td>Stable on 275 examples; each weight can be explained in the demo</td></tr>
+        <tr><td>Graph</td><td>NetworkX</td><td>—</td><td>Standard, simple</td></tr>
+        <tr><td>Demo</td><td>Decision needed</td><td>Streamlit (fast, Python) or Next.js with Cytoscape.js (polished)</td><td>Trade build time against polish</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="caption">The full catalog, with licences, versions, costs and risks for 28 tools, is in <code>docs/research/influence-2026-10/tools.yaml</code>.</p>
+</section>
+
+<section id="decisions">
+  <h2>13. Decisions for you</h2>
+  <p>Nothing gets built until these are settled:</p>
+  <div class="decide">
+    <div class="card"><h4><span>D1</span>Language-model judge</h4><p>None (local signals only), Jev, Claude, or a local model. Jev or Claude needs an account, a key and your approval to send public text to that company.</p></div>
+    <div class="card"><h4><span>D2</span>Demo app</h4><p>Streamlit (hours to build, plainer) or Next.js (polished, more work on the day).</p></div>
+    <div class="card"><h4><span>D3</span>The prototype</h4><p>Keep it as the starting point after you have read it, or rebuild from this design.</p></div>
+    <div class="card"><h4><span>D4</span>Team split</h4><p>Who owns which parts. A natural split: data and loading (part 1), matching (parts 2–4), graph, adoption and demo (parts 5–7).</p></div>
+    <div class="card"><h4><span>D5</span>Questions to the organizers</h4><p>Do pairs arrive as text or IDs? How is recall computed from scores? May step 3 use the final law's text? May we prepare code and data before Saturday?</p></div>
+  </div>
+</section>
+
+<section id="sources">
+  <h2>Sources</h2>
+  <p>Every tagged fact on this page is recorded, with its source and status, in three validated research catalogs in the repository: <code>docs/research/influence-2026-10/facts.yaml</code>, <code>existing-systems.yaml</code> and <code>tools.yaml</code>. The main public sources:</p>
+  <ul>
+    <li>Organizers' brief: <code>docs/brief/madrid-open-reversa-challenges.pdf</code></li>
+    <li><a href="https://github.com/lobbyplag/lobbyplag-data">LobbyPlag data repository</a> (GDPR amendments, lobby proposals, verified matches)</li>
+    <li><a href="http://publications.europa.eu/resource/celex/32016R0679">Final GDPR text</a> (Publications Office)</li>
+    <li><a href="https://www.lobbyfacts.eu/">LobbyFacts</a> (Transparency Register data)</li>
+    <li><a href="https://corporateeurope.org/en/2026/01/article-article-how-big-tech-shaped-eus-roll-back-digital-rights">Corporate Europe Observatory, January 2026</a> (Digital Omnibus and lobby spending)</li>
+    <li><a href="https://time.com/6288245/openai-eu-lobbying-ai-act/">TIME, 20 June 2023</a> (OpenAI and the AI Act)</li>
+    <li><a href="https://dssgfellowship.org/lid/">Legislative Influence Detector</a></li>
+    <li><a href="https://publicintegrity.org/politics/state-politics/copy-paste-legislate/how-we-uncovered-10000-times-lawmakers-introduced-copycat-model-bills-and-why-it-matters/">Copy, Paste, Legislate: method</a></li>
+    <li><a href="https://arxiv.org/abs/2309.11381">Suresh and co-authors, Studying Lobby Influence in the European Parliament</a></li>
+    <li><a href="https://docs.typesafe.ai/primitives/noul">TypeSafe Jev documentation</a></li>
+  </ul>
+</section>
+
+<footer>Prepared 2 October 2026 for the team's Challenge 03 entry. Tracked as tasks rev-enx3, rev-tm4a and rev-t50d.</footer>
+</main>
+</div>

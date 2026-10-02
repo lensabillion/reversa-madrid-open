@@ -1,0 +1,158 @@
+softschema:
+  contract: reversa.research:ExistingSystemCatalog/v1
+  schema: existing-systems.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+systems:
+  - id: lobbyplag
+    name: LobbyPlag
+    builder: Volunteer transparency project
+    year: 2013
+    kind: tool
+    scope: EU GDPR - 4,867 committee amendments against 1,159 proposals from 76 lobby documents
+    url: https://github.com/lobbyplag/lobbyplag-data
+    method: >-
+      For every amendment and lobby proposal on the same article, average the Dice
+      similarity of word trigrams over the whole old and new text; pairs above about 0.4
+      became candidates that volunteers checked by hand.
+    results: >-
+      1,976 candidates, 175 verified copies, 100 rejected, 1,701 never reviewed. Showed
+      some MEPs had 22-25% of their amendments containing lobby text.
+    failure_modes:
+      - Compares whole texts, so the shared quoted law inflates every score; a rejected pair scored 1.00
+      - Needs human volunteers to separate real copies from lookalikes; most candidates were never checked
+      - Exact wording only; rewording or translation escapes it
+    lesson: >-
+      Compare only what each side changes, and score automatically. Its labelled pairs
+      are our practice set. Measured on simulated hidden tests: precision in top 20 0.86,
+      recall 0.68, AUC 0.81, against 1.00, 0.82 and 0.93 for our change-based prototype.
+    status: measured
+  - id: legislative-influence-detector
+    name: Legislative Influence Detector (LID)
+    builder: Data Science for Social Good, University of Chicago (Burgess and co-authors, KDD 2016)
+    year: 2016
+    kind: tool
+    scope: US state bills against model legislation from interest groups
+    url: https://dssgfellowship.org/lid/
+    method: >-
+      Elasticsearch finds the 100 most similar documents, then Smith-Waterman local
+      alignment scores the best matching passage word by word.
+    results: Found 45,405 bill-to-bill and 14,137 model-legislation-to-bill reuse instances.
+    failure_modes:
+      - Only exact matches count; synonyms are mismatches, so rewritten text escapes
+      - Boilerplate can produce high alignment scores (false positives)
+      - Short passages are unreliable
+      - Scores below about 100 need manual review
+    lesson: >-
+      Local alignment is the right tool for finding the matching stretch inside a long
+      paper, but it must ignore boilerplate and be paired with a meaning signal for
+      paraphrases.
+    status: verified
+  - id: copy-paste-legislate
+    name: Copy, Paste, Legislate
+    builder: USA TODAY, The Arizona Republic and the Center for Public Integrity
+    year: 2019
+    kind: journalism
+    scope: Nearly 1 million US state bills (2010-2018) against more than 2,100 model bills
+    url: https://publicintegrity.org/politics/state-politics/copy-paste-legislate/how-we-uncovered-10000-times-lawmakers-introduced-copycat-model-bills-and-why-it-matters/
+    method: >-
+      Compare bills sharing a topic keyword; find shared strings of six or more stemmed
+      words; score 0-100 from the longest shared string and the counts of 5+ and 10+ word
+      matches; flag scores of 80 or more.
+    results: >-
+      At least 10,000 bills almost entirely copied from model legislation; more than
+      2,100 signed into law. Won the 2020 Goldsmith Prize.
+    failure_modes:
+      - In the team's words, a bill that copied an idea but not the precise language was not flagged
+      - Required the equivalent of 150 computers for months and more than 30 reporters for review
+    lesson: >-
+      Long shared word runs are near-certain evidence, but recall needs a paraphrase
+      signal. Their score design (longest run plus counts of long matches) is a good
+      feature set.
+    status: verified
+  - id: wilkerson-text-reuse
+    name: Tracing the Flow of Policy Ideas in Legislatures
+    builder: Wilkerson, Smith and Stramp (American Journal of Political Science)
+    year: 2015
+    kind: paper
+    scope: The US Affordable Care Act against 29,000 bill versions of the 111th Congress
+    url: http://faculty.washington.edu/jwilker/559/policyideas.pdf
+    method: Sequence alignment borrowed from genetics to find shared policy ideas between bill versions.
+    results: Traced the law's provisions back to earlier bills.
+    failure_modes:
+      - Built for bill-to-bill reuse, where wording is preserved; not for lobby papers rewritten into amendments
+    lesson: Alignment works when text is reused; it is one signal, not the whole system.
+    status: reported
+  - id: suresh-ep-lobby-influence
+    name: Studying Lobby Influence in the European Parliament
+    builder: Suresh, Radojevic, Salvi, Magron, Kristof and Grossglauser (EPFL)
+    year: 2023
+    kind: paper
+    scope: Lobby position papers against MEP speeches in the European Parliament
+    url: https://arxiv.org/abs/2309.11381
+    method: Semantic similarity and entailment models link MEPs to lobbies whose papers say similar things.
+    results: AUC 0.77 when checked against MEP-lobby retweets and published meetings.
+    failure_modes:
+      - No ground truth of real influence; validated only against indirect signals
+      - Measures topical agreement, not whether text was copied
+    lesson: >-
+      Meaning models alone find who agrees, not who wrote it. The closest EU work; our
+      design adds change extraction and labelled copies.
+    status: verified
+  - id: whole-text-embeddings
+    name: Whole-text embedding similarity (the obvious modern approach)
+    year: 2026
+    kind: method
+    scope: Any pair of texts
+    url: https://www.sbert.net/
+    method: Embed both full texts with a sentence-embedding model and take cosine similarity.
+    results: On LobbyPlag, lookalike decoys score higher on average (0.84) than real copies (0.78).
+    failure_modes:
+      - Rewards same topic and same quoted law, which is exactly what decoys share
+      - Tiny legal words that flip meaning (shall to may) barely move the embedding
+    lesson: Use embeddings only on the extracted changes, never on whole texts.
+    status: measured
+  - id: kluver-preference-attainment
+    name: Measuring interest group influence in the EU
+    builder: Heike Klüver
+    year: 2009
+    kind: paper
+    scope: EU Commission consultations against final policy (56 issues, 2,696 groups in the 2013 book)
+    url: https://journals.sagepub.com/doi/10.1177/1465116509346782
+    method: >-
+      Place consultation submissions and the final policy on a position scale (Wordfish)
+      and measure how close each group ended up to the outcome.
+    results: Established the standard way to measure who wins in EU lobbying.
+    failure_modes:
+      - Works on overall positions, not on specific proposed wording
+    lesson: Precedent for step 3 and for "who wins"; we do it at the level of each proposed change.
+    status: reported
+  - id: ngo-manual-analysis
+    name: Manual article-by-article analyses by NGOs and journalists
+    builder: Corporate Europe Observatory, LobbyControl, TIME and others
+    year: 2026
+    kind: ngo-analysis
+    scope: AI Act (2023), Digital Omnibus (2025-2026) and other files
+    url: https://corporateeurope.org/en/2026/01/article-article-how-big-tech-shaped-eus-roll-back-digital-rights
+    method: Experts read lobby papers, freedom-of-information documents and legal texts side by side.
+    results: Credible, specific findings, for example Big Tech demands mirrored in the Digital Omnibus.
+    failure_modes:
+      - Slow and manual; covers a few files and a few lobbies
+      - No scores, so no ranking of how confident each link is
+    lesson: >-
+      This is the work Reversa's customers pay for today. Our product should produce the
+      same evidence (side-by-side changed words) automatically, with a score.
+    status: verified
+  - id: reversa-product
+    name: Reversa (the sponsor's product)
+    builder: Reversa, Madrid
+    year: 2025
+    kind: product
+    scope: Regulatory monitoring, Legislative Twins of EU procedures
+    url: https://builtineurope.substack.com/p/turning-regulatory-chaos-into-structured-intelligence-reversa
+    method: Monitoring of 500+ official sources and AI agents following procedures.
+    results: Its public site claims no lobby-tracing capability (checked 2026-10-02).
+    failure_modes:
+      - Not built for this yet; the challenge is a problem their team is working on
+    lesson: A working tracer is a feature they could ship; explain it so a lawyer trusts it.
+    status: verified

@@ -1,0 +1,83 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: DatasetCatalog
+description: >-
+  Public datasets, corpora, APIs and benchmarks that could supply Challenge 03 with
+  labelled pairs, vote outcomes, adopted texts, meeting links or evaluation data. One
+  record per source. Consumers: the data-loading plan and the evaluation design.
+type: object
+required: [updated, datasets]
+properties:
+  updated:
+    type: string
+    pattern: '^\d{4}-\d{2}-\d{2}$'
+  datasets:
+    type: array
+    items:
+      $ref: '#/$defs/Dataset'
+$defs:
+  Dataset:
+    type: object
+    required: [id, name, url, provider, year, kind, access, licence, scope, contents, labels,
+               steps, fit, fit_reason, status, checked, evidence, caveats]
+    properties:
+      id:
+        type: string
+        pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      name:
+        type: string
+      url:
+        type: string
+        pattern: '^https?://'
+      provider:
+        type: string
+      year:
+        type: integer
+        minimum: 1990
+        maximum: 2030
+      kind:
+        type: string
+        enum: [dataset, replication-data, corpus, api, benchmark]
+      access:
+        type: string
+        enum: [download, api, request, scrape, unavailable]
+      licence:
+        description: As stated by the provider; "unknown" when none is stated.
+        type: string
+      scope:
+        description: Legislatures, laws and years covered.
+        type: string
+      contents:
+        description: Records and fields, with counts.
+        type: string
+      labels:
+        description: The ground truth the source carries, or "none".
+        type: string
+      steps:
+        description: >-
+          Challenge parts it can serve: match (score pairs), graph (who links to whom),
+          heard (an MEP tabled the wording), passed (Parliament adopted it), won (in the
+          final law), predict (adoption), demo.
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum: [match, graph, heard, passed, won, predict, demo]
+      fit:
+        type: string
+        enum: [high, medium, low]
+      fit_reason:
+        type: string
+      status:
+        description: >-
+          verified = the files, API responses or pages were opened and inspected on the
+          checked date; reported = known from a search result, citation or description only.
+        type: string
+        enum: [verified, reported]
+      checked:
+        type: string
+        pattern: '^\d{4}-\d{2}-\d{2}$'
+      evidence:
+        description: What was opened or seen.
+        type: string
+      caveats:
+        type: string

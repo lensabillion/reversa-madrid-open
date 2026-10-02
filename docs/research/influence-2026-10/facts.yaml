@@ -1,0 +1,205 @@
+softschema:
+  contract: reversa.research:FactCatalog/v1
+  schema: facts.schema.yaml
+  status: permissive
+updated: '2026-10-02'
+facts:
+  # How EU laws are made
+  - id: commission-proposes
+    topic: eu-process
+    claim: >-
+      Under the ordinary legislative procedure the European Commission proposes the law;
+      the European Parliament and the Council of the EU (national ministers) amend it and
+      must agree on one final text, usually negotiated in three-way talks (trilogues).
+    source: https://www.europarl.europa.eu/infographic/legislative-procedure/index_en.html
+    source_kind: official
+    status: reported
+    checked: '2026-10-02'
+    note: Europarl blocks scripted fetches (HTTP 202 bot challenge); textbook-level fact.
+  - id: mep-count
+    topic: eu-process
+    claim: The European Parliament has 720 members (MEPs) in the 2024-2029 term.
+    source: https://www.europarl.europa.eu/about-parliament/en
+    source_kind: official
+    status: reported
+    checked: '2026-10-02'
+  - id: hys-feedback-on-proposal
+    topic: eu-process
+    claim: >-
+      After the Commission adopts a proposal, anyone has 8 weeks to send feedback on the
+      Have Your Say portal; the Commission summarizes this feedback for Parliament and
+      Council. This is when lobbies comment on the actual legal text.
+    source: https://op.europa.eu/webpub/eca/special-reports/public-participation-14-2019/en/
+    source_kind: official
+    status: reported
+    checked: '2026-10-02'
+  - id: who-tables-amendments
+    topic: eu-process
+    claim: >-
+      In committee, amendments are tabled by full or substitute members of that
+      committee. In plenary, by the responsible committee, a political group, or at
+      least one-twentieth of MEPs (36).
+    source: https://www.europarl.europa.eu/rules/rules20240716/Rules20240716_EN.pdf
+    source_kind: official
+    status: reported
+    checked: '2026-10-02'
+    note: The PDF is behind the same bot challenge; taken from a search summary of it.
+  - id: rapporteur-meetings-published
+    topic: lobbying
+    claim: >-
+      Since a 2019 rule change, rapporteurs, shadow rapporteurs and committee chairs must
+      publish their scheduled meetings with interest representatives for each report.
+    source: https://transparency.eu/mep-lobby-meetings/
+    source_kind: ngo
+    status: reported
+    checked: '2026-10-02'
+  # Lobbying
+  - id: register-size
+    topic: lobbying
+    claim: >-
+      LobbyFacts shows 17,469 organizations in the EU Transparency Register as of
+      1 October 2026 (largest declared lobby budget: Fleishman-Hillard, 12.73 million
+      euros).
+    source: https://www.lobbyfacts.eu/
+    source_kind: ngo
+    status: verified
+    checked: '2026-10-02'
+  - id: tech-lobby-spend
+    topic: lobbying
+    claim: >-
+      Tech-sector lobbying of EU institutions rose from 113 million euros a year (2023)
+      to 151 million euros (2025), according to Corporate Europe Observatory and
+      LobbyControl.
+    source: https://corporateeurope.org/en/2026/01/article-article-how-big-tech-shaped-eus-roll-back-digital-rights
+    source_kind: ngo
+    status: verified
+    checked: '2026-10-02'
+  # Real cases
+  - id: amazon-gdpr-copied
+    topic: case
+    claim: >-
+      Amazon's lobby paper proposed narrowing GDPR draft Article 26(1) to processing that
+      would "permit the processor to reasonably identify the data subject". Four
+      amendments tabled by different MEPs in three committees (IMCO 333, ITRE 614,
+      JURI 259, ITRE 616) contained the phrase and were verified by LobbyPlag volunteers.
+    source: docs/research/reversa-2026-10/evidence/lobbyplag-example.txt
+    source_kind: dataset
+    status: measured
+    checked: '2026-10-02'
+  - id: amazon-gdpr-lost
+    topic: case
+    claim: >-
+      Amazon's phrase is not in the final GDPR (Regulation 2016/679). Article 28(1) keeps
+      the Commission's broad rule: the controller "shall use only processors providing
+      sufficient guarantees". Copied into amendments, but lost in the final law.
+    source: http://publications.europa.eu/resource/celex/32016R0679
+    source_kind: official
+    status: measured
+    checked: '2026-10-02'
+  - id: openai-ai-act
+    topic: case
+    claim: >-
+      TIME (20 June 2023) obtained documents showing OpenAI argued in 2022 that general
+      purpose systems like GPT-3 should not be "high risk" under the AI Act; several of
+      its proposals appeared in the text Parliament approved on 14 June 2023.
+    source: https://time.com/6288245/openai-eu-lobbying-ai-act/
+    source_kind: journalism
+    status: verified
+    checked: '2026-10-02'
+  - id: digital-omnibus-article-by-article
+    topic: case
+    claim: >-
+      In January 2026 Corporate Europe Observatory matched, article by article, the
+      Commission's November 2025 Digital Omnibus (changes to the GDPR, AI Act and
+      ePrivacy rules) against Big Tech lobby positions, for example DigitalEurope's
+      demand that pseudonymised data not count as personal data.
+    source: https://corporateeurope.org/en/2026/01/article-article-how-big-tech-shaped-eus-roll-back-digital-rights
+    source_kind: ngo
+    status: verified
+    checked: '2026-10-02'
+    note: Done by hand by an NGO, which is exactly the work Challenge 03 asks us to automate.
+  # Scoring
+  - id: c03-scoring
+    topic: scoring
+    claim: >-
+      At 19:00 Reversa publishes 60 amendment-submission pairs (30 real, 30 lookalike
+      decoys) and 20 consultation proposals. Scored by precision in our top 20 (good 70%,
+      excellent 90%), recall on the 30 real pairs (good 60%, excellent 80%) and adoption
+      AUC (good 0.65, excellent 0.75). Hand labelling disqualifies. Event score: 60%
+      hidden test, 20% difficulty, 20% demo.
+    source: docs/brief/madrid-open-reversa-challenges.pdf
+    source_kind: official
+    status: verified
+    checked: '2026-10-02'
+  # Data and our measurements
+  - id: lobbyplag-labels
+    topic: data
+    claim: >-
+      LobbyPlag's GDPR data holds 1,976 candidate amendment-proposal pairs: 175 verified
+      as copies by volunteers, 100 reviewed and rejected (lookalikes its own matcher had
+      flagged), 1,701 never reviewed.
+    source: https://github.com/lobbyplag/lobbyplag-data
+    source_kind: dataset
+    status: measured
+    checked: '2026-10-02'
+  - id: prototype-redline
+    topic: measurement
+    claim: >-
+      Prototype (uncommitted, bead rev-ma0a), simulated 30+30 tests on LobbyPlag with
+      lobbyist-grouped cross-validation, lobby text as clean redlines: precision in top
+      20 1.00, recall 0.82, AUC 0.93. LobbyPlag's own matcher on the same tests: 0.86,
+      0.68, 0.81. Whole-text character similarity: 0.86, 0.74, 0.73.
+    source: influence/evaluate.py
+    source_kind: measured
+    status: measured
+    checked: '2026-10-02'
+  - id: prototype-paper
+    topic: measurement
+    claim: >-
+      Same prototype when each submission is the whole lobby paper instead of a redline:
+      precision in top 20 0.91, recall 0.65, AUC 0.87 (logistic model, lookalike decoys).
+    source: influence/evaluate.py
+    source_kind: measured
+    status: measured
+    checked: '2026-10-02'
+  - id: embeddings-prefer-decoys
+    topic: measurement
+    claim: >-
+      Whole-text sentence embeddings rate lookalike decoys as more similar (mean 0.84)
+      than real copies (0.78); embeddings of only the changed words reverse this (0.48
+      versus 0.92).
+    source: influence/evaluate.py
+    source_kind: measured
+    status: measured
+    checked: '2026-10-02'
+  - id: idf-boilerplate
+    topic: measurement
+    claim: >-
+      Across 354,985 EU legal documents (LobbyPlag GDPR texts and Parltrack Parliament
+      amendments), phrase rarity on a 0-1 scale: "shall" 0.10, "member states shall"
+      0.25, "reasonably identify" 0.78.
+    source: influence/corpus.py
+    source_kind: measured
+    status: measured
+    checked: '2026-10-02'
+  # Tools
+  - id: jev-noul
+    topic: tool
+    claim: >-
+      TypeSafe's Jev (jev-1.13.0, documented as generally available) answers yes/no
+      questions with the probability of yes (the Noul primitive) at 0.042 dollars per
+      million input tokens, output free; English is its strongest language.
+    source: https://docs.typesafe.ai/primitives/noul
+    source_kind: vendor-docs
+    status: verified
+    checked: '2026-10-02'
+  - id: claude-pricing
+    topic: tool
+    claim: >-
+      Claude API prices per million input/output tokens: Opus 5.5 4/20 dollars,
+      Sonnet 5.5 2/10, Haiku 4.5 1/5.
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    source_kind: vendor-docs
+    status: reported
+    checked: '2026-10-02'
+    note: From the Claude API skill's model table cached 2026-09-25.
