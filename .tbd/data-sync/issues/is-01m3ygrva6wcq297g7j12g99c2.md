@@ -5,7 +5,7 @@ title: "Challenge 03 Influence Graph: design, build and rehearse our entry"
 kind: epic
 status: open
 priority: 1
-version: 14
+version: 16
 labels: []
 dependencies: []
 child_order_hints:
@@ -22,7 +22,9 @@ child_order_hints:
   - is-01m3ymycfd7dcbj83gb14j7t30
   - is-01m3yp2g13g6tm23jncfm8476x
   - is-01m3yp5tjt1gsz6s29w5wgs9ep
+  - is-01m3yq5jb899pga6bsbqyg3h3s
+  - is-01m3yq5jh751jzk4q5n7m8d59q
 created_at: 2026-10-02T14:37:25.189Z
-updated_at: 2026-10-02T16:11:53.305Z
+updated_at: 2026-10-02T16:29:13.638Z
 ---
 Reversa Madrid Open, Sat 3 Oct 2026. Score 60 amendment-submission pairs (precision in top 20, recall on 30 real), predict adoption of 20 consultation proposals (AUC), demo an influence graph to a non-lawyer. Design must be agreed with the user before any build code.
