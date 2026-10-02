@@ -1,0 +1,37 @@
+// Profile B of `tbd guidelines typescript-lint-format-rules`. Biome's defaults supply the
+// rest of the floor: the recommended rule preset, import sorting, 2-space indentation,
+// LF line endings, and skipping node_modules and package-lock.json.
+// tests/gate-probes.test.ts proves that each rule below, import sorting, and the preset
+// reject a known violation.
+{
+  "files": {
+    // Next.js generates these.
+    "includes": ["**", "!**/.next", "!next-env.d.ts"],
+    // Skip files Biome has no language for (.npmrc, .nvmrc); with --verbose it reports
+    // them as warnings, which fail the zero-warning gate.
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 100
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "useBlockStatements": "error",
+        "useImportType": "error"
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
+      },
+      // tsc does not report unhandled promises; these type-aware nursery rules are the
+      // only static check for them. Re-run the gate probes after every Biome upgrade.
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "useAwaitThenable": "error"
+      }
+    }
+  }
+}

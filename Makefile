@@ -5,6 +5,9 @@
 # See SUPPLY-CHAIN-SECURITY.md.
 export UV_EXCLUDE_NEWER := 14 days
 
+# Next.js sends anonymous usage data to Vercel unless this is set. Gates make no such calls.
+export NEXT_TELEMETRY_DISABLED := 1
+
 PYTHON := 3.14
 # Ruff is pinned once, in backend/uv.lock. --project keeps the working directory at the
 # repository root, so paths stay `scripts` and Ruff reads the root ruff.toml for them.
@@ -13,11 +16,16 @@ SOFTSCHEMA_VERSION := 0.8.1
 # Runs a command in backend/. --locked fails instead of rewriting uv.lock when it no
 # longer matches pyproject.toml.
 BACKEND := uv run --directory backend --locked
+# Runs npm inside frontend/, so frontend/.npmrc (cool-off, no install scripts) always applies.
+NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend \
+	frontend-env check-frontend check-frontend-quality check-frontend-tests \
+	check-frontend-build audit-frontend fix-frontend dev-frontend
 
-check: check-scripts check-docs check-backend audit-backend  ## Run every gate.
+# Audits come last: they need network access, and the local gates fail faster.
+check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
 
 check-scripts:  ## Ruff format and lint check of repository scripts.
 	$(RUFF) format --check scripts
@@ -55,3 +63,27 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+
+frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
+	$(NPM) ci
+
+check-frontend: check-frontend-quality check-frontend-tests check-frontend-build  ## Run every frontend gate.
+
+check-frontend-quality: frontend-env  ## Biome format, lint and import order, then route types and tsc.
+	$(NPM) run check:lint
+	$(NPM) run check:types
+
+check-frontend-tests: frontend-env  ## Vitest: component tests and gate probes.
+	$(NPM) test
+
+check-frontend-build: frontend-env  ## Production build with next build, which type-checks again.
+	$(NPM) run build
+
+audit-frontend:  ## Fail on any advisory of moderate or higher severity in frontend/package-lock.json.
+	$(NPM) audit --audit-level=moderate
+
+fix-frontend: frontend-env  ## Apply Biome formatting and fixes, including unsafe ones such as adding braces.
+	$(NPM) run fix
+
+dev-frontend: frontend-env  ## Serve the web app at http://localhost:3000, reloading on changes.
+	$(NPM) run dev

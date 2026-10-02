@@ -1,0 +1,3 @@
+/* Tailwind CSS expands this into its base styles, its theme variables, and the utility
+   classes that the source files use. All styling is done with those classes. */
+@import "tailwindcss";
