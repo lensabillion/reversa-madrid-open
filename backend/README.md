@@ -10,6 +10,8 @@ also requires semantic influence scoring and adoption forecasting. This backend 
 starting evidence demo and an executable lexical baseline. It does not yet deliver the
 two competition CSVs, a trained influence probability, or an adoption forecast.
 See the [primer](../docs/explainer/influence-graph-primer.md) for the broader design.
+See [implementation status](../docs/implementation-status.md) for verified capabilities,
+remaining competition work and handoff instructions.
 
 ## Run With Public Data
 
@@ -64,6 +66,8 @@ by CORS. This is a local public-data demo without authentication or deployment h
 | `GET /api/v1/amendments/{id}/graph` | Organization, amendment and author nodes with typed edges |
 | `GET /api/v1/organizations` | Recorded proposal, verified-link and distinct amendment counts |
 | `POST /api/v1/score` | Deterministic changed-text similarity and source-offset evidence |
+| `POST /api/v1/compare` | Explicit edit or whole-passage comparison when originals may be unknown |
+| `POST /api/v1/documents/extract` | Page-preserving extraction from PDF or UTF-8 text |
 
 List parameters are `q` (committee, amendment number or author; at most 200 characters),
 `offset` (nonnegative), `limit` (1–100, default 20), and `verified_only` (default false).
@@ -86,6 +90,48 @@ curl --fail http://127.0.0.1:8000/api/v1/score \
   -H 'Content-Type: application/json' \
   -d '{"amendment":{"old":"Keep data for 30 days.","new":"Keep data for 90 days."},"submission":{"old":"Keep data for 30 days.","new":"Keep data for 90 days."}}'
 ```
+
+### User-Supplied Text
+
+`/compare` accepts `amendment` and `submission`, each with `old: string | null` and
+`new: string`. Null means original wording is unavailable; an empty string means a
+known empty original. When both originals are known, the response uses `mode: edits`
+and `method: lexical-delta-v1`. Otherwise it compares both full passages with
+`mode: passages` and `method: lexical-passage-v1`; a one-sided original is not used.
+The response states that limitation and does not invent changed-text spans. Evidence
+offsets reference `new` in passage mode. Both modes remain lexical similarity, not
+influence or adoption probabilities, and use the existing character/token bounds.
+
+```sh
+curl --fail http://127.0.0.1:8000/api/v1/compare \
+  -H 'Content-Type: application/json' \
+  -d '{"amendment":{"old":null,"new":"Keep data for 90 days."},"submission":{"old":null,"new":"Keep data for 90 days."}}'
+```
+
+### PDF and Text Extraction
+
+Send raw file bytes to `/documents/extract` with `Content-Type: application/pdf`,
+`text/plain`, or `text/markdown`. It returns `format`, numbered `pages` with extracted
+`text`, `warnings`, and `character_count`. Extraction does not guess which columns are
+original/proposed wording or select evidence passages. The same service can be called
+by a future batch adapter without HTTP. Files are processed in memory and are not saved.
+
+```sh
+curl --fail http://127.0.0.1:8000/api/v1/documents/extract \
+  -H 'Content-Type: application/pdf' --data-binary @public-submission.pdf
+```
+
+Limits: 8 MiB uploaded, 100 PDF pages, 500,000 extracted characters, 2 MiB expanded
+content per page and 16 MiB aggregate page streams. Oversized input returns 413,
+unsupported media 415, and invalid/encrypted/empty documents 422 with a safe
+`detail.code` and message. PDFs with no text return `ocr_required`; mixed blank pages
+remain present with warnings. OCR is not performed. Multi-column/table reading order
+requires inspection, because PDF extraction cannot guarantee visual order.
+
+`pypdf==6.19.0` is the one added dependency, pinned through the repository's 14-day
+package-age policy. Its context-local decompression limits contain common expansion
+cases and external image conversion is disabled. These limits are not a hard memory or
+CPU sandbox: this is a local public-document demo, not an internet-facing upload service.
 
 ## Separation of Responsibilities
 
