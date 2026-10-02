@@ -1,0 +1,72 @@
+name: Frontend
+
+# No path filters: a check that does not run must not look like a check that passed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only token: these jobs only check files.
+permissions:
+  contents: read
+
+# One job per question, so a red job says what kind of problem it is. Each job runs the
+# same make target a contributor runs locally; the Makefile also disables Next.js telemetry.
+jobs:
+  quality:
+    name: Frontend passes Biome and TypeScript
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Actions are pinned to full commit SHAs: a tag can be moved to other code, a SHA cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make check-frontend-quality
+      # `next typegen` rewrites tsconfig.json when a setting Next.js requires is missing;
+      # fail instead of checking a configuration that is not the committed one.
+      - run: git diff --exit-code
+
+  test:
+    name: Frontend tests and gate probes pass
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make check-frontend-tests
+
+  build:
+    name: Frontend production build succeeds
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make check-frontend-build
+      # `next build` rewrites tsconfig.json when a setting Next.js requires is missing.
+      - run: git diff --exit-code
+
+  audit:
+    name: Frontend dependencies have no known vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+      - run: make audit-frontend

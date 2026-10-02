@@ -68,13 +68,17 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 
 | Command | What it does |
 | --- | --- |
-| `make check` | Every gate below except the dev server; changes nothing |
+| `make check` | Every gate below except the dev servers; changes nothing |
 | `make check-scripts` | Ruff format and lint check of `scripts/` |
 | `make check-docs` | Validates every research catalog against its schema |
 | `make check-backend` | Locked install, Ruff format and lint, basedpyright strict, tests with gate probes and 100% branch coverage |
 | `make audit-backend` | Looks up every package in `backend/uv.lock` in the OSV vulnerability database (needs network) |
+| `make check-frontend` | Clean `npm ci`, Biome, Next.js route types and `tsc`, Vitest with gate probes, production build |
+| `make audit-frontend` | `npm audit` of `frontend/package-lock.json`; moderate severity or higher fails (needs network) |
 | `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |
+| `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
+| `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
 
 Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 
@@ -165,6 +169,13 @@ Rules that apply to every test (`tbd guidelines general-testing-rules`):
 - This Next.js version is newer than most model training data and has breaking changes.
   Read the relevant guide in `frontend/node_modules/next/dist/docs/` before writing
   Next.js code, and heed deprecation notices.
+  `frontend/AGENTS.md` holds the same instruction as a block that `next dev` manages; do
+  not edit it by hand.
+- TypeScript 7 (the native compiler); Next.js type-checks with the project's own `tsc`.
+- Style with Tailwind CSS v4 utility classes. `app/globals.css` only imports Tailwind.
+- Run npm only inside `frontend/` (the `make` targets do), so `frontend/.npmrc` applies.
+- After changing `biome.jsonc` or `tsconfig.json`, or upgrading Biome or TypeScript, run
+  `make check-frontend-tests`: the gate probes prove each rule still rejects its violation.
 - Biome is the only formatter and linter, at the floor in
   `tbd guidelines typescript-lint-format-rules`, verified in CI with
   `biome ci --error-on-warnings`.
