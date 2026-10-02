@@ -3,9 +3,9 @@ type: is
 id: is-01m3z0te5ze4n2qcvsy0b0q6e8
 title: Build the GDPR evidence-demo backend with typed API and separated domain services
 kind: feature
-status: in_progress
+status: closed
 priority: 1
-version: 6
+version: 7
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -15,8 +15,12 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T19:17:54.489Z
-updated_at: 2026-10-02T19:46:25.328Z
+updated_at: 2026-10-02T19:52:00.490Z
 started_at: 2026-10-02T19:18:44.595Z
+closed_at: 2026-10-02T19:52:00.489Z
+close_reason: Merged in GitHub PR10 as a7b092c on main. All9CIchecks passed on7593653;74backendtests100%line/branch, full repository gate and real4867amendment/graph rehearsal passed. First-principles PR and backend README document behavior, limitations and remaining pipeline work.
+resolution: null
+duplicate_of: null
 ---
 Implement the starting demo backend from the agreed new architecture: local public LobbyPlag ingestion, amendment/source evidence, organization-MEP graph, transparent automated baseline scoring, separated schemas/routers/business logic, documented API and reproducible validation. Keep historical verification labels separate from model scores. Assess ML necessity without claiming trained predictive quality unsupported by labels. Deliver a first-principles PR with full gates and CI.
 
