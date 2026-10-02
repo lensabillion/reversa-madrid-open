@@ -1,0 +1,15 @@
+---
+type: is
+id: is-01m3z9e72y2h66snf8c7fpppem
+title: "Plan step 1: submission command that scores supplied pairs and writes a validated pairs.csv"
+kind: feature
+status: open
+priority: 0
+version: 1
+labels: []
+dependencies: []
+parent_id: is-01m3ygrva6wcq297g7j12g99c2
+created_at: 2026-10-02T21:48:31.197Z
+updated_at: 2026-10-02T21:48:31.197Z
+---
+Architecture parts 1-4 wired into one command (see .agents/skills/influence-architecture). Read a normalized pairs input (JSON Lines; the organizers' format gets an adapter once D5 is answered), score each pair with the existing comparison service, write pairs.csv (pair_id,influence_score) atomically after validating exactly the input IDs, uniqueness and finite scores in [0,1], and save each score's evidence. Rehearse on 60 LobbyPlag pairs against a timer. Part of rev-fkut (R11).
