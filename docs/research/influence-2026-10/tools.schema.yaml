@@ -1,0 +1,60 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: ToolCatalog
+description: >-
+  Candidate tools and models for each part of the Challenge 03 pipeline. One record per
+  tool. Consumers: the architecture decision and the event-day setup checklist.
+type: object
+required: [updated, tools]
+properties:
+  updated:
+    type: string
+    pattern: '^\d{4}-\d{2}-\d{2}$'
+  tools:
+    type: array
+    items:
+      $ref: '#/$defs/Tool'
+$defs:
+  Tool:
+    type: object
+    required: [id, name, component, provider, licence, access, cost, fit, risks, recommendation, status]
+    properties:
+      id:
+        type: string
+        pattern: '^[a-z0-9]+(-[a-z0-9]+)*$'
+      name:
+        type: string
+      component:
+        type: string
+        enum: [data-access, pdf-extraction, language-detection, translation, embeddings,
+               reranker, nli, llm-judge, text-alignment, ml, graph-analysis, graph-ui,
+               demo-ui, local-llm-runtime]
+      provider:
+        type: string
+      version:
+        type: string
+      licence:
+        type: string
+      access:
+        type: string
+        enum: [local, api, local-or-api, web]
+      cost:
+        type: string
+      needs:
+        description: Accounts, keys, hardware or downloads required before use.
+        type: string
+      fit:
+        description: What it would do for us.
+        type: string
+      risks:
+        type: string
+      recommendation:
+        description: Proposal pending the user's agreement.
+        type: string
+        enum: [proposed, candidate, fallback, avoid]
+      status:
+        description: >-
+          verified = licence and version or behaviour checked on 2026-10-02 from the
+          registry or docs; measured = we ran it on our practice data; reported = from
+          documentation or search summaries only.
+        type: string
+        enum: [verified, measured, reported]
