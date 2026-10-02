@@ -16,16 +16,16 @@ SOFTSCHEMA_VERSION := 0.8.1
 # Runs a command in backend/. --locked fails instead of rewriting uv.lock when it no
 # longer matches pyproject.toml.
 BACKEND := uv run --directory backend --locked
-# Every npm command runs inside frontend/, so frontend/.npmrc (cool-off, no install
-# scripts) always applies.
-FRONTEND := frontend
+# Runs npm inside frontend/, so frontend/.npmrc (cool-off, no install scripts) always applies.
+NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend
-.PHONY: install-frontend check-frontend lint-frontend typecheck-frontend test-frontend
-.PHONY: build-frontend audit-frontend fix-frontend dev-frontend
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend \
+	frontend-env check-frontend check-frontend-quality check-frontend-tests \
+	check-frontend-build audit-frontend fix-frontend dev-frontend
 
-check: check-scripts check-docs check-backend audit-backend check-frontend  ## Run every gate.
+# Audits come last: they need network access, and the local gates fail faster.
+check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
 
 check-scripts:  ## Ruff format and lint check of repository scripts.
 	$(RUFF) format --check scripts
@@ -64,29 +64,26 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
 
-install-frontend:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
-	cd $(FRONTEND) && npm ci
+frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
+	$(NPM) ci
 
-# Ordered cheapest first. Each gate is also a target of its own, for the CI jobs.
-check-frontend: lint-frontend typecheck-frontend test-frontend build-frontend audit-frontend  ## Run every frontend gate.
+check-frontend: check-frontend-quality check-frontend-tests check-frontend-build  ## Run every frontend gate.
 
-lint-frontend: install-frontend  ## Biome format, lint and import-order check (verify only).
-	cd $(FRONTEND) && npm run check:lint
+check-frontend-quality: frontend-env  ## Biome format, lint and import order, then route types and tsc.
+	$(NPM) run check:lint
+	$(NPM) run check:types
 
-typecheck-frontend: install-frontend  ## Generate Next.js route types, then type-check with tsc.
-	cd $(FRONTEND) && npm run check:types
+check-frontend-tests: frontend-env  ## Vitest: component tests and gate probes.
+	$(NPM) test
 
-test-frontend: install-frontend  ## Vitest: component tests and gate probes.
-	cd $(FRONTEND) && npm test
+check-frontend-build: frontend-env  ## Production build with next build, which type-checks again.
+	$(NPM) run build
 
-build-frontend: install-frontend  ## Production build with next build (type-checks again).
-	cd $(FRONTEND) && npm run build
+audit-frontend:  ## Fail on any advisory of moderate or higher severity in frontend/package-lock.json.
+	$(NPM) audit --audit-level=moderate
 
-audit-frontend:  ## Fail on any known advisory of moderate or higher severity in the lockfile.
-	cd $(FRONTEND) && npm audit --audit-level=moderate
+fix-frontend: frontend-env  ## Apply Biome formatting and fixes, including unsafe ones such as adding braces.
+	$(NPM) run fix
 
-fix-frontend: install-frontend  ## Apply Biome formatting and fixes, including unsafe ones.
-	cd $(FRONTEND) && npm run fix
-
-dev-frontend: install-frontend  ## Start the Next.js development server.
-	cd $(FRONTEND) && npm run dev
+dev-frontend: frontend-env  ## Serve the web app at http://localhost:3000, reloading on changes.
+	$(NPM) run dev

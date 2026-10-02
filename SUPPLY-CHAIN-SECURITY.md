@@ -46,4 +46,17 @@ clears the window and the exception can be removed.
 
 | Package | Version | Published | Reason | Approved by | Clears window |
 | --- | --- | --- | --- | --- | --- |
-| `next`, with `@next/env` and the eight `@next/swc-*` binaries it pins to the same version | 16.3.6 | 2026-09-22 | 16.3.5, the newest version outside the window, has the critical advisory [GHSA-vcvr-r3jv-pc5j](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j) (remote code execution in `next/og` `ImageResponse`, affects 16.2.0 to 16.3.5); 16.3.6 is the first fixed version. Verified before install: published by GitHub Actions through npm trusted publishing with SLSA provenance, integrity `sha512-L+otWM/aQbYTx98aZhgEoMb4bZAXx1YVW4UMA/vuCyCoWG5HJyZUili8QAkqzrcC+5///tsz3s0M+SlyB5bLMw==`, and no advisory affects 16.3.6. Installed with a one-command `--min-release-age=0` after the rest of the tree resolved under the policy; that step changed only these ten packages. 16.3.7 and 16.3.8 fix no advisory, so they are not taken. | Pending project owner approval in this PR | 2026-10-06 |
+| `next`, `@next/env` and eight `@next/swc-*` binaries | 16.3.6 | 2026-09-22 | 16.3.5 has the critical advisory GHSA-vcvr-r3jv-pc5j; 16.3.6 is the first fixed version (note 1) | Pending project owner approval in this PR | 2026-10-06 |
+
+Notes:
+
+1. **next 16.3.6.** [GHSA-vcvr-r3jv-pc5j](https://github.com/advisories/GHSA-vcvr-r3jv-pc5j)
+   allows remote code execution through `next/og` `ImageResponse` in versions 16.2.0 to
+   16.3.5. `next` pins `@next/env` and its eight platform `@next/swc-*` binaries to its own
+   version, so all ten packages share the publication date. Verified before installing:
+   published by GitHub Actions through npm trusted publishing with SLSA provenance;
+   integrity
+   `sha512-L+otWM/aQbYTx98aZhgEoMb4bZAXx1YVW4UMA/vuCyCoWG5HJyZUili8QAkqzrcC+5///tsz3s0M+SlyB5bLMw==`;
+   no advisory affects 16.3.6. The rest of the tree resolved under the policy first; one
+   `npm install next@16.3.6 --min-release-age=0` then changed only these ten packages.
+   16.3.7 and 16.3.8 fix no advisory, so they are not taken.

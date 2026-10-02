@@ -1,5 +1,6 @@
 name: Frontend
 
+# No path filters: a check that does not run must not look like a check that passed.
 on:
   pull_request:
   push:
@@ -9,12 +10,11 @@ on:
 permissions:
   contents: read
 
-env:
-  NEXT_TELEMETRY_DISABLED: 1
-
+# One job per question, so a red job says what kind of problem it is. Each job runs the
+# same make target a contributor runs locally; the Makefile also disables Next.js telemetry.
 jobs:
   quality:
-    name: Biome and TypeScript pass
+    name: Frontend passes Biome and TypeScript
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -25,13 +25,13 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
-      - run: make lint-frontend typecheck-frontend
+      - run: make check-frontend-quality
       # `next typegen` rewrites tsconfig.json when a setting Next.js requires is missing;
       # fail instead of checking a configuration that is not the committed one.
       - run: git diff --exit-code
 
   test:
-    name: Vitest passes
+    name: Frontend tests and gate probes pass
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -41,10 +41,10 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
-      - run: make test-frontend
+      - run: make check-frontend-tests
 
   build:
-    name: Next.js production build succeeds
+    name: Frontend production build succeeds
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -54,12 +54,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: frontend/.nvmrc
-      - run: make build-frontend
+      - run: make check-frontend-build
       # `next build` rewrites tsconfig.json when a setting Next.js requires is missing.
       - run: git diff --exit-code
 
   audit:
-    name: No known vulnerable dependency
+    name: Frontend dependencies have no known vulnerabilities
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
