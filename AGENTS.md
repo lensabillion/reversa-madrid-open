@@ -64,7 +64,19 @@ These come from the project owner and override any default habit.
 
 `make check` is the one gate: it verifies everything and changes nothing.
 CI runs the same targets, so a local pass predicts a CI pass.
-Each area adds its own `check-*` target to the root `Makefile` when it lands.
+Each area adds its targets to the root `Makefile` and to this table when it lands.
+
+| Command | What it does |
+| --- | --- |
+| `make check` | Every gate below except the dev server; changes nothing |
+| `make check-scripts` | Ruff format and lint check of `scripts/` |
+| `make check-docs` | Validates every research catalog against its schema |
+| `make check-backend` | Locked install, Ruff format and lint, basedpyright strict, tests with gate probes and 100% branch coverage |
+| `make audit-backend` | Looks up every package in `backend/uv.lock` in the OSV vulnerability database (needs network) |
+| `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |
+| `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
+
+Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 
 ## Workflow
 
