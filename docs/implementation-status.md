@@ -55,6 +55,15 @@ rehearsal. See [the retained measurement](../backend/validation/rehearsal-2026-1
 
 ## Next Work in Competition Order
 
+`rev-6i5t` establishes a reproducible starting measurement: the lexical scorer ranks the
+preferred submission first in 2/10 frozen synthetic triplets; a pinned local Qwen3
+reranker does so in 8/10. The remaining deadline and obligation failures, and high
+scores on contradictory submissions, prevent promotion to production. These are
+diagnostics, not held-out influence accuracy. See the [complete experiment and raw
+results](../backend/evaluation/README.md). The production API still uses the lexical
+baseline. The experiment is on `feat/pair-evaluation`; its heavyweight runtime is
+isolated and its dependency lock is audited by the normal gate.
+
 1. `rev-p2rd`: establish practice labels with provenance and lobbyist-grouped folds;
    compare lexical and pretrained semantic candidates using top-20 precision and recall.
    Do not use unverified candidates as known negatives or hand-label hidden test pairs.

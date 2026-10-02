@@ -1,0 +1,166 @@
+{
+  "version": "synthetic-diagnostics-v1",
+  "provenance": "Agent-authored public-domain diagnostic examples, frozen before reranker inference on 2026-10-02. Preferred means closer requested legal outcome in this illustrative case; neither label asserts historical influence. Not held-out real-world data.",
+  "cases": [
+    {
+      "id": "paraphrase",
+      "category": "paraphrase",
+      "amendment": {
+        "old": null,
+        "new": "Erase personal records when the purpose has ended."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Delete private information once it is no longer needed."
+      },
+      "decoy": {
+        "old": null,
+        "new": "Publish annual reports about consumer complaints."
+      }
+    },
+    {
+      "id": "antonym",
+      "category": "contradictory_request",
+      "amendment": {
+        "old": null,
+        "new": "Operators shall permit independent audits."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Independent reviewers must be allowed to inspect operators."
+      },
+      "decoy": {
+        "old": null,
+        "new": "Operators shall prohibit independent audits."
+      }
+    },
+    {
+      "id": "quantity",
+      "category": "quantity",
+      "amendment": {
+        "old": null,
+        "new": "Report a breach within 24 hours."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Notify the authority within one day of a breach."
+      },
+      "decoy": {
+        "old": null,
+        "new": "Report a breach within 72 hours."
+      }
+    },
+    {
+      "id": "percentage",
+      "category": "quantity",
+      "amendment": {
+        "old": null,
+        "new": "The maximum fine shall be 2% of annual turnover."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Cap the financial penalty at two percent of yearly revenue."
+      },
+      "decoy": {
+        "old": null,
+        "new": "The maximum fine shall be 20% of annual turnover."
+      }
+    },
+    {
+      "id": "boilerplate",
+      "category": "boilerplate",
+      "amendment": {
+        "old": null,
+        "new": "This Regulation protects fundamental rights and freedoms. Controllers shall erase expired records."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Delete personal information after its retention period expires."
+      },
+      "decoy": {
+        "old": null,
+        "new": "This Regulation protects fundamental rights and freedoms. Controllers shall retain expired records."
+      }
+    },
+    {
+      "id": "shared-deletion",
+      "category": "shared_deletion",
+      "amendment": {
+        "old": "Operators shall process personal data fairly and lawfully for specified explicit legitimate purposes and retain records for six months.",
+        "new": "Operators may disclose records."
+      },
+      "preferred": {
+        "old": "Operators shall process personal data fairly and lawfully for specified explicit legitimate purposes and retain records for six months.",
+        "new": "Organizations are permitted to share the information."
+      },
+      "decoy": {
+        "old": "Operators shall process personal data fairly and lawfully for specified explicit legitimate purposes and retain records for six months.",
+        "new": "Operators must safeguard records."
+      }
+    },
+    {
+      "id": "negation-scope",
+      "category": "negation_scope",
+      "amendment": {
+        "old": null,
+        "new": "Controllers must not disclose records unless the person consents."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Disclosure is forbidden without permission from the individual."
+      },
+      "decoy": {
+        "old": null,
+        "new": "Controllers must disclose records unless the person does not consent."
+      }
+    },
+    {
+      "id": "legal-modality",
+      "category": "legal_modality",
+      "amendment": {
+        "old": null,
+        "new": "The authority shall investigate complaints."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Investigating complaints is mandatory for the authority."
+      },
+      "decoy": {
+        "old": null,
+        "new": "The authority may investigate complaints."
+      }
+    },
+    {
+      "id": "identical",
+      "category": "literal_control",
+      "amendment": {
+        "old": null,
+        "new": "Pseudonymised records must be stored separately."
+      },
+      "preferred": {
+        "old": null,
+        "new": "Pseudonymised records must be stored separately."
+      },
+      "decoy": {
+        "old": null,
+        "new": "Member States shall establish supervisory authorities."
+      }
+    },
+    {
+      "id": "unchanged-law",
+      "category": "unchanged_control",
+      "amendment": {
+        "old": "The controller shall retain records for 90 days.",
+        "new": "The controller shall retain records for 30 days."
+      },
+      "preferred": {
+        "old": "The controller shall retain records for 90 days.",
+        "new": "The controller shall retain records for 30 days."
+      },
+      "decoy": {
+        "old": "The controller shall retain records for 90 days.",
+        "new": "The controller shall retain records for 90 days."
+      }
+    }
+  ]
+}
