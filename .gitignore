@@ -9,6 +9,7 @@ outputs/
 .cache/
 .pytest_cache/
 .ruff_cache/
+.coverage
 attic/
 # Agent worktrees created by Claude Code; each is a separate checkout of this repository.
 .claude/worktrees/

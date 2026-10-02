@@ -15,7 +15,9 @@ reviewed lockfile records remove most of that risk at little cost.
 1. **14-day cool-off.** Never install or upgrade to a version published less than 14
    days ago, unless an exception below is recorded and approved by a human.
    Agents never approve their own exceptions.
-2. **Install scripts are off.** npm runs with `ignore-scripts=true`.
+2. **No package code runs at install time.** npm runs with `ignore-scripts=true`; uv
+   never builds a dependency from source (`no-build = true`), because a build runs the
+   package's own code.
 3. **Lockfiles are committed and installed frozen**: `uv sync --locked`, `npm ci`.
    A lockfile diff is reviewed like code.
 4. **Pin exactly.** Direct dependencies use exact versions; GitHub Actions use full
@@ -23,7 +25,8 @@ reviewed lockfile records remove most of that risk at little cost.
    code and a SHA cannot.
 5. **No unpinned one-off runners.** `uvx`, `npx` and similar always name an exact
    version.
-6. **Audit in CI.** Dependency audits run in the same gate as tests.
+6. **Audit in CI.** Dependency audits run in the same gate as tests: `make audit-backend`
+   checks every package in `backend/uv.lock` against the OSV vulnerability database.
 7. **Do not update for its own sake.** Upgrade for a named reason: a fix, a feature we
    use, or a security advisory.
 
