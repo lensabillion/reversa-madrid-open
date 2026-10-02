@@ -1,83 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type {
-  AmendmentDetail,
-  AmendmentPage,
-  DatasetOverview,
-  SourceMatch,
-  SourceText,
-  TextSpan,
-} from "../lib/api";
+import type { AmendmentDetail, AmendmentPage, DatasetOverview } from "../lib/api";
 import { useResource } from "../lib/use-resource";
 import { CompareTexts } from "./compare-texts";
-import { HighlightedText } from "./highlighted-text";
+import { EvidenceColumns } from "./evidence-columns";
 import { InfluenceNetwork } from "./influence-network";
 
 const buttonStyle =
   "rounded-sm px-3 py-2 text-xs font-medium transition-colors hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:opacity-35";
 
-function TextColumn({
-  title,
-  text,
-  spans,
-  language,
-}: {
-  title: string;
-  text: string;
-  spans: TextSpan[];
-  language: string;
-}) {
-  return (
-    <section className="min-w-0">
-      <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.14em] text-stone-500">
-        {title}
-      </h3>
-      <div
-        lang={language}
-        className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words pr-3 font-serif text-[16px] leading-[1.85] text-stone-800"
-      >
-        {text ? (
-          <HighlightedText text={text} spans={spans} />
-        ) : (
-          <span className="font-sans text-sm italic text-stone-400">No text</span>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Comparison({
-  amendment,
-  source,
-  operation,
-}: {
-  amendment: SourceText;
-  source: SourceMatch;
-  operation: "insert" | "delete";
-}) {
-  const evidence = source.score?.evidence.filter((item) => item.operation === operation) ?? [];
-  return (
-    <div className="grid gap-8 py-7 md:grid-cols-2 md:gap-10">
-      <TextColumn
-        title="Amendment"
-        text={operation === "insert" ? amendment.new : amendment.old}
-        spans={evidence.map((item) => item.amendment)}
-        language={amendment.language}
-      />
-      <TextColumn
-        title="Lobby proposal"
-        text={operation === "insert" ? source.text.new : source.text.old}
-        spans={evidence.map((item) => item.submission)}
-        language={source.text.language}
-      />
-    </div>
-  );
-}
-
 function Evidence({ detail }: { detail: AmendmentDetail }) {
   const [sourceId, setSourceId] = useState<string | null>(null);
-  const [operation, setOperation] = useState<"insert" | "delete">("insert");
   const source = detail.sources.find((item) => item.candidate_id === sourceId) ?? detail.sources[0];
   if (!source) {
     return (
@@ -85,20 +19,13 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
         <p className="mb-8 text-sm text-stone-500">
           No source candidates recorded for this amendment.
         </p>
-        <div className="grid gap-8 md:grid-cols-2">
-          <TextColumn
-            title="Original"
-            text={detail.text.old}
-            spans={[]}
-            language={detail.text.language}
-          />
-          <TextColumn
-            title="Proposed"
-            text={detail.text.new}
-            spans={[]}
-            language={detail.text.language}
-          />
-        </div>
+        <EvidenceColumns
+          amendment={detail.text}
+          submission={null}
+          evidence={[]}
+          mode="edits"
+          sourceMetadata={null}
+        />
       </div>
     );
   }
@@ -125,9 +52,6 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
               </option>
             ))}
           </select>
-          <p className="mt-2 break-all text-xs leading-5 text-stone-500">
-            {source.document} · p. {source.page}
-          </p>
           {detail.sources.length < detail.total_sources && (
             <p className="mt-1 text-xs text-stone-500">
               Showing {detail.sources.length} of {detail.total_sources}; verified first.
@@ -149,37 +73,24 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
             <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">
               Lexical similarity
             </p>
-            <p className="mt-1 font-mono text-3xl tracking-tight text-stone-900">
+            <p className="mt-1 font-mono text-xl tracking-tight text-stone-700">
               {source.score ? source.score.score.toFixed(2) : "—"}
             </p>
           </div>
         </div>
       </div>
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-y border-stone-200 py-2">
-        <fieldset className="flex gap-1" aria-label="Text version">
-          <button
-            type="button"
-            aria-pressed={operation === "insert"}
-            onClick={() => setOperation("insert")}
-            className={`${buttonStyle} ${operation === "insert" ? "bg-stone-100 text-stone-950" : "text-stone-500"}`}
-          >
-            Proposed text
-          </button>
-          <button
-            type="button"
-            aria-pressed={operation === "delete"}
-            onClick={() => setOperation("delete")}
-            className={`${buttonStyle} ${operation === "delete" ? "bg-stone-100 text-stone-950" : "text-stone-500"}`}
-          >
-            Original text
-          </button>
-        </fieldset>
-        <span className="flex items-center gap-2 text-xs text-stone-500">
-          <span aria-hidden="true" className="h-2.5 w-2.5 bg-teal-200" />
-          Shared changed wording
-        </span>
-      </div>
-      <Comparison amendment={detail.text} source={source} operation={operation} />
+      <EvidenceColumns
+        key={source.candidate_id}
+        amendment={detail.text}
+        submission={source.text}
+        evidence={source.score?.evidence ?? []}
+        mode="edits"
+        sourceMetadata={{
+          organization: source.organization,
+          document: source.document,
+          page: source.page,
+        }}
+      />
       {source.score?.negation_conflict && (
         <p role="note" className="border-l-2 border-amber-500 pl-3 text-sm text-amber-900">
           Negation differs between these edits.
