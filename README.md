@@ -23,6 +23,7 @@ turn raw inputs into both CSVs with one command.
 - [SUPPLY-CHAIN-SECURITY.md](SUPPLY-CHAIN-SECURITY.md): rules for adding dependencies.
 - [Backend guide](backend/README.md): run the evidence API, obtain the public snapshot,
   understand the layers and scoring limits, and verify the implementation.
+- [Frontend guide](frontend/README.md): run the evidence workspace and connect it to the API.
 - [The explainer](docs/explainer/influence-graph-primer.md): the challenge explained from
   first principles. A styled version is
   [published separately](https://claude.ai/artifact/HL1KzDHpMWYerESyy3pLje) (private; the
