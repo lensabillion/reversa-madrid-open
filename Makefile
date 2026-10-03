@@ -22,7 +22,7 @@ NPM := cd frontend && npm
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
 	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect atlas \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
-	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag
+	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
 # Audits come last: they need network access, and the local gates fail faster.
 check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
@@ -82,6 +82,20 @@ submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file
 # The snapshot is pinned to a commit and verified against recorded SHA-256 digests.
 fetch-lobbyplag:  ## Download and verify LobbyPlag's data into data/lobbyplag/ (needs network).
 	$(BACKEND) python ../scripts/fetch_lobbyplag.py
+
+# The Qwen model files (about 1.8 GB) are pinned to a Hugging Face commit and verified by SHA-256.
+fetch-qwen-embedding:  ## Download and verify Qwen3-Embedding-0.6B (ONNX, 8-bit) into data/models/ (needs network).
+	$(BACKEND) python ../scripts/fetch_qwen_embedding.py
+
+fetch-qwen-reranker:  ## Download and verify Qwen3-Reranker-0.6B (ONNX) into data/models/ (needs network).
+	$(BACKEND) python ../scripts/fetch_qwen_reranker.py
+
+# The optional `models` dependency group holds the model runtime; nothing else installs it.
+evaluate-dense:  ## Measure the Qwen meaning signals on LobbyPlag (needs the models; see make fetch-qwen-*).
+	uv run --directory backend --locked --group models python -m influence.practice.dense \
+		--data "$(abspath data/lobbyplag)" --model "$(abspath data/models/qwen3-embedding-0.6b)" \
+		--reranker "$(abspath data/models/qwen3-reranker-0.6b)" \
+		--cache "$(abspath data/models/cache.sqlite3)" --out evaluation/dense-meaning.json
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci
