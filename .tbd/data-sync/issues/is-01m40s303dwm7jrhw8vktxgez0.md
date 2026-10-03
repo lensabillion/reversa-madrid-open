@@ -5,18 +5,18 @@ title: Complete consolidated-plan signal calculation and evaluation
 kind: task
 status: in_progress
 priority: 0
-version: 6
+version: 7
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies: []
 hold: null
 hold_until: null
 created_at: 2026-10-03T11:41:15.245Z
-updated_at: 2026-10-03T14:16:27.536Z
+updated_at: 2026-10-03T14:19:56.113Z
 started_at: 2026-10-03T11:41:31.110Z
 ---
 User explicitly requests complete calculation per docs/plan.md, no omitted signals. Extend Agent2 assessment/outcome branches rather than duplicate them. Scope: requirement coverage matrix, measured semantic retrieval, rarity/alignment/background/mutual/legal signals, fitted grouped combiner and threshold evidence, integration/handoff. No unapproved external judge/API spending; no probability/publication claims without evaluation.
 
 ## Notes
 
-PR48 remains merged. Follow-up draft PR63 https://github.com/lensabillion/reversa-madrid-open/pull/63 integrates Jev with existing deterministic, rarity, alignment, operation, legal-cue, background/rank and semantic features in one fitted calculation and optional pipeline.build_view path through outcomes/graph/rankings/API. Combined19feature integration tests prove semantic and Jev values independently affect the same support score and missing features fail. Full make check1188 backend+benchmark tests100%,94frontend passed. Maincb9c299 default CLI still lexical; no validated fit/publication policy enabled. Full-signal +Jev AUC improves .9230→.9516 but P20 drops .9727→.9561. Real diagnostic review still fails; Gate3 NOT complete. Required next work: freeze actual deployable model/corpus/feature and context policy; measured real-prose precision, complete source background beyond target provision, safe CLI artifacts then actual20published+10random reads. Gate7 independent human audit separate. Cost/evidence/limitations in docs/implementation-status.md and backend/evaluation/*jev*.json.
+PR48 merged; followup draftPR63 https://github.com/lensabillion/reversa-madrid-open/pull/63 at cba37cf has ALL NINE CI checks SUCCESS. One19feature fitted calculation now combines deterministic rarity/alignment/operation/legal cues,background/mutual ranks,Qwen semantic cosine,and4Jev signals; optional FittedVerification connects it to outcomes/graph/rankings/API. Missing features fail; fullsource context provenance checked. Local gate1188 backend/benchmark tests100% application branches,94frontend and allothergates passed. Combinedmodel improvesAUC butreducesP20; realagent review remains poor afterproposalcontextfix. DefaultCLI is still existingrules,live0published,Gate3 NOT complete. Required next: validated frozen fit/corpus/features/model/prompt/context policy, real-prose precision, safeCLIartifactloader, then actual20published+10randomreads. Gate7 independenthuman audit separate. All evidence/provenance and actualcostUSD.136191594 in PR repositorydocs/artifacts. Keep task open; codeCIpass doesnotprove modelaccuracy.
