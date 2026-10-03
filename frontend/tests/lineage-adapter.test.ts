@@ -193,3 +193,14 @@ test("refuses a view whose records name what it does not hold", () => {
     prepareLineage({ ...view, origins: [{ ...origin, amendment_ids: ["am:stranger"] }] }),
   ).toThrow("names am:stranger, which does not carry its phrase");
 });
+
+test("one passage judged for several carrying amendments is shown once per phrase", () => {
+  const view = fixtureView();
+  const [origin] = view.origins;
+  if (origin === undefined) {
+    throw new Error("Fixture origin missing");
+  }
+  const semantic = { ...origin, kind: "semantic" as const, similarity: 0.8 };
+  const [phrase] = prepareLineage({ ...view, origins: [origin, semantic, semantic] }).adopted;
+  expect(phrase?.origins.map((row) => row.kind)).toEqual(["verbatim", "semantic"]);
+});

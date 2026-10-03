@@ -228,6 +228,25 @@ Verified offline only, on the backend's test world (see the PR for commands and 
 Not verified: a real law's view in the page, and the precision of the claims (the review
 gate in `practice/lineage_review.py` has not been run).
 
+## Lineage Explorer Answers the Brief, and AI Act Mock Data — 3 October 2026
+
+Bead `rev-80c5`. `/lineage` now leads with the brief's five questions for the open law
+(WHO and HOW answered from the view; WHAT and TOWARDS marked partial; NEXT marked "not in
+this view"), ranks organisations by adopted wording they said first, counts channels
+(stage, committee, year, cross-group amendments, timing), and draws three links at random
+with a shown seed for the jury's check. Cards read submission → amendment → final act; a
+search box and evidence, group and committee filters narrow the list. Lexical (teal) and
+semantic (violet, Jev) evidence are told apart everywhere, always with a text label.
+
+`make lineage LAW='AI Act'` ran end to end in this container (`measured`, 3 October,
+cloud container, Have Your Say index not built, so title search): collect 560.6 s, total
+9 m 34 s; 631 adopted phrases from 838 of 5,660 amendments; 10,454 of 73,606 new final-act
+words traced; 195 of 788 documents said wording first; 153 named organisations. Its
+`lineage.json` is committed as `mock-data/laws/2021-0106-COD/lineage.json`
+(`INFLUENCE_DATA_ROOT=mock-data make dev-backend` serves it). Not verified: the run with
+`--jev` (semantic origins), and any audit of the shown links. Observed, not explained: all
+530 dated non-citation matches have the submission first (0 amendment-first).
+
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
 `influence coordinated <law>` (`make coordinated LAW=...`, bead `rev-637f`) lists the

@@ -115,19 +115,52 @@ quotation, the amendments that carry it and the submissions that say it; every t
 phrase the same way; credits split into groups and holders in the backend's order. A
 record that names a phrase or amendment the view lacks rejects the whole view, as in the
 Atlas page. Phrases are ordered by evidence (an earlier, non-citation submission first,
-then any submission, then length) and paged 20 at a time; a filter keeps only wording a
-submission said first. Each submission is labelled "Said before the amendments", "Said
+then any submission, then length) and paged 20 at a time. Each card reads in the brief's
+order, left to right: what the submission said, the amendment that carried it, the final
+wording. A search box (every word must appear, ignoring case and accents, across the
+wording, quotes, Members, organisations and amendment IDs) and three filters (evidence,
+political group, committee) narrow the list. Each submission is labelled "Said before the amendments", "Said
 after the first amendment", "Order unknown" or "Citation, not a request", straight from the
 view's `eligibility`, `precedes` and `is_citation`. Credits are whole (no fractional
 credit) and shown as "N of M amendments adopted" with the rate, in the backend's order. A
 count the view could not compute reads "unknown", and a view with `status: "unknown"`
 shows its reason. Limitations and coverage gaps sit in a disclosure.
 
+The law opens on a **Summary** tab (four key numbers and the five questions, one line each
+with "Explore →"); the detail lives in tabs the reader opens on demand: Who, How, Graph,
+Evidence and Check 3 links. Everything comes from the same view only
+(`lib/lineage-insights.ts`, `lib/lineage-graph.ts`, linear in the view's records):
+
+- **The five questions**: WHO and HOW are answered from the view; WHAT and TOWARDS are
+  marked "partly" (one law; direction labels come from `make directions`); NEXT is marked
+  "not in this view", because no forecast is computed. Nothing is filled in to look complete.
+- **Who gets their way: organisations** (`rankOrganisations`): every named organisation whose
+  submission says inserted wording, ranked by adopted phrases it said before any amendment
+  carried them, then by adopted phrases said later or undated, then tabled ones. A phrase
+  counts once per organisation; citations and unnamed submitters are counted apart, never
+  named. Searchable, 15 rows until "Show all".
+- **How it got there** (`lineageChannels`): adopting amendments by stage, committee and year
+  (each amendment once), the share tabled across political groups, the share of dated
+  matches where the submission came first, and reworded (Jev, `kind: "semantic"`) matches
+  apart from word-for-word ones. Only matches dated before the amendment count: wording
+  said after it, or undated, cannot have shaped it, and is counted apart.
+- **Graph** (`buildLineageGraph`, `sliceGraph`, `components/lineage-graph.tsx`): organisation
+  → who tabled the amendment (political groups, or Members) → final-act provision, drawn
+  from adopted wording an organisation said first. The overview shows the 12 largest nodes
+  per column; clicking a node or a line keeps only the paths that share its phrases and
+  lists their evidence. Teal lines are lexical, dashed violet ones semantic.
+- **Check three links at random** (`drawLinks`): the jury's check built in. It draws three
+  adopted phrases a submission said first, with a seeded generator whose seed is shown, so a
+  draw can be repeated.
+
 - `app/lineage/page.tsx`: the route; a Suspense boundary lets the shell prerender
 - `components/lineage-law-browser.tsx`: law selector, URL state, the view, every state
-- `lib/lineage-api.ts`: endpoint types and readers; `lib/lineage.ts`: the adapter
+- `components/lineage-insights.tsx`: the five questions, organisations, channels, link check
+- `lib/lineage-api.ts`: endpoint types and readers; `lib/lineage.ts`: the adapter;
+  `lib/lineage-insights.ts`: rankings, channels, search and the seeded draw
 
-`tests/lineage-adapter.test.ts` and `tests/lineage-page.test.tsx` read
+`tests/lineage-adapter.test.ts`, `tests/lineage-insights.test.ts` and
+`tests/lineage-page.test.tsx` read
 `backend/tests/fixtures/lineage/view.json`, which the backend writes from its offline test
 world. Checked once by hand in headless Chromium: the production build against the real
 backend serving that view. Not verified: a real law's run.

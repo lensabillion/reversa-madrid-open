@@ -15,6 +15,8 @@ export interface LineageAmendmentRow {
   committee: string | null;
   /** Each author's name, with the political group in brackets when it is known. */
   authors: readonly string[];
+  /** The distinct known political groups of its authors, for filtering by group. */
+  groups: readonly string[];
   tabledOn: string | null;
   /** Words of the amendment's new text inside adopted wording, of all its words; `null` for tabled wording. */
   adoptedWords: number | null;
@@ -98,6 +100,7 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     stage: adoption.stage,
     committee: adoption.committee,
     authors: authorLabels(adoption),
+    groups: [...new Set(adoption.author_groups.filter((group) => group !== null))],
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
     newWords: adoption.new_words,
@@ -125,6 +128,7 @@ function tabledRow(amendmentId: string): LineageAmendmentRow {
     stage: null,
     committee: null,
     authors: [],
+    groups: [],
     tabledOn: null,
     adoptedWords: null,
     newWords: null,
@@ -208,7 +212,19 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       throw new Error(`${origin.document_id} names ${stranger}, which does not carry its phrase`);
     }
     const rows = origins.get(origin.phrase_id) ?? [];
-    rows.push(originRow(origin));
+    const row = originRow(origin);
+    // A reworded match is judged per amendment, so one passage can back the same phrase
+    // through several carrying amendments; the card shows that passage once.
+    const repeated = rows.some(
+      (other) =>
+        other.documentId === row.documentId &&
+        other.kind === row.kind &&
+        other.quote.start === row.quote.start &&
+        other.quote.end === row.quote.end,
+    );
+    if (!repeated) {
+      rows.push(row);
+    }
     origins.set(origin.phrase_id, rows);
   }
 
