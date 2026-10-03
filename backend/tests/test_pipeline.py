@@ -21,7 +21,7 @@ from influence.extraction.records import StageStore
 from influence.repositories import hys
 from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, SourceSpan, span_matches
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN
-from influence.services import assessment, pipeline
+from influence.services import assessment, modes, pipeline
 from influence.services.pipeline import PipelineError
 
 AI_ACT = "2021/0106(COD)"
@@ -93,6 +93,7 @@ def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path
     assert f"({assessment.METHOD_REVISION})" in scoring
     assert all(f"{tier}-tier" in scoring for tier in assessment.DEFAULT_PUBLISHABLE)
     assert view.coverage == view.bundle.laws[0].coverage
+    assert view.modes == ()
     assert view.generated_at == LATER
 
 
@@ -142,6 +143,23 @@ def test_a_law_without_matches_has_an_empty_but_valid_view(tmp_path: Path) -> No
 
     assert all(link.status != "published" for link in view.bundle.links)
     assert view.bundle.laws[0].procedure_id == AI_ACT
+
+
+def test_the_view_carries_the_mode_labels_of_its_laws_gaps(tmp_path: Path) -> None:
+    law = collected(make_world(tmp_path))
+    gaps = tuple(
+        item.model_copy(update={"status": "partial", "reason": "The dump predates the vote"})
+        if item.layer == "committee_amendments"
+        else item
+        for item in law.law.coverage
+    )
+    open_file = law.law.model_copy(update={"status": "ongoing", "coverage": gaps})
+
+    view = pipeline.build_view(replace(law, law=open_file), generated_at=LATER)
+
+    assert modes.PARTIAL_AMENDMENTS in view.modes
+    assert view.modes == modes.mode_labels(open_file)
+    assert pipeline.build_view(law, generated_at=LATER).modes == ()
 
 
 def test_the_strongest_traced_link_is_the_origin_published_first() -> None:
@@ -203,6 +221,8 @@ def test_the_view_is_written_with_the_frontend_names_and_read_back_equal(tmp_pat
         "Artificial Intelligence Act",
         1,
     )
+    # No `coordinated.json` beside the view: not computed, which is not zero clusters.
+    assert summary.cross_group_clusters is None
 
 
 def test_absent_and_invalid_views(tmp_path: Path) -> None:
@@ -268,8 +288,10 @@ def test_the_api_lists_built_laws_and_serves_a_view(tmp_path: Path) -> None:
 
     assert listing.status_code == 200
     assert listing.json()["laws"][0]["slug"] == SLUG
+    assert listing.json()["laws"][0]["cross_group_clusters"] is None
     assert view.status_code == 200
     body = view.json()
+    assert body["modes"] == []
     assert set(body["bundle"]) == {
         "laws",
         "documents",
