@@ -6,9 +6,10 @@ one of two rules. This scores both on the practice set the other scorers use (27
 tests of 30 + 30 with seed 0), so the numbers compare with `evaluation/practice-results.json`:
 
 * verbatim: the amendment's inserted words and the submission's wording share a run of at
-  least `MIN_ADOPTED_RUN_WORDS` (12) words, the rule `services/origin.py` applies. The score
-  is the longest shared run over 24, capped at 1, so the harness's 0.5 recall threshold is
-  exactly the 12-word rule;
+  least `MIN_ADOPTED_RUN_WORDS` words holding the law's rare words (`lineage.Rarity`, built
+  here from the 2013 proposal's provisions, the amendments' original wording), the rule
+  `services/origin.py` applies. The score is the longest such run over twice the minimum,
+  capped at 1, so the harness's 0.5 recall threshold is exactly the rule;
 * reworded: Jev's four Gate 3 answers, with the request and state of
   `benchmarks/lineage_jev.py` (submission old/new known here). The link rule is
   `same_legal_change` and `actual_request` >= 0.5 with neither `incompatible_legal_change`
@@ -51,6 +52,7 @@ from influence.practice.recall import build_index
 from influence.repositories.lobbyplag import DemoRepository
 from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS
 from influence.services.jev import JevClient, JevError, JevRequest, JevResult
+from influence.services.lineage import Rarity
 from influence.services.prose_match import words_of
 
 FOLDS = 5
@@ -61,11 +63,12 @@ TOP_K = 20
 THRESHOLD = 0.5
 
 
-def longest_inserted_run(old: str, new: str, submission: str) -> int:
-    """Longest run of the amendment's inserted words that the submission repeats.
+def longest_inserted_run(old: str, new: str, submission: str, rarity: Rarity) -> int:
+    """Longest significant run of the amendment's inserted words that the submission repeats.
 
-    Word diff of old against new (O(n m)), then the longest common block of each inserted
-    block against the submission (O(b s)); designed for amendments of a few hundred words.
+    Word diff of old against new (O(n m)), then the common blocks of each inserted block and
+    the submission (O(b s)), keeping a block only when `rarity` finds it significant;
+    designed for amendments of a few hundred words.
     """
     old_words = [w.text for w in words_of(old)]
     new_words = [w.text for w in words_of(new)]
@@ -79,10 +82,10 @@ def longest_inserted_run(old: str, new: str, submission: str) -> int:
     ]
     best = 0
     for block in blocks:
-        match = SequenceMatcher(None, block, target, autojunk=False).find_longest_match(
-            0, len(block), 0, len(target)
-        )
-        best = max(best, match.size)
+        for match in SequenceMatcher(None, block, target, autojunk=False).get_matching_blocks():
+            run = block[match.a : match.a + match.size]
+            if match.size > best and rarity.significant(run):
+                best = match.size
     return best
 
 
@@ -132,16 +135,22 @@ def main() -> int:
         "seed": SEED,
     }
 
+    rarity = Rarity.of(
+        sorted({t.old for a in repository.amendments.values() for t in a.text if t.old.strip()})
+    )
     runs = [
-        longest_inserted_run(p.pair.amendment.old, p.pair.amendment.new, p.pair.submission.new)
+        longest_inserted_run(
+            p.pair.amendment.old, p.pair.amendment.new, p.pair.submission.new, rarity
+        )
         for p in pairs
     ]
     verbatim = [min(1.0, run / (2 * MIN_ADOPTED_RUN_WORDS)) for run in runs]
-    result = evaluate("verbatim 12-word run", verbatim, pairs, plan, tests, settings)
+    result = evaluate("verbatim significant run", verbatim, pairs, plan, tests, settings)
     report["verbatim"] = {
+        "min_run_words": MIN_ADOPTED_RUN_WORDS,
         "full_set_auc": result.full_set_auc,
         "precision_at_20_mean": round(result.draws.precision_at_top.mean, 4),
-        "rule_12_words": counts([run >= MIN_ADOPTED_RUN_WORDS for run in runs], pairs),
+        "rule": counts([run >= MIN_ADOPTED_RUN_WORDS for run in runs], pairs),
     }
 
     # BM25 shortlist recall: one search per distinct verified amendment, k = 5 as in the

@@ -35,7 +35,7 @@ from influence.schemas.atlas import (
     id_part,
 )
 from influence.services import pipeline
-from influence.services.lineage import adopt
+from influence.services.lineage import Rarity, adopt
 from influence.services.origin import find_origins, submitters_from
 from influence.services.prose_match import words_of
 
@@ -141,6 +141,7 @@ def main() -> int:
         adoption.phrases,
         adoption.adoptions,
         submissions,
+        rarity=Rarity.of(article.text for article in collected.articles),
         amendments=amendments,
         submitters=submitters_from(collected.passages, collected.actors),
         proposal_texts=[a.text for a in collected.articles if a.stage == "proposal"],
