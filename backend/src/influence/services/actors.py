@@ -12,7 +12,9 @@ identity, and everything weaker is recorded as a proposal a person can check:
    data), so the match is accepted only when both names use those words equally often.
 
 An acronym match and a fuzzy name match never merge. The actor keeps an identity of its
-own (`actor:name:...`) and lists the register entries it might be in `candidate_ids`. An
+own (`actor:name:...`) and lists the register entries it might be in `candidate_ids`.
+That identity keeps the scope words the matching key drops, so "Fair Trials" and "Fair
+Trials Europe" stay two actors even when neither is in the register. An
 association and its members are different actors: the register's member lists are free
 text and are not used as a matching key at all. An actor absent from the register still
 gets an identity and keeps its asks. Private citizens share one aggregate actor and are
@@ -96,13 +98,16 @@ def _usable_register_id(register_id: str | None) -> str | None:
         return None
 
 
-def _named_id(source_kind: SourceKind, key: str, spelling: str) -> str:
+def _named_id(source_kind: SourceKind, normalised: str, spelling: str) -> str:
     """An identity for a name with no register identity, stable across runs.
 
-    An ASCII key maps to an ID one to one. Other scripts lose their letters in an ID, so
-    two different names could collide; a digest of the key (or of the spelling, when
-    normalisation left nothing) keeps them apart.
+    The key is the normalised name followed by its scope words, which normalisation
+    drops but which separate a European body from its namesake. An ASCII key maps to an
+    ID one to one. Other scripts lose their letters in an ID, so two different names
+    could collide; a digest of the key (or of the spelling, when nothing is left) keeps
+    them apart.
     """
+    key = " ".join((normalised, *_SCOPE_WORD.findall(spelling.lower()))).strip()
     if key and key.isascii():
         return named_actor_id(source_kind, key)
     digest = sha256((key or spelling.casefold()).encode()).hexdigest()[:12]

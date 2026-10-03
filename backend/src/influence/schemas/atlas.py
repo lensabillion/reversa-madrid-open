@@ -245,6 +245,10 @@ class Passage(AtlasRecord):
 type AmendmentStage = Literal["committee", "plenary"]
 
 
+def _nothing(value: tuple[object, ...]) -> bool:
+    return not value
+
+
 class Amendment(AtlasRecord):
     """One tabled amendment. `old_text` None is unknown; an empty string is an insertion."""
 
@@ -256,6 +260,12 @@ class Amendment(AtlasRecord):
     number: int | None = Field(default=None, ge=0)
     author_ids: tuple[ActorId, ...] = ()
     author_names: tuple[str, ...] = ()
+    # Each author's political group on `tabled_on`, aligned with `author_ids`; None where
+    # the group on that day is unknown. Empty when the amendment was not annotated (a
+    # bundle written before this field). `Actor.political_group` is the latest group,
+    # for display; a Member who changed group was in another one when tabling. Left out
+    # of the JSON when empty, so records written without it keep their bytes and hashes.
+    author_groups: tuple[str | None, ...] = Field(default=(), exclude_if=_nothing)
     tabled_on: date | None
     target_provision: str | None = None
     old_text: str | None
@@ -267,6 +277,8 @@ class Amendment(AtlasRecord):
     def holds_some_text(self) -> Self:
         if not (self.old_text or "").strip() and not self.new_text.strip():
             raise ValueError("An amendment needs original or proposed wording")
+        if self.author_groups and len(self.author_groups) != len(self.author_ids):
+            raise ValueError("author_groups must align with author_ids")
         return self
 
 
