@@ -22,7 +22,7 @@ from influence.services.assessment import amendment_direction, assess_link
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 SOURCE = "Intro. Providers shall keep logs for at least six months after launch. Outro."
-QUOTE = "Providers shall keep logs for at least six months after launch."
+QUOTE = "for at least six months after launch."
 
 
 def _rows(name: str) -> list[dict[str, object]]:
@@ -73,18 +73,23 @@ def test_fixture_verdicts_match_the_committed_contract_examples() -> None:
     }
     asks = {row["ask_id"]: Ask.model_validate(row) for row in _rows("asks.jsonl")}
     texts = {str(row["document_id"]): str(row["text"]) for row in _rows("document_texts.jsonl")}
+    # Two fixture examples differ on purpose. The fixture publishes both, but their overlap
+    # (0.64 and 0.58) is under the calibrated copied threshold of 0.75, and the reworded tier
+    # is labelled and not published because it missed its precision floor on LobbyPlag.
+    differ = {
+        "link:a-am1-makers": ("unconfirmed", "reworded"),
+        "link:b-am3-labels": ("unconfirmed", "reworded"),
+    }
     checked = 0
     for row in _rows("links.jsonl"):
         expected = LinkAssessment.model_validate(row)
         ask = asks[expected.ask_id]
         got = assess_link(amendments[expected.amendment_id], ask, texts[ask.document_id])
-        assert (got.status, got.time_eligibility) == (expected.status, expected.time_eligibility)
-        if expected.link_id == "link:a-am1-makers":
-            # The fixture says "copied"; this ask quotes a whole sentence around the shared
-            # words, so Dice is 0.64, below the placeholder copied threshold of 0.7.
-            assert got.tier in ("copied", "reworded")
+        assert got.time_eligibility == expected.time_eligibility
+        if expected.link_id in differ:
+            assert (got.status, got.tier) == differ[expected.link_id]
         else:
-            assert got.tier == expected.tier
+            assert (got.status, got.tier) == (expected.status, expected.tier)
         checked += 1
     assert checked == 6
 
@@ -210,3 +215,14 @@ def test_published_links_always_have_valid_spans_and_an_earlier_ask(
         assert got.time_eligibility == "ask_first"
         assert all(span_matches(span, source) for span in got.ask_spans)
         assert all(span.text for span in got.amendment_spans)
+
+
+def test_a_reworded_link_is_labelled_but_not_published_unless_the_caller_allows_it() -> None:
+    sentence = "Providers shall keep logs for at least six months after launch."
+    ask = _ask(sentence)
+    default = assess_link(_amendment(), ask, SOURCE)
+    assert (default.status, default.tier) == ("unconfirmed", "reworded")
+    allowed: frozenset[LinkTier] = frozenset({"copied", "reworded"})
+    opted_in = assess_link(_amendment(), ask, SOURCE, publishable=allowed)
+    assert (opted_in.status, opted_in.tier) == ("published", "reworded")
+    assert opted_in.support_score == default.support_score
