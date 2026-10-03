@@ -32,6 +32,7 @@ from influence.schemas.coordinated import (
 from influence.schemas.scoring import TextChange
 from influence.services.prose_match import words_of
 from influence.services.scoring import changed_spans
+from influence.services.tabling_groups import group_limitations, known_groups, latest_groups
 
 METHOD: CoordinationMethod = "shingle-jaccard-1"
 VIEW_FILE = "coordinated.json"
@@ -46,8 +47,6 @@ LIMITATIONS = (
     "Near-identical wording tabled by Members of different groups is consistent with a "
     "shared outside draft. It does not show who wrote the draft, and Members also agree "
     "wording among themselves.",
-    "A Member's political group is the one of their latest spell in Parltrack's dump, which "
-    "can differ from their group on the day the amendment was tabled.",
     f"Only inserted wording of at least {MIN_INSERTED_WORDS} words is compared: identical "
     "deletions and short edits are not clustered.",
     f"Two amendments are joined when their inserted wording shares at least "
@@ -154,7 +153,7 @@ def _spans_groups(members: Sequence[ClusterMember]) -> bool:
     )
 
 
-def _cluster(changes: Sequence[_Change], groups: dict[str, str]) -> CoordinatedCluster:
+def _cluster(changes: Sequence[_Change], latest: dict[str, str]) -> CoordinatedCluster:
     ordered = sorted(
         changes,
         key=lambda change: (change.amendment.tabled_on or date.max, change.amendment.amendment_id),
@@ -168,9 +167,7 @@ def _cluster(changes: Sequence[_Change], groups: dict[str, str]) -> CoordinatedC
             target_provision=change.amendment.target_provision,
             author_ids=change.amendment.author_ids,
             author_names=change.amendment.author_names,
-            political_groups=tuple(
-                sorted({groups[a] for a in change.amendment.author_ids if a in groups})
-            ),
+            political_groups=tuple(sorted(known_groups(change.amendment, latest))),
             inserted=change.inserted,
         )
         for change in ordered
@@ -195,11 +192,7 @@ def find_coordinated(
     Measured on the AI Act (5,660 amendments) and the Digital Services Act (6,476): under
     one second each.
     """
-    groups = {
-        actor.actor_id: actor.political_group
-        for actor in actors
-        if actor.political_group is not None
-    }
+    latest = latest_groups(actors)
     compared: list[_Change] = []
     counts: Counter[str] = Counter()
     for amendment in sorted(amendments, key=lambda amendment: amendment.amendment_id):
@@ -214,7 +207,7 @@ def find_coordinated(
             continue
         compared.append(change)
     clusters = (
-        _cluster([compared[index] for index in component], groups)
+        _cluster([compared[index] for index in component], latest)
         for component in _components(compared)
     )
     return (
@@ -246,6 +239,7 @@ def build_coordination(
     *,
     generated_at: datetime,
 ) -> CoordinatedView:
+    amendments = tuple(amendments)
     clusters, counts = find_coordinated(amendments, actors)
     return CoordinatedView(
         procedure_id=law.procedure_id,
@@ -259,7 +253,7 @@ def build_coordination(
         similarity_threshold=SIMILARITY_THRESHOLD,
         counts=counts,
         clusters=clusters,
-        limitations=LIMITATIONS,
+        limitations=(*LIMITATIONS, *group_limitations(amendments)),
     )
 
 

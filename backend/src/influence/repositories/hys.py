@@ -40,6 +40,8 @@ REUSE_TERMS = "Commission reuse policy, CC BY 4.0 (Decision 2011/833/EU)"
 CITIZEN_USER_TYPES: frozenset[str] = frozenset({"EU_CITIZEN", "NON_EU_CITIZEN"})
 FEEDBACK_METHOD = "hys_api:feedback_field"
 ATTACHMENT_METHOD = "pypdf"
+# Appended to the method when lost ligature glyphs were guessed or spaced (documents.py).
+GLYPH_REPAIR_MARK = "+glyph_repair:"
 PAGE_SEPARATOR = "\n\n"
 
 # The API writes naive local timestamps ("2021/08/06 23:57:37"). They are Brussels time:
@@ -562,6 +564,11 @@ def fetch_attachment(
         complete = all(page.text.strip() for page in extracted.pages)
         status = "extracted" if complete else "partial"
         method = ATTACHMENT_METHOD
+        if extracted.glyphs_guessed or extracted.glyphs_unresolved:
+            method = (
+                f"{ATTACHMENT_METHOD}{GLYPH_REPAIR_MARK}guessed={extracted.glyphs_guessed},"
+                f"unresolved={extracted.glyphs_unresolved}"
+            )
     document = SourceDocument(
         document_id=identifier,
         procedure_id=procedure_id,

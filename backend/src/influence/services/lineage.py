@@ -67,6 +67,7 @@ from influence.schemas.lineage import (
 )
 from influence.services.pipeline import Collected
 from influence.services.prose_match import Word, words_of
+from influence.services.tabling_groups import group_limitations, latest_groups, tabling_groups
 
 # A word diff is quadratic. Past this many words on either side the exact diff is replaced by
 # "the new words that the old text does not contain", which finds the same runs here (the
@@ -362,7 +363,7 @@ def adopt_records(
         for article, first, end in intervals
     ]
     carriers: list[list[Amendment]] = [[] for _ in intervals]
-    group_of = {actor.actor_id: actor.political_group for actor in actors}
+    latest = latest_groups(actors)
     adoptions: list[AmendmentAdoption] = []
     for amendment, places, adopted, inserted, new_words, longest in found:
         numbers = sorted({phrase_of[place] for place in places})
@@ -375,7 +376,9 @@ def adopt_records(
                 committee=amendment.committee,
                 author_ids=amendment.author_ids,
                 author_names=amendment.author_names,
-                author_groups=tuple(group_of.get(author) for author in amendment.author_ids),
+                author_groups=tuple(
+                    tabling_groups(amendment, latest)[author] for author in amendment.author_ids
+                ),
                 tabled_on=amendment.tabled_on,
                 phrase_ids=tuple(sorted(phrase_ids[number] for number in numbers)),
                 adopted_words=adopted,
@@ -401,7 +404,7 @@ def adopt_records(
             key=lambda phrase: phrase.phrase_id,
         )
     )
-    notes: list[str] = []
+    notes = list(group_limitations(amendments))
     if dropped[0]:
         notes.append(
             f"{dropped[0]} run(s) of {MIN_ADOPTED_RUN_WORDS} or more words were not counted: "
@@ -443,7 +446,8 @@ def _credits(
 
     Linear in the carriers and amendments.
     """
-    group_of = {actor.actor_id: actor.political_group for actor in actors}
+    latest = latest_groups(actors)
+    group_on_day = {a.amendment_id: tabling_groups(a, latest) for a in amendments}
     name_of = {actor.actor_id: actor.name for actor in actors}
     holders_of = {a.amendment_id: _holders(a, name_of) for a in amendments}
     # A committee amendment and its plenary re-tabling with the same words are one.
@@ -455,7 +459,7 @@ def _credits(
         for holder in holders_of[amendment_id]:
             found.add(holder.key)
             names[holder.key] = (holder.kind, holder.name)
-            group = group_of.get(holder.key) if holder.kind == "mep" else None
+            group = group_on_day[amendment_id].get(holder.key) if holder.kind == "mep" else None
             if group is not None:
                 found.add(f"group:{group}")
                 names[f"group:{group}"] = ("group", group)

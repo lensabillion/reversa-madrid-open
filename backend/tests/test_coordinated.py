@@ -22,6 +22,7 @@ from influence.schemas.atlas import Actor, Amendment, LawRecord, span_matches
 from influence.schemas.coordinated import CoordinatedView
 from influence.services import coordinated, pipeline
 from influence.services.pipeline import PipelineError
+from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 AI_ACT = "2021/0106(COD)"
 SLUG = "2021-0106-COD"
@@ -331,7 +332,8 @@ def test_the_view_records_its_method_and_round_trips_through_its_file(tmp_path: 
     assert (view.method, view.generated_at, view.limitations) == (
         coordinated.METHOD,
         LATER,
-        coordinated.LIMITATIONS,
+        # The test amendments record no tabling-day groups, as an older bundle's.
+        (*coordinated.LIMITATIONS, TABLING_DAY_GROUPS, LATEST_SPELL_FALLBACK),
     )
     assert (view.min_inserted_words, view.shingle_words, view.similarity_threshold) == (
         coordinated.MIN_INSERTED_WORDS,
@@ -390,7 +392,14 @@ def coordinated_world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         **mep_record(1, "Axel EXAMPLE"),
         "Groups": [{"groupid": "PPE", "start": "2019-07-02T00:00:00", "end": "9999-12-31"}],
     }
-    write_dump(world.inputs.meps, [conservative, mep_record(2, "Brando BENIFEI")])
+    benifei = {
+        **mep_record(2, "Brando BENIFEI"),
+        # The S&D spell covering the tabling day, which the shared record leaves out.
+        "Groups": [
+            {"groupid": "S&D", "start": "2019-07-02T00:00:00", "end": "2024-07-15T00:00:00"}
+        ],
+    }
+    write_dump(world.inputs.meps, [conservative, benifei])
     scripted_cli(monkeypatch, world)
 
 

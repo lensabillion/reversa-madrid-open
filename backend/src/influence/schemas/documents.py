@@ -19,3 +19,7 @@ class ExtractedDocument(BaseModel):
     pages: tuple[ExtractedPage, ...]
     warnings: tuple[str, ...]
     character_count: int = Field(ge=0)
+    # PDF glyphs with no character in their font (U+0000 from pypdf), usually ligatures:
+    # restored by a word guess, or replaced by a space. Each count also has a warning.
+    glyphs_guessed: int = Field(ge=0)
+    glyphs_unresolved: int = Field(ge=0)

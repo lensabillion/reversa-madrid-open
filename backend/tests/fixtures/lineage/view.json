@@ -208,6 +208,7 @@
     "Verbatim wording only: a request the final act says in other words is not traced.",
     "Shared wording is evidence, not proof of authorship: the Council, the trilogues, a common draft or a coalition can explain the same words.",
     "Every holder of a phrase is credited with the whole phrase (no fractional credit); a phrase with several holders is joint. Members are ranked by their rate per amendment tabled.",
+    "A Member's political group is their group on the day the amendment was tabled, from Parltrack's dated group spells; a Member with no spell covering that day counts as group unknown, never under a later group.",
     "1 amendment(s) have no original wording; their whole text was treated as inserted."
   ]
 }
