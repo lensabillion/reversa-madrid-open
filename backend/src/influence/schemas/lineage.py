@@ -42,9 +42,11 @@ from influence.schemas.scoring import FrozenModel
 
 LINEAGE_SCHEMA_VERSION = "lineage-1"
 # Phrases are found as runs of consecutive words; an 8-word window is the unit that is
-# looked up, and a run must be at least this many words to count as adopted wording.
+# looked up, and a run must be at least this many words to count as shared wording. A run
+# must also hold rare words (`services/lineage.Rarity`), so the law's own formulas do not
+# count. Provisional: chosen by the owner on 3 October, not calibrated.
 NGRAM_WORDS = 8
-MIN_ADOPTED_RUN_WORDS = 12
+MIN_ADOPTED_RUN_WORDS = 8
 
 PhraseId = Annotated[str, StringConstraints(pattern=r"^phrase:[0-9a-f]{16}$")]
 type AmendmentStage = Literal["committee", "plenary"]

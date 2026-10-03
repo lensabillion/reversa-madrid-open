@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 from influence.schemas.atlas import Actor, Amendment, ArticleVersion, span_matches
 from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS
 from influence.services import lineage
-from influence.services.lineage import COMMITTEE_TEXT, adopt, adopt_records
+from influence.services.lineage import COMMITTEE_TEXT, Rarity, adopt, adopt_records
 from influence.services.pipeline import Collected
 
 PROCEDURE = "2099/0001(COD)"
@@ -202,7 +202,9 @@ def test_an_author_missing_from_the_actors_has_an_unknown_group_and_keeps_the_id
 
 def test_a_phrase_found_in_several_final_places_quotes_at_most_three() -> None:
     final = [article(f"Copy {number}", NEW) for number in range(5)]
-    result = adopt_records([amendment(1, NEW)], [PROPOSAL, *final], [])
+    # Enough other provisions that five copies stay under the law's rarity share.
+    others = [article(f"Other {n}", sentence("other", 3, 3 * n)) for n in range(120)]
+    result = adopt_records([amendment(1, NEW)], [PROPOSAL, *final, *others], [])
     (phrase,) = result.phrases
     assert len(phrase.final_spans) == lineage.MAX_SPANS_PER_PHRASE
 
@@ -268,3 +270,30 @@ def test_every_quotation_is_exact_and_each_phrase_is_worth_exactly_one(
     grouped = sum(c.phrases for c in result.credits if c.holder_kind == "group")
     assert abs(individual - len(result.phrases)) < 1e-9
     assert grouped <= len(result.phrases) + 1e-9
+
+
+# --- Rarity: a run made of the law's own common words is not shared wording ---------------
+
+
+def test_a_word_is_common_in_enough_provisions_and_never_in_only_one() -> None:
+    small = Rarity.of(["shall b", "shall c", "shall d"])
+    assert small.common == frozenset({"shall"})
+    assert small.significant(["shall", "b", "c", "d"])
+    assert not small.significant(["shall", "b", "c"])
+    assert not small.significant(["b", "b", "b", "c"])
+    # In 100 provisions the 5% share is 5: a word in 4 of them is still rare.
+    large = Rarity.of([*(["rare common"] * 4), *(["common"] * 96)])
+    assert large.common == frozenset({"common"})
+    assert Rarity.of([]).common == frozenset()
+
+
+def test_new_wording_made_of_the_laws_common_words_is_not_adopted_and_is_counted() -> None:
+    formula = "the provider shall in accordance with this regulation and the"
+    scrambled = " ".join(reversed(formula.split()))
+    others = [article(f"Recital {n}", scrambled, "proposal") for n in range(3)]
+    result = adopt_records([amendment(1, formula)], [*others, article("A", formula)], [])
+    assert result.phrases == ()
+    assert result.limitations == (
+        f"1 run(s) of {MIN_ADOPTED_RUN_WORDS} or more words were not counted: they hold fewer "
+        f"than {lineage.MIN_RARE_WORDS} of the law's rare words.",
+    )

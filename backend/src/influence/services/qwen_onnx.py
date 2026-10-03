@@ -133,9 +133,9 @@ def _state_at(hidden: object, row: int, position: int) -> list[float]:
 def load_qwen(directory: Path) -> QwenEmbedder:  # pragma: no cover
     """Open the model in `directory` (see `scripts/fetch_qwen_embedding.py`) on the CPU.
 
-    The only function that imports the optional `models` group: onnxruntime, tokenizers and
-    numpy. Excluded from coverage because the default install does not have them; the logic
-    it hands them to is tested.
+    The only function that imports the optional `models` group: onnxruntime and tokenizers.
+    Excluded from coverage because the default install does not have them; the logic it
+    hands them to is tested.
     """
     try:
         onnxruntime = importlib.import_module("onnxruntime")
