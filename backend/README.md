@@ -467,6 +467,42 @@ all correct, at or above the cut.
 blindness, determinism by seed, agreements and splits, the threshold grid, invalid
 sheets). No real sample has been drawn or read yet; no precision is measured.
 
+## Forecast Command (Part 7, NEXT)
+
+`influence forecast <law> [<law> ...]` (`make forecast LAW='2021/0106(COD)'`, more laws in
+`ARGS`, each quoted) answers "which asks will land next?" from the views `make atlas` has
+already written; it fetches nothing. Each law is named by slug, procedure number, CELEX,
+COM reference, common name or title, and must have an `atlas.json`. It writes
+`data/laws/forecast.json` atomically (`schemas/forecast_view.py`, `ForecastView`):
+`laws` (per law: status, whether it is a target, asks, training examples, forecasts and
+excluded counts by reason), `validation`, `fallback_rule`, `forecasts` (`Forecast`
+records) and `limitations`.
+
+- **History** (`services/forecasting.py`): every ask of every completed law whose final-act
+  outcome is decided: full or partial is a win, not observed a loss, unknown is left out.
+  Features are the law's first subject, the asking actor's kind and how many amendments
+  carry the ask through a published or unconfirmed link. An example is kept only when the
+  ask and each of those amendments are dated before the law's completion date
+  (`Example` refuses any other).
+- **Targets**: the undecided asks of the named laws that are still open (`ongoing` or
+  `unknown`). A named completed law only adds history; a withdrawn one has nothing to
+  forecast.
+- **Validation** (`services/forecast.py`): rolling time splits ordered by completion date,
+  never one law on both sides, against the prevalence baseline. A probability is published
+  only with three tested splits, a hundred test asks and a Brier score at least 5% better
+  than prevalence. Otherwise every forecast is a scenario with no score, and its reasons
+  give the counts of laws, splits and test asks that fell short. With the few laws built
+  for the demo, that is the expected result.
+- **Fallback rule**: the plan's labelled fallback, "the rapporteur's draft includes the
+  ask", is reported as `computable: false`. Parltrack gives the rapporteurs' names, but
+  the collect step fetches no draft report text, so no rule score is computed rather than
+  one approximated from other data.
+
+**Limits.** The view keeps only asks with a link, so the history holds no ask that no
+amendment carried. Tested offline (`tests/test_forecasting.py`: scenario and probability
+paths, leakage refusal, every exclusion reason, law naming, the command end to end); not
+yet run on real laws or timed.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
