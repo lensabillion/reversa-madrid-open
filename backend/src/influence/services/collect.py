@@ -248,7 +248,9 @@ _ASKS_FILES = ("documents.jsonl", "document_texts.jsonl", "passages.jsonl", "act
 
 def _files(names: Iterable[str], *, law: LawRecord) -> dict[str, tuple[AtlasRecord, ...]]:
     """A stage's full set of files, empty but present, so every reader finds every name."""
-    return {"law.jsonl": (law,)} | dict.fromkeys(names, ())
+    files: dict[str, tuple[AtlasRecord, ...]] = {"law.jsonl": (law,)}
+    files.update((name, ()) for name in names)
+    return files
 
 
 @dataclass(frozen=True)
@@ -541,9 +543,13 @@ def _publication(run: _Run, publication_id: int, resolver: ActorResolver, found:
     except hys.HysError as error:
         found.unread_publications.append(str(error))
         return
+    # One cache lookup per page, not per submission: a lookup reads the page's body.
+    page_fetched: dict[str, datetime] = {}
     for position, item in enumerate(items):
         url = hys.feedback_url(publication_id, position // hys.PAGE_SIZE)
-        retrieved = fetched_at(run.fetcher, url, run.started_at)
+        if url not in page_fetched:
+            page_fetched[url] = fetched_at(run.fetcher, url, run.started_at)
+        retrieved = page_fetched[url]
         document, text = hys.feedback_records(
             item, procedure_id=procedure, retrieved_at=retrieved, url=url
         )
