@@ -20,7 +20,7 @@ From backend: uv run --locked python benchmarks/lineage_view.py --law ../data/la
 
 import argparse
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -28,8 +28,10 @@ from unittest.mock import patch
 
 from influence.schemas.atlas import (
     Amendment,
+    ArticleVersion,
     Ask,
     LinkAssessment,
+    Outcome,
     Passage,
     SourceSpan,
     id_part,
@@ -40,6 +42,9 @@ from influence.services.origin import find_origins, submitters_from
 from influence.services.prose_match import words_of
 
 JEV_THRESHOLD = 0.5
+# A phrase that this many different submitters repeat is a shared reference (an institution's
+# name, a title, a formula), not one organisation's request, so it links nobody.
+SHARED_REFERENCE_SUBMITTERS = 3
 METHOD_REVISION = "lineage-view-1"
 type Eligibility = Literal["ask_first", "amendment_first", "unknown_date"]
 
@@ -144,16 +149,30 @@ def main() -> int:
         rarity=Rarity.of(article.text for article in collected.articles),
         amendments=amendments,
         submitters=submitters_from(collected.passages, collected.actors),
-        proposal_texts=[a.text for a in collected.articles if a.stage == "proposal"],
     )
     asks = {ask.ask_id: ask for ask in pipeline.asks_from_passages(collected.passages)}
     passages_by_document: dict[str, list[Passage]] = {}
     for passage in collected.passages:
         passages_by_document.setdefault(passage.document_id, []).append(passage)
 
+    phrases = {phrase.phrase_id: phrase for phrase in adoption.phrases}
+    submitters_by_phrase: dict[str, set[str]] = {}
+    for origin in origins:
+        submitters_by_phrase.setdefault(origin.phrase_id, set()).add(
+            origin.actor_id or origin.organisation or origin.document_id
+        )
+    shared = {
+        phrase_id
+        for phrase_id, who in submitters_by_phrase.items()
+        if len(who) >= SHARED_REFERENCE_SUBMITTERS
+    }
+
     links: dict[str, LinkAssessment] = {}
+    final_outcomes: dict[str, Outcome] = {}
     unplaced = 0
     for origin in origins:
+        if origin.phrase_id in shared:
+            continue
         passage = next(
             (
                 p
@@ -194,6 +213,35 @@ def main() -> int:
                 method="lineage-verbatim-origin",
                 method_revision=METHOD_REVISION,
             )
+            # The run is adopted wording, so it stands in the final act by construction: quote
+            # it there instead of re-aligning the whole passage, which would miss it. Only for a
+            # published link: the graph accepts no outcome through an unpublished amendment.
+            if not published:
+                continue
+            phrase = phrases[origin.phrase_id]
+            final_outcomes.setdefault(
+                ask.ask_id,
+                Outcome(
+                    outcome_id=f"outcome:{id_part(ask.ask_id)}:final_act",
+                    procedure_id=collected.law.procedure_id,
+                    ask_id=ask.ask_id,
+                    link_id=link_id,
+                    amendment_id=amendment_id,
+                    relation="via_amendment",
+                    stage="final_act",
+                    result="partial",
+                    kind="wording",
+                    article_id=phrase.final_spans[0].record_id,
+                    spans=tuple(
+                        span
+                        for span in phrase.final_spans
+                        if span.record_id == phrase.final_spans[0].record_id
+                    ),
+                    reason="The passage's shared wording stands in the final act; the rest of "
+                    "the passage was not compared.",
+                    method="lineage-verbatim-outcome",
+                ),
+            )
     verbatim = len(links)
 
     jev_path = args.law / "lineage-jev.json"
@@ -203,24 +251,42 @@ def main() -> int:
     reworded = len(links) - verbatim
 
     shown = tuple(links.values())
+    traced = pipeline.trace
+
+    def trace(
+        asks: Iterable[Ask],
+        amendments: Mapping[str, Amendment],
+        links: Iterable[LinkAssessment],
+        articles: Sequence[ArticleVersion],
+    ) -> tuple[Outcome, ...]:
+        """The pipeline's outcomes, with lineage's final-act outcome where it has one."""
+        return tuple(
+            final_outcomes.get(outcome.ask_id, outcome) if outcome.stage == "final_act" else outcome
+            for outcome in traced(asks, amendments, links, articles)
+        )
+
     with (
         patch.object(pipeline, "find_candidates", return_value=()),
         patch.object(pipeline, "assess_candidates", return_value=shown),
+        patch.object(pipeline, "trace", trace),
     ):
         view = pipeline.build_view(collected, generated_at=datetime.now(UTC))
     view = view.model_copy(
         update={
             "ask_method": "lineage-v0",
             "limitations": (
-                "Links come from lineage: amendments whose inserted wording (12+ identical "
-                "words absent from the proposal) stands in the final act, linked to the "
+                "Links come from lineage: amendments whose inserted wording (a run of 8+ "
+                "identical words with the law's rare words, absent from the proposal) stands "
+                "in the final act, linked to the "
                 "consultation passages that repeat that wording (verbatim) or that Jev judged "
                 "to ask for the same change (reworded, always unconfirmed). Shared wording "
                 "or meaning is not proof of authorship.",
                 f"Lineage: {len(adoption.phrases)} adopted phrases in "
                 f"{len(adoption.adoptions)} amendments; {verbatim} verbatim link(s) from "
                 f"{len(origins)} origin match(es) in {len(submissions)} submissions "
-                f"({unplaced} not inside a passage); {reworded} reworded link(s) from "
+                f"({unplaced} not inside a passage; {len(shared)} phrase(s) repeated by "
+                f"{SHARED_REFERENCE_SUBMITTERS}+ submitters left out as shared references); "
+                f"{reworded} reworded link(s) from "
                 f"{len(rows)} Jev row(s).",
                 *adoption.limitations,
                 *view.limitations[2:],
