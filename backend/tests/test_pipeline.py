@@ -20,7 +20,7 @@ from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.repositories import hys
 from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, span_matches
-from influence.services import pipeline
+from influence.services import assessment, pipeline
 from influence.services.pipeline import PipelineError
 
 AI_ACT = "2021/0106(COD)"
@@ -85,26 +85,12 @@ def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path
         "Artificial Intelligence Act",
     )
     assert (view.ask_method, view.limitations) == (pipeline.ASK_METHOD, pipeline.LIMITATIONS)
+    # The scoring sentence names the revision and published tiers part 4 actually uses.
+    scoring = view.limitations[1]
+    assert f"({assessment.METHOD_REVISION})" in scoring
+    assert all(f"{tier}-tier" in scoring for tier in assessment.DEFAULT_PUBLISHABLE)
     assert view.coverage == view.bundle.laws[0].coverage
     assert view.generated_at == LATER
-
-
-def test_an_amendment_too_long_to_compare_is_left_out_and_counted(tmp_path: Path) -> None:
-    usual = collected(matching_world(tmp_path))
-    long_one = usual.amendments[0].model_copy(
-        update={"amendment_id": "am:2021-0106-COD:ENVI:PE7-999", "new_text": "word " * 801}
-    )
-    assert not pipeline.comparable(long_one)
-
-    view = pipeline.build_view(
-        replace(usual, amendments=(*usual.amendments, long_one)), generated_at=LATER
-    )
-
-    total = len(usual.amendments) + 1
-    assert view.limitations[:-1] == pipeline.LIMITATIONS
-    assert view.limitations[-1].startswith(f"1 of {total} amendments were not analysed")
-    assert long_one.amendment_id not in {link.amendment_id for link in view.bundle.links}
-    assert [link.status for link in view.bundle.links].count("published") == 1
 
 
 def test_every_shown_record_is_reachable_and_every_quote_matches_its_source(
@@ -336,3 +322,30 @@ def test_the_atlas_command_keeps_the_bundle_when_the_view_fails(
     assert status == 1
     assert "no view at" in capsys.readouterr().err
     assert StageStore(tmp_path / "laws" / SLUG).current() is not None
+
+
+def test_an_amendment_too_long_to_search_is_a_labelled_gap_not_a_crash(tmp_path: Path) -> None:
+    """The first real AI Act run stopped on a long recital amendment (over 800 tokens)."""
+    bundle = collected(matching_world(tmp_path))
+    recital = bundle.amendments[0].model_copy(
+        update={
+            "amendment_id": "am:2021-0106-COD:ENVI:PE7-LONG",
+            "old_text": "word " * 900,
+            "new_text": "other " * 900,
+        }
+    )
+    view = pipeline.build_view(
+        replace(bundle, amendments=(*bundle.amendments, recital)), generated_at=LATER
+    )
+
+    assert [link for link in view.bundle.links if link.status == "published"]
+    assert view.limitations[: len(pipeline.LIMITATIONS)] == pipeline.LIMITATIONS
+    assert view.limitations[-1].startswith("1 amendment(s) were too long or empty to search")
+    assert all(link.amendment_id != recital.amendment_id for link in view.bundle.links)
+
+
+def test_candidates_can_be_found_without_collecting_the_unsearchable(tmp_path: Path) -> None:
+    bundle = collected(matching_world(tmp_path))
+    recital = bundle.amendments[0].model_copy(update={"old_text": "word " * 900})
+    asks = pipeline.asks_from_passages(bundle.passages)
+    assert pipeline.find_candidates([recital], asks) == ()

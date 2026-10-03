@@ -45,8 +45,7 @@ from influence.schemas.atlas_view import (
     RankingRow,
 )
 from influence.schemas.retrieval import SourcePassage
-from influence.schemas.scoring import MAX_TEXT_LENGTH, MAX_TOKENS, TextChange
-from influence.services.assessment import assess_link
+from influence.services.assessment import DEFAULT_PUBLISHABLE, METHOD_REVISION, assess_link
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.outcomes import trace_outcomes
@@ -63,7 +62,10 @@ TRACED_STATUSES = frozenset({"published", "unconfirmed"})
 LIMITATIONS = (
     "Ask extraction v0: each consultation passage is treated as one ask, so outcome counts "
     "count passages, not distinct requests.",
-    "Links come from lexical rules (rules-1) with placeholder thresholds; their precision "
+    # Built from part 4's own constants, so the sentence follows its revision and tiers.
+    f"Links come from lexical rules ({METHOD_REVISION}); only "
+    f"{' and '.join(sorted(DEFAULT_PUBLISHABLE))}-tier links are published, at thresholds "
+    "calibrated on LobbyPlag's labelled pairs from one 2013 law; their precision on this law "
     "has not been audited yet.",
     "Outcomes are traced only for asks with a published or unconfirmed link.",
 )
@@ -141,21 +143,16 @@ def asks_from_passages(passages: Iterable[Passage]) -> tuple[Ask, ...]:
     )
 
 
-def comparable(amendment: Amendment) -> bool:
-    """Whether the comparison's size limits admit this amendment's wording.
-
-    The token diff behind retrieval, assessment and outcomes is quadratic and bounded by
-    `TextChange`; a few real amendments replace a whole long recital or annex and exceed it.
-    """
-    try:
-        TextChange(old=amendment.old_text or "", new=amendment.new_text)
-    except ValidationError:
-        return False
-    return True
-
-
-def find_candidates(amendments: Iterable[Amendment], asks: Sequence[Ask]) -> tuple[Candidate, ...]:
+def find_candidates(
+    amendments: Iterable[Amendment],
+    asks: Sequence[Ask],
+    unsearchable: list[str] | None = None,
+) -> tuple[Candidate, ...]:
     """The top BM25 asks for each amendment's changed words.
+
+    An amendment the scorer's bounds refuse (over 800 tokens a side, as a long recital can
+    be, or no text) has no candidates; its ID is appended to `unsearchable` so the view can
+    say so, instead of one long amendment stopping a whole law.
 
     Building the index is linear in the asks' total length; each search costs the postings
     of the amendment's distinct changed words plus O(M log k) over M matching passages.
@@ -174,12 +171,17 @@ def find_candidates(amendments: Iterable[Amendment], asks: Sequence[Ask]) -> tup
     by_slice = {(ask.document_id, ask.span.start, ask.span.end): ask for ask in asks}
     found: list[Candidate] = []
     for amendment in amendments:
-        shortlist = index.search(
-            amendment.amendment_id,
-            amendment.old_text,
-            amendment.new_text,
-            k=CANDIDATES_PER_AMENDMENT,
-        )
+        try:
+            shortlist = index.search(
+                amendment.amendment_id,
+                amendment.old_text,
+                amendment.new_text,
+                k=CANDIDATES_PER_AMENDMENT,
+            )
+        except ValueError:
+            if unsearchable is not None:
+                unsearchable.append(amendment.amendment_id)
+            continue
         for candidate in shortlist.candidates:
             passage = candidate.passage
             ask = by_slice[(passage.document_id, passage.start, passage.end)]
@@ -278,19 +280,10 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
     amendments = {amendment.amendment_id: amendment for amendment in collected.amendments}
     asks_by_id = {ask.ask_id: ask for ask in asks}
     texts = {text.document_id: text.text for text in collected.document_texts}
-    # An amendment the comparison cannot hold is left out and counted, never a crash and
-    # never a silent skip: the view's limitations say how many.
-    analysed = tuple(amendment for amendment in collected.amendments if comparable(amendment))
-    left_out = len(collected.amendments) - len(analysed)
-    limitations = LIMITATIONS
-    if left_out:
-        limitations = (
-            *LIMITATIONS,
-            f"{left_out} of {len(collected.amendments)} amendments were not analysed: their "
-            f"text is empty or exceeds the comparison limit of {MAX_TOKENS} tokens or "
-            f"{MAX_TEXT_LENGTH} characters.",
-        )
-    links = assess_candidates(find_candidates(analysed, asks), amendments, asks_by_id, texts)
+    unsearchable: list[str] = []
+    links = assess_candidates(
+        find_candidates(collected.amendments, asks, unsearchable), amendments, asks_by_id, texts
+    )
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)
 
@@ -352,7 +345,15 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
         bundle=bundle,
         snapshot=snapshot,
         rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
-        limitations=limitations,
+        limitations=(
+            LIMITATIONS
+            if not unsearchable
+            else (
+                *LIMITATIONS,
+                f"{len(unsearchable)} amendment(s) were too long or empty to search and have no "
+                "candidates.",
+            )
+        ),
     )
 
 
