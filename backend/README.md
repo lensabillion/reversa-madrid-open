@@ -190,8 +190,13 @@ counts and timings are not measured yet.
 ## Atlas Command and View API (Parts 3 to 8)
 
 `influence atlas <law>` (`make atlas LAW='2021/0106(COD)'`) runs `influence collect`, then
-`services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. The
-pipeline adds no logic of its own; it calls each part's code in order:
+`services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. It
+also writes `coordinated.json`, the law's coordinated amendments (clusters of near-identical
+inserted wording tabled by Members of different political groups, `services/coordinated.py`,
+the same code and file as `influence coordinated <law>`), and prints one line with how many
+clusters span political groups. Both files are built before either is written, and the view
+is written last, so a listed law has the clusters of the same run beside it. The pipeline
+adds no logic of its own; it calls each part's code in order:
 
 | Step | Code | Writes into the view |
 | --- | --- | --- |
@@ -201,14 +206,30 @@ pipeline adds no logic of its own; it calls each part's code in order:
 | Outcomes | `services/outcomes.py` for each ask's strongest published or unconfirmed link | outcomes |
 | Graph | `services/atlas_graph.py` from the same records as the bundle | `snapshot` |
 | Counts | `services/atlas_analysis.py`, final-act rows in its order | `rankings` |
+| Mode labels | `services/modes.py` from the law's typed coverage and status | `modes` |
 
 The view keeps every record the shown links reach and nothing else, so the frontend
 adapter (`frontend/lib/atlas.ts`) re-validates exactly what the graph shows.
 
 | Endpoint | Answer |
 | --- | --- |
-| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links}]}` for every law with an `atlas.json` |
-| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): coverage, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links, cross_group_clusters}]}` for every law with an `atlas.json`. `cross_group_clusters` counts the clusters of the law's `coordinated.json` that span political groups, and is `null` when the law has no such file (not computed, which is not zero). 500 when a view or a clusters file on disk is invalid |
+| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): `coverage`, `modes`, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+| `GET /api/v1/atlas/{slug}/coordinated` | The `CoordinatedView` (`schemas/coordinated.py`), field names in snake_case: `counts`, `clusters` (each with `cross_group`, `political_groups`, `members` and their quoted `inserted` spans), the method's thresholds and `limitations`. 404 when the law has no `coordinated.json`; 422 for a malformed slug; 500 when the file on disk is invalid |
+
+`modes` holds the mode labels of [the plan, section 6](../docs/plan.md#6-typed-partial-results):
+what a gap in the law's layers means for a reader. Each is derived from the coverage rows
+part 1 recorded and from the law's status, never from an empty list:
+
+| Label | Applies when |
+| --- | --- |
+| `Contextual evidence, not textual` | The asks layer is `missing`, `not_collected`, `not_applicable`, has no row, or counted zero |
+| `No amendment stage` | Both the committee and the plenary amendment layers are `missing` or `not_applicable`, or counted zero. A layer that is `not_collected` is unknown and does not count as absent |
+| `Negotiation in progress` | The law's status is `ongoing` and its final act was not read (the layer is not `complete`, `partial` or `stale`) |
+| `Partial amendment coverage` | Either amendment layer is `partial` or `stale` |
+
+The plan's fifth label, "Not analysed (DE)", needs per-passage language counts the view does
+not carry yet and is not derived.
 
 The API reads the same data root as the command (`INFLUENCE_DATA_ROOT`, default the
 repository's `data/`; `create_app(atlas_data_root=...)` in tests).
@@ -218,8 +239,8 @@ ask, so outcome counts count passages, not distinct requests. Only copied-tier l
 published, at part 4's thresholds calibrated on LobbyPlag (one 2013 law), and their precision
 on new laws is unaudited; the sentence is built from `assessment.py`'s revision and tiers.
 Outcomes are traced only for asks with a published or
-unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
-timed.
+unconfirmed link. Tested offline (`tests/test_pipeline.py`, `tests/test_modes.py`, and
+`tests/test_coordinated.py` for the clusters route); not yet run on real data or timed.
 
 ## Submission Command
 
