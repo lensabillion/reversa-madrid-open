@@ -99,3 +99,45 @@ The role-label clarification is tracked in **rev-foxs**.
 Its full `make check` also passes 106 backend and 38 frontend tests, build and audits.
 Browser inspection confirmed the three explanatory captions and Amazon's filename/page
 inside its own column. Model accuracy is unchanged by this display clarification.
+
+## Atlas Components and Agent 3 Handoff
+
+`AtlasWorkspace` opens on an explanation and a graph: who requested a change, which
+amendment matched it, and what appeared in the final law. Separate views provide the
+source evidence and descriptive outcome counts. The production application route still
+uses the earlier evidence workspace; Agent 1's API/route integration remains pending.
+The local `/atlas-preview` route is an uncommitted, explicitly synthetic rehearsal.
+
+- `AtlasGraph` draws supplied snapshot nodes and edges, with selectable connections and
+  supporting quotations. A final outcome connects the request to its article; the UI
+  does not infer an amendment-to-article causal edge. Missing outcomes add no edge.
+- `AtlasExplorer` filters assessed links by law/actor/request text, each individual
+  topic and procedure year. Published links and audit candidates have separate views.
+- `AtlasEvidence` shows the request, original legal wording, amendment and final text,
+  with URLs, pages, dates, assessment methods and limits. Unknown wording differs from
+  known empty wording. Exact Unicode code-point quotes are checked before highlighting.
+- `lib/atlas.ts` maps schema-validated `atlas-1` records into display props. It checks
+  joins, ownership, source spans and source versions;
+  it never decides publication or outcomes. Passage-local offsets are normalized.
+  It supports all four assessment states, joint actors and multiple law subjects.
+
+The adapter is a typed projection, not a runtime decoder for arbitrary API JSON.
+Its four-column evidence view can represent one source field per column and one final
+outcome per request. Unsupported multi-field or multi-source evidence and multiple final
+outcomes fail explicitly instead of silently dropping records. The integration owner
+must extend this presentation before routing such bundles to it. Shared schemas are
+owned upstream and are not changed here.
+
+`AtlasAnalysis` presents pipeline-supplied ordering and counts: full, partial,
+not-reflected and unknown outcomes. Full wins are shown against assessed requests;
+unknowns are excluded from that denominator and retained in total observed coverage.
+An all-unknown sample has no rate. Getting a requested outcome does not prove causation.
+Report findings need usable citations; a usable URL does not itself establish accuracy.
+Absent findings and forecasts remain labelled gaps.
+
+Tracking: `rev-oodw` (explorer/graph display), `rev-1jc4` (analysis presentation),
+`rev-i006` (backend graph), `rev-5yy6` (backend aggregation), `rev-qn6b` (live integration).
+Shared contracts and synthetic fixtures arrived in PR #25. Agent 2's PR #27 adds
+retrieval, which still needs verification and outcome assessment before publication.
+Real data, any-law runtime, calibrated precision, spend-adjusted rankings, forecasting
+and the generated public report remain separate acceptance gates.

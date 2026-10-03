@@ -230,3 +230,31 @@ technical design and plan); check `git status` before editing shared files. The 
 rebuilt it from the bead's notes: commit and push before a session ends. Load data and start services using README
 commands; never depend on a previous chat's running server, temporary log or browser
 state.
+
+## Agent 3 Graph Interface — 3 October 2026
+
+`feat/atlas-explorer` / PR #24 provides a graph-first workspace, source evidence,
+loaded-record search and individual topic/procedure-year filters, plus supplied outcome
+counts and report presentation. The `atlas-1` adapter consumes PR #25's shared fixtures;
+PR #27's candidate retrieval is merged into the branch. Graph selection opens its exact
+source comparison; absent or unpublished evidence IDs produce an explicit gap rather
+than showing another link. The opening view explains the investigation in plain language.
+
+`make check-frontend` passed: 83 tests across 11 files, Biome, TypeScript and production
+build; npm audit reported 0 vulnerabilities. The build included the LOCAL UNCOMMITTED
+synthetic `/atlas-preview` route, which is excluded from the PR. Browser inspection
+confirmed the graph and selected connection quotations. These are synthetic checks,
+not real findings or complete live integration. [Frontend handoff](../frontend/README.md#atlas-components-and-agent-3-handoff).
+
+The backend graph/count services are PR #28 (`rev-i006`, `rev-5yy6`), with all nine CI
+checks passing. Presentation is `rev-oodw` and `rev-1jc4`. Agent 3 is not complete:
+reproducible report generation (`rev-fod0`), dated position/channel enrichment
+(`rev-rg6l`), forecast-record presentation and complete analysis hydration remain.
+The evidence adapter currently rejects multiple final outcomes and multi-source or
+multi-field columns; expand that representation before integrating such records.
+Agent 1 owns shared route/CLI assembly (`rev-qn6b`); Agent 2 owns inference/forecasting.
+
+Completion needs a real bundle of source texts/provenance, resolved actors, all observed
+asks, published assessments, outcomes including unmatched/unknown asks, and coverage.
+Then rehearse three random published links and the five-minute presentation. No real
+any-law, model-quality, large-graph or final mobile-integration claim is made here.
