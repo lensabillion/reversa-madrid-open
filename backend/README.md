@@ -476,3 +476,34 @@ Measured on Apple M5, Python 3.14.7, 3 October 2026: 1,000 cached fixture projec
 aggregations took 0.1062 seconds (0.1062 ms per run). This tiny in-memory benchmark
 excludes ingestion, scoring, network and disk loading; it does not establish full-pipeline
 runtime or real-world accuracy. The script retains the inputs and measurement procedure.
+
+## Fitted Calculation and Local Model Evaluation
+
+`influence.services.calculation.calculate_links` composes the merged passage-change
+reader and assessment with fitted signals, law-local background/mutual ranks and explicit
+publication evidence. It returns the shared `LinkAssessment` contract consumed by the
+Atlas graph. It preserves all candidate alternatives and reports missing/experimental
+evidence. The default accepted-model set is empty: a fitted support score is neither a
+calibrated probability nor permission to publish.
+
+The [calculation design and plan-coverage handoff](../docs/design/calculation-handoff.md)
+explains formulas, evidence gates, known gaps and dependencies. The
+[isolated model runtime](models/README.md) gives reproducible local Qwen/E5 embeddings,
+DeBERTa NLI inference, measured retrieval comparisons and failed legal diagnostics.
+No paid API or new application dependency is required.
+
+Run the grouped development comparison from the repository root:
+
+```sh
+uv run --directory backend --locked python benchmarks/calculation_plan.py \
+  --data /absolute/path/to/data/lobbyplag \
+  --out /absolute/path/to/calculation-development.json
+```
+
+To include model features, first prepare and run the models as described in their
+README, then pass `--semantic <semantic-pairs.json>`, `--judge <judge-pairs.json>` and
+`--model-inputs <inputs.json>`. Both artifacts must bind the same exact prepared-input
+file and current source hashes. The evaluator rejects incomplete coverage or missing
+scores instead of inserting zeros. Its output retains all variants, five fitted models
+per variant, paired out-of-fold scores, settings, hashes and threshold diagnostics.
+Those pooled diagnostics cannot serve as the cutoff for a separately refitted model.

@@ -155,7 +155,7 @@ Open decisions are not settled until the project owner agrees.
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
-| D1: language-model judge (none, local open model, Claude or Jev) | **Open** | Now runs on thousands of candidates, not 60 pairs; bead `rev-jaig`; [Atlas explainer §10](explainer/influence-atlas-primer.md#10-models-from-hugging-face) |
+| D1: language-model judge | **Local evaluation authorized; no paid API** by the owner, 3 October 2026 | A pinned local DeBERTa NLI model scored 17/24 on a separate synthetic legal diagnostic. Evaluation is authorized; automatic publication is not validated. Raw outputs and labels stay separate. See [calculation handoff](design/calculation-handoff.md), `rev-jaig` and `rev-qs6i`. |
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
 | D5: organizer questions of the first brief | **Superseded**; one question remains: may we use code written before today? | Bead `rev-qvmx` |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
@@ -258,3 +258,38 @@ Completion needs a real bundle of source texts/provenance, resolved actors, all 
 asks, published assessments, outcomes including unmatched/unknown asks, and coverage.
 Then rehearse three random published links and the five-minute presentation. No real
 any-law, model-quality, large-graph or final mobile-integration claim is made here.
+
+## Consolidated Calculation Development — 3 October 2026
+
+Work under `rev-qs6i` extends the merged Agent 2 assessment/audit services with quoted-law
+masking, rarity, local alignment, legal cues, semantic evidence, law-background/mutual
+ranks, grouped fitted logistic support and provenance-bound publication gates. The
+[calculation handoff](design/calculation-handoff.md) maps each plan requirement to code,
+measurements and remaining dependencies. It does not mark all Agent 3 work complete.
+
+The user authorized local model evaluation only, with no paid API. The isolated
+[model runtime and generated report](../backend/models/README.md) record pinned Qwen/E5
+encoder runs and DeBERTa NLI. With deletion-only proposals retained, BM25 retrieves
+157/172 known LobbyPlag matches at 20; Qwen dense retrieves 142 and Qwen fusion 156;
+E5 dense retrieves 138 and E5 fusion 157. Retain BM25: no measured retrieval gain.
+The local NLI model matches 17/24 intended synthetic legal relations; seven failures
+prevent a claim that it can approve reworded links. These synthetic labels are not an
+independent legal audit, and LobbyPlag borrowing labels are not entailment labels.
+
+The existing lexical scorer remains the incumbent. Fitted models and cutoffs are
+explicit development artifacts until the paired evaluation and independent publication
+audit justify adoption. No real 2019+ blind audit or end-to-end collected-law snapshot
+has been established by this calculation work. Complete-law source coverage, part 7
+spend/trend/forecast calculations and the final public report remain separate tracked
+work; see the handoff rather than inferring completion from a working synthetic graph.
+
+Verification of the calculation branch on 3 October, 14:22 CEST: `make check` exited 0;
+854 backend tests passed with 100% coverage (4,666 statements, 1,248 branches); strict
+basedpyright reported zero errors/warnings; 83 frontend tests passed, production build
+passed, six catalogs validated, and backend/frontend vulnerability audits were clean.
+The isolated model gate additionally passed strict typing and four tests, with no known
+vulnerabilities in its 57-package audit. Generated grouped evaluation reports are in
+`backend/evaluation/calculation-qwen.json` and `calculation-e5.json`; their recorded
+implementation hashes match the tested source. Baseline mean precision@20 is 0.9801;
+fitted deterministic/background is 0.9765, Qwen full-signals/NLI 0.9671 and E5 0.9718.
+No fitted replacement is activated. CI status and PR identity remain on the beads.
