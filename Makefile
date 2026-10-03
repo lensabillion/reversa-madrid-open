@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions report \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -96,6 +96,12 @@ channels:  ## Count the channels one law was lobbied through: make channels LAW=
 directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
 	$(BACKEND) influence directions "$(LAW)" $(ARGS)
+
+# Part 8: the public report, read from the files the commands above wrote; collects nothing.
+# Several laws are separated by commas: make report LAW='AI Act, 2022/0140(COD)'.
+report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
+	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
+	$(BACKEND) influence report "$(LAW)" $(ARGS)
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
