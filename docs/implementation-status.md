@@ -348,7 +348,7 @@ check measured five generated asks but only two in the view/ranking input, confi
 frontend 404 (`rev-13x8`) was on `00033b1`; PR #46 adds the route and its browser check
 is being repeated against the current backend. Final test findings follow below.
 
-## Gate 3 Real-Data Check — 3 October 2026
+## Historical Gate 3 Check on `2fbb229` — 3 October 2026
 
 Gate 3 in `docs/plan.md` is **not passed**. Main `2fbb229` plus the bounded-ask fix
 `104e462` can build a real AI Act view from the completed collection, but publishes only
@@ -405,3 +405,52 @@ The bounds-fix branch passed `make check`: 751 backend tests with 100% branch co
 build, strict types, Ruff/Biome, six catalogs, and clean backend/frontend dependency
 audits. A deterministic punctuation-only outcome regression also makes an existing
 coverage branch independent of chance-based property-test generation.
+
+
+## Gate 3 Follow-Up on Main `086d42a` — 3 October 2026
+
+Main merged PR #48 (calculation/model evaluation), #49 (real-data collection fixes),
+#50 (prose-aware assessment), and #51 (reproducible setup). PR #52 integrates that main
+with the bounded-ask fix at `cecb869`. The preceding two-link run is historical: the new
+`rules-3` assessor keeps prose matches unconfirmed by default, including shared boilerplate.
+No `publish_prose` override is enabled. The same permission/obligation probe is now
+unconfirmed at support 0.9167; explicitly enabling prose publication would publish it
+without detecting the modal mismatch. The guard prevents default publication but does
+not establish legal-meaning accuracy. Prose thresholds and reworded-link validation
+remain open (`rev-nuk5`, `rev-sbrp`, `rev-zzur`, `rev-jaig`).
+
+The integrated `make check` passed: 987 backend tests in 15.59 seconds, 100% coverage
+(5,627 statements, 1,462 branches), 94 frontend tests in 12 files, six catalogs, strict
+types, lint/format, production build and clean audits. All nine remote CI checks passed
+at `cecb869`. This confirms engineering checks, not Gate 3 acceptance.
+
+Browser checks on the earlier populated snapshot verified both graph-to-evidence paths,
+correct source URLs and highlight counts, with no JavaScript errors. They also found
+that displaying an entire long PDF defeats side-by-side reading: the first Novartis
+highlight was 46,768 pixels down, where the neighboring columns were blank (`rev-48sd`).
+Ranking rows supply no usable source anchors (`rev-1wb7`), and the initial graph should
+show source coverage more clearly (`rev-7lfp`). These UI issues are tracked separately
+from scoring and have not been fixed by PR #52.
+
+The actual `influence atlas '2021/0106(COD)' --data-root <data>` command then completed
+with **exit 0 in 310.134 seconds (5 minutes 10 seconds)**, using verified TLS and the
+existing public download cache, without `--refresh` or prose-publication overrides.
+Collection took 52.9 seconds, retrieval 212.381 seconds (28,229 candidate pairs),
+assessment 29.392 seconds, and outcome tracing 15.010 seconds. The only network attempt
+was one feedback-publication request returning HTTP 400; usable downloads were reused.
+That missing publication remains in typed coverage. This is a successful full CLI run
+with cached public inputs, not an uncached download benchmark or second-law rehearsal.
+
+The resulting `rules-3` view has **0 published, 859 unconfirmed and 82 contradicted
+links**, with 27,288 insufficient candidates omitted from the view. The published graph
+has one law node and zero edges. **Gate 3 still fails**: there are no published links
+against the required 20, and no published sample of ten can be read or checked. A check
+of zero published spans is unavailable, not a passing evidence audit. The output follows
+the merged policy of withholding unvalidated prose findings.
+
+Run ID: `20261003T130918Z`; view SHA-256:
+`ec377825c4c2110cfdb2a76efd82188bc80987419a7d927f17877542ac909fde`.
+Diagnostic wrappers recorded phase times and fetch counts without changing algorithms;
+the source fingerprint and assessor/pipeline/matcher hashes were captured before the run.
+Artifacts remain under ignored `data/laws/2021-0106-COD/`; earlier view/audit artifacts
+are preserved separately under `gate3-runs/rules-2-0741e0e3d9fb/`.
