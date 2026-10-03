@@ -15,19 +15,36 @@ import {
 } from "../lib/lineage";
 import {
   type LineageLawSummary,
+  type LineageMatchKind,
   type LineageView,
   lineageLawsUrl,
   lineageViewUrl,
   readLineageLaws,
   readLineageView,
 } from "../lib/lineage-api";
+import {
+  anyPhrase,
+  filterPhrases,
+  type LineageChannels,
+  lineageChannels,
+  linkPool,
+  type OrganisationRanking,
+  type PhraseFilter,
+  phraseFacets,
+  rankOrganisations,
+} from "../lib/lineage-insights";
 import { useResource } from "../lib/use-resource";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
+import { Channels, FiveQuestions, LinkCheck, questionsFor, WhoShaped } from "./lineage-insights";
+import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
 /** Phrases shown before "Show more"; the AI Act has hundreds, and each card is tall. */
 export const PHRASES_PER_PAGE = 20;
 const CREDITS_SHOWN = 15;
+/** Wording copied into many amendments would make one card very tall; the rest are counted. */
+const AMENDMENTS_PER_CARD = 6;
+const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600";
 
 const count = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
@@ -65,9 +82,20 @@ function day(value: string | null): string {
   return value === null ? "date unknown" : value.slice(0, 10);
 }
 
-function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
+/** The quote's left rule takes its method's color: teal lexical, violet semantic. */
+function Quote({
+  span,
+  label,
+  kind,
+}: {
+  span: AtlasSourceSpan;
+  label: string;
+  kind: LineageMatchKind;
+}) {
   return (
-    <blockquote className="border-l-2 border-teal-700 bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900">
+    <blockquote
+      className={`border-l-4 ${kindStyle[kind].border} bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900`}
+    >
       <span className="sr-only">{label}: </span>
       {span.text}
     </blockquote>
@@ -77,8 +105,8 @@ function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
 function Timing({ origin }: { origin: LineageOriginRow }) {
   if (origin.countsAsOrigin) {
     return (
-      <span className="rounded-sm bg-[#e8efea] px-2 py-0.5 font-medium text-teal-900">
-        Said before the amendments
+      <span className="rounded-sm border border-stone-400 bg-white px-2 py-0.5 font-medium text-stone-900">
+        <span aria-hidden="true">✓ </span>Said before the amendments
       </span>
     );
   }
@@ -101,36 +129,56 @@ function Timing({ origin }: { origin: LineageOriginRow }) {
   );
 }
 
-function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
+function Arrow() {
+  return (
+    <span
+      aria-hidden="true"
+      className="hidden text-lg text-stone-400 lg:absolute lg:top-4 lg:-right-3 lg:z-10 lg:block lg:rounded-full lg:bg-white lg:px-1"
+    >
+      →
+    </span>
+  );
+}
+
+/**
+ * One link in the brief's order, left to right: what the submission asked, the amendment
+ * that carried it, and the wording of the final act (or, for tabled wording, its absence).
+ */
+export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
   return (
     <li className="rounded-sm border border-stone-200 bg-white">
       <article aria-label={`Phrase ${phrase.phraseId}`} className="grid gap-0 lg:grid-cols-3">
-        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
-          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
-            {phrase.adopted ? "In the final act" : "Tabled, not adopted"}
+        <section className="relative space-y-3 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>
+            {phrase.origins.length === 0
+              ? "No submission says it"
+              : plural(phrase.origins.length, "submission says it", "submissions say it")}
           </h4>
-          {phrase.finalQuotes.length > 0 ? (
-            phrase.finalQuotes.map((span) => (
-              <Quote
-                key={`${span.record_id}:${span.start}`}
-                span={span}
-                label="Final act wording"
-              />
-            ))
-          ) : (
-            <p className="font-serif text-[15px] leading-6 text-stone-900">{phrase.text}</p>
-          )}
-          <p className="text-xs text-stone-500">
-            {plural(phrase.words, "word", "words")} · {phrase.kind}
-            {phrase.joint ? " · joint: credited to several holders" : ""}
-          </p>
+          <ul className="space-y-3">
+            {phrase.origins.map((origin) => (
+              <li key={`${origin.documentId}:${origin.kind}`} className="space-y-1.5 text-sm">
+                <p className="font-medium text-stone-900">
+                  {origin.organisation ?? "Unnamed submitter"}
+                </p>
+                <p className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-stone-500">
+                    {day(origin.publishedAt)} · {origin.documentId}
+                  </span>
+                  <Timing origin={origin} />
+                  <KindBadge kind={origin.kind} />
+                </p>
+                <Quote span={origin.quote} label="Submission wording" kind={origin.kind} />
+              </li>
+            ))}
+          </ul>
+          <Arrow />
         </section>
-        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
-          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+        <section className="relative space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>
             {plural(phrase.amendments.length, "amendment carries it", "amendments carry it")}
           </h4>
           <ul className="space-y-2 text-sm text-stone-700">
-            {phrase.amendments.map((amendment) => (
+            {phrase.amendments.slice(0, AMENDMENTS_PER_CARD).map((amendment) => (
               <li key={amendment.amendmentId}>
                 <span className="block font-mono text-xs text-stone-800">
                   {amendment.amendmentId}
@@ -153,29 +201,33 @@ function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
               </li>
             ))}
           </ul>
+          {phrase.amendments.length > AMENDMENTS_PER_CARD && (
+            <p className="text-xs text-stone-500">
+              and {count.format(phrase.amendments.length - AMENDMENTS_PER_CARD)} more amendments
+              with the same wording
+            </p>
+          )}
+          <Arrow />
         </section>
-        <section className="space-y-3 p-4">
-          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
-            {phrase.origins.length === 0
-              ? "No submission says it"
-              : plural(phrase.origins.length, "submission says it", "submissions say it")}
-          </h4>
-          <ul className="space-y-3">
-            {phrase.origins.map((origin) => (
-              <li key={origin.documentId} className="space-y-1.5 text-sm">
-                <p className="font-medium text-stone-900">
-                  {origin.organisation ?? "Unnamed submitter"}
-                </p>
-                <p className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-stone-500">
-                    {day(origin.publishedAt)} · {origin.documentId}
-                  </span>
-                  <Timing origin={origin} />
-                </p>
-                <Quote span={origin.quote} label="Submission wording" />
-              </li>
-            ))}
-          </ul>
+        <section className="space-y-2 p-4">
+          <h4 className={eyebrow}>{phrase.adopted ? "In the final act" : "Tabled, not adopted"}</h4>
+          {phrase.finalQuotes.length > 0 ? (
+            phrase.finalQuotes.map((span) => (
+              <Quote
+                key={`${span.record_id}:${span.start}`}
+                span={span}
+                label="Final act wording"
+                kind={phrase.kind}
+              />
+            ))
+          ) : (
+            <p className="font-serif text-[15px] leading-6 text-stone-900">{phrase.text}</p>
+          )}
+          <p className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+            <KindBadge kind={phrase.kind} note="adoption" />
+            {plural(phrase.words, "word", "words")}
+            {phrase.joint ? " · joint: credited to several holders" : ""}
+          </p>
         </section>
       </article>
     </li>
@@ -184,23 +236,44 @@ function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
 
 type PhraseTab = "adopted" | "tabled";
 
+const evidenceChoices: readonly { value: PhraseFilter["evidence"]; label: string }[] = [
+  { value: "", label: "Any evidence" },
+  { value: "first", label: "A submission said it first" },
+  { value: "any-origin", label: "Any submission says it" },
+  { value: "lexical", label: "Lexical match (same words)" },
+  { value: "reworded", label: "Semantic match (Jev)" },
+];
+
+const fieldStyle =
+  "rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-teal-700";
+
 function Phrases({ lineage }: { lineage: PreparedLineage }) {
   const [tab, setTab] = useState<PhraseTab>("adopted");
-  const [onlyEarlier, setOnlyEarlier] = useState(false);
+  const [filter, setFilter] = useState<PhraseFilter>(anyPhrase);
   const [shown, setShown] = useState(PHRASES_PER_PAGE);
   const all = tab === "adopted" ? lineage.adopted : lineage.tabled;
-  const phrases = onlyEarlier ? all.filter((phrase) => phrase.hasEarlierRequest) : all;
+  const facets = useMemo(
+    () => phraseFacets([...lineage.adopted, ...lineage.tabled]),
+    [lineage.adopted, lineage.tabled],
+  );
+  const phrases = useMemo(() => filterPhrases(all, filter), [all, filter]);
   function choose(next: PhraseTab) {
     setTab(next);
     setShown(PHRASES_PER_PAGE);
   }
+  function update(next: Partial<PhraseFilter>) {
+    setFilter((current) => ({ ...current, ...next }));
+    setShown(PHRASES_PER_PAGE);
+  }
+  const filtered =
+    filter.query !== "" || filter.group !== "" || filter.committee !== "" || filter.evidence !== "";
   const tabStyle = (active: boolean) =>
     `rounded-sm px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-teal-700 ${active ? "bg-teal-900 text-white" : "bg-white text-stone-700 hover:bg-stone-100"}`;
   return (
-    <section aria-labelledby="lineage-phrases" className="space-y-4">
+    <section aria-labelledby="lineage-evidence" className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 id="lineage-phrases" className="font-serif text-xl text-stone-900">
-          Wording and where it came from
+        <h3 id="lineage-evidence" className="font-serif text-xl text-stone-900">
+          The evidence: submission → amendment → final act
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -219,23 +292,84 @@ function Phrases({ lineage }: { lineage: PreparedLineage }) {
           >
             Tabled, not adopted ({count.format(lineage.tabled.length)})
           </button>
-          <label className="flex items-center gap-2 text-sm text-stone-700">
-            <input
-              type="checkbox"
-              checked={onlyEarlier}
-              onChange={(event) => {
-                setOnlyEarlier(event.target.checked);
-                setShown(PHRASES_PER_PAGE);
-              }}
-            />
-            Only wording a submission said first
-          </label>
         </div>
       </div>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
         {tab === "adopted"
-          ? "Each phrase stands in the final act, was not in the Commission's proposal, and was inserted by the amendments listed. Submissions that contain the same words are shown with their dates."
+          ? "Each phrase stands in the final act, was not in the Commission's proposal, and was inserted by the amendments listed. Submissions that contain the same words, or that Jev judged to ask for it in other words, are shown with their dates."
           : "Wording that amendments inserted and a submission also says, but that did not reach the final act."}
+      </p>
+      <KindLegend />
+      <search className="flex flex-wrap items-end gap-3 rounded-sm border border-stone-200 bg-white p-3">
+        <label className="flex min-w-64 flex-1 flex-col gap-1 text-xs text-stone-600">
+          Search words, organisations, Members or amendments
+          <input
+            type="search"
+            value={filter.query}
+            onChange={(event) => update({ query: event.target.value })}
+            placeholder="e.g. biometric, DIGITALEUROPE, sandbox"
+            className={fieldStyle}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-stone-600">
+          Evidence
+          <select
+            value={filter.evidence}
+            onChange={(event) =>
+              update({
+                evidence:
+                  evidenceChoices.find((choice) => choice.value === event.target.value)?.value ??
+                  "",
+              })
+            }
+            className={fieldStyle}
+          >
+            {evidenceChoices.map((choice) => (
+              <option key={choice.value} value={choice.value}>
+                {choice.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-stone-600">
+          Political group
+          <select
+            value={filter.group}
+            onChange={(event) => update({ group: event.target.value })}
+            className={fieldStyle}
+          >
+            <option value="">Any group</option>
+            {facets.groups.map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-stone-600">
+          Committee
+          <select
+            value={filter.committee}
+            onChange={(event) => update({ committee: event.target.value })}
+            className={fieldStyle}
+          >
+            <option value="">Any committee</option>
+            {facets.committees.map((committee) => (
+              <option key={committee} value={committee}>
+                {committee}
+              </option>
+            ))}
+          </select>
+        </label>
+        {filtered && (
+          <button type="button" onClick={() => update(anyPhrase)} className={retryStyle}>
+            Clear filters
+          </button>
+        )}
+      </search>
+      <p role="status" className="text-xs text-stone-500">
+        {count.format(phrases.length)} of {count.format(all.length)} phrases shown, strongest
+        evidence first
       </p>
       {phrases.length === 0 ? (
         <p className="text-sm text-stone-600">No phrase matches this selection.</p>
@@ -317,7 +451,7 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
   return (
     <section aria-labelledby="lineage-credits" className="space-y-4">
       <h3 id="lineage-credits" className="font-serif text-xl text-stone-900">
-        Who tabled the adopted wording
+        Who gets their way: Members and political groups
       </h3>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
         Every holder of an adopted phrase is credited with the whole phrase; a phrase with several
@@ -329,9 +463,12 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
       ) : (
         tables.map((table) => (
           <div key={table.basis} className="grid gap-6 lg:grid-cols-2">
-            <CreditList title={`Political groups (${table.basis})`} rows={table.groups} />
             <CreditList
-              title={`Members and committee text (${table.basis})`}
+              title={`Political groups · ${kindStyle[table.basis].label.toLowerCase()}`}
+              rows={table.groups}
+            />
+            <CreditList
+              title={`Members and committee text · ${kindStyle[table.basis].label.toLowerCase()}`}
               rows={table.holders}
             />
           </div>
@@ -350,12 +487,27 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-type Prepared = { ok: true; lineage: PreparedLineage } | { ok: false; error: string };
+type Prepared =
+  | {
+      ok: true;
+      lineage: PreparedLineage;
+      organisations: OrganisationRanking;
+      channels: LineageChannels;
+      pool: readonly LineagePhraseRow[];
+    }
+  | { ok: false; error: string };
 
 function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
   const prepared = useMemo<Prepared>(() => {
     try {
-      return { ok: true, lineage: prepareLineage(view) };
+      const lineage = prepareLineage(view);
+      return {
+        ok: true,
+        lineage,
+        organisations: rankOrganisations(view),
+        channels: lineageChannels(view),
+        pool: linkPool(lineage.adopted),
+      };
     } catch (error: unknown) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
@@ -375,12 +527,20 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       </StateMessage>
     );
   }
-  const { lineage } = prepared;
+  const { lineage, organisations, channels, pool } = prepared;
   const { counts } = view;
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
   });
+  const sections = [
+    ["#lineage-questions", "Five questions"],
+    ["#lineage-who", "Who"],
+    ["#lineage-how", "How"],
+    ["#lineage-check", "Check 3 links"],
+    ["#lineage-evidence", "Evidence"],
+    ["#lineage-limits", "Limits"],
+  ] as const;
   return (
     <main className="mx-auto max-w-[1536px] space-y-8 px-5 py-6 sm:px-8">
       <header className="space-y-1">
@@ -390,6 +550,20 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           generated {view.generated_at}
         </p>
       </header>
+      <nav
+        aria-label="Sections of this law"
+        className="sticky top-0 z-20 -mx-5 flex flex-wrap gap-1 border-b border-stone-200 bg-stone-50/95 px-5 py-2 backdrop-blur sm:-mx-8 sm:px-8"
+      >
+        {sections.map(([href, label]) => (
+          <a
+            key={href}
+            href={href}
+            className="rounded-sm px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-teal-700"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
       {view.status === "unknown" && (
         <p role="alert" className="max-w-3xl text-sm leading-6 text-amber-900">
           Adoption could not be computed for this law.{" "}
@@ -412,9 +586,19 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           value={ofTotal(counts.documents_with_origin, counts.documents_read)}
         />
       </dl>
+      <FiveQuestions questions={questionsFor(view, lineage, organisations, channels)} />
+      <WhoShaped ranking={organisations} />
       <Credits tables={lineage.credits} />
+      <Channels channels={channels} />
+      <LinkCheck
+        pool={pool}
+        renderLink={(phrase) => <PhraseCard key={phrase.phraseId} phrase={phrase} />}
+      />
       <Phrases lineage={lineage} />
-      <details className="rounded-sm border border-stone-200 bg-white p-4 text-sm leading-6 text-stone-600">
+      <details
+        id="lineage-limits"
+        className="rounded-sm border border-stone-200 bg-white p-4 text-sm leading-6 text-stone-600"
+      >
         <summary className="cursor-pointer font-medium text-stone-900">
           Limitations and source coverage
         </summary>
