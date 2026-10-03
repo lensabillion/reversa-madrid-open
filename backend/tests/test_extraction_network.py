@@ -79,7 +79,8 @@ def test_urllib_fetcher_sends_a_contact_address_and_returns_status_type_and_body
     response = UrllibFetcher(timeout=5.0)("https://transparency-register.europa.eu/")
     assert response == RawResponse(200, "application/xml", b"<register/>")
     assert seen[0].get_header("User-agent") == USER_AGENT
-    assert "contact:" in USER_AGENT
+    assert "contact: https://github.com/lensabillion/reversa-madrid-open" in USER_AGENT
+    assert "@" not in USER_AGENT
 
 
 def test_urllib_fetcher_sends_caller_headers_but_never_lets_them_replace_the_identity(
