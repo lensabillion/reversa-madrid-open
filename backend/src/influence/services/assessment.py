@@ -37,12 +37,17 @@ from influence.services.passage_change import read_changes
 from influence.services.scoring import score_pair
 
 METHOD = "lexical-rules"
-METHOD_REVISION = "rules-1"
-# Placeholders until the practice loop calibrates them on LobbyPlag and freezes them.
-COPIED_THRESHOLD = 0.7
-REWORDED_THRESHOLD = 0.4
+METHOD_REVISION = "rules-2"
+# Proposed by the LobbyPlag calibration (PR #40, evaluation/link-calibration.json): the least
+# lexical score whose held-out precision, with a Wilson 95% lower bound, clears each tier's
+# floor on practice data. Proposals, not frozen values: the practice loop owner freezes them
+# before the blind audit. On that data the copied tier held (35 of 36 correct); the reworded
+# tier did not reach its floor (36 of 50, 0.72 against 0.80), so it is labelled but not
+# published until an audit shows otherwise. Weak negatives, one law, mostly verbatim copies.
+COPIED_THRESHOLD = 0.75
+REWORDED_THRESHOLD = 0.32
 SHORT_EDIT_TOKENS = 3
-DEFAULT_PUBLISHABLE: frozenset[LinkTier] = frozenset({"copied", "reworded"})
+DEFAULT_PUBLISHABLE: frozenset[LinkTier] = frozenset({"copied"})
 
 _STRICTER_WORDS = frozenset({"shall", "must", "required", "least", "minimum"})
 _WEAKER_WORDS = frozenset({"may", "can", "optional"})
