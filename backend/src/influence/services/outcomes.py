@@ -8,7 +8,7 @@ not proof that the wording did not survive. Linear in the text length, plus one 
 the provisions of a stage per ask.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from influence.schemas.atlas import (
@@ -166,6 +166,45 @@ def _heard(ask: Ask, amendment: Amendment, link: LinkAssessment | None) -> Outco
     )
 
 
+type _Make = Callable[..., Outcome]
+
+
+def _status_quo(
+    ask: Ask,
+    versions: Sequence[ArticleVersion],
+    here: Sequence[ArticleVersion],
+    outcome: _Make,
+) -> Outcome:
+    """An ask to keep a provision wins when it comes through word for word.
+
+    This is a defence of the status quo, kept apart from winning a change (kind
+    "status_quo"): the proposal's provision is found by the ask's own words, then the same
+    provision is found at this stage by the proposal's words, and the two are compared.
+    """
+    before = _align([item for item in versions if item.stage == "proposal"], ask.span.text)
+    if before is None:
+        return outcome("unknown", reason="No proposal provision lines up with the ask to compare.")
+    version = _align(here, before.text)
+    if version is None:
+        return outcome(
+            "unknown", reason="No provision in this text lines up with the one the ask wants kept."
+        )
+    if [word for word, _, _ in _words(version.text)] == [
+        word for word, _, _ in _words(before.text)
+    ]:
+        return outcome(
+            "full",
+            article_id=version.article_id,
+            kind="status_quo",
+            spans=(_span(version, 0, len(version.text)),),
+        )
+    return outcome(
+        "not_observed",
+        article_id=version.article_id,
+        reason="The provision was changed from the proposal.",
+    )
+
+
 def _stage_outcome(
     ask: Ask,
     amendment: Amendment | None,
@@ -202,6 +241,8 @@ def _stage_outcome(
     here = [version for version in versions if version.stage == _ARTICLE_STAGE[stage]]
     if not here:
         return outcome("unknown", reason=_MISSING_TEXT[stage])
+    if ask.direction == "keep":
+        return _status_quo(ask, versions, here, outcome)
     request = _request(ask, amendment)
     version = _align(here, request.probe)
     if version is None:
@@ -224,12 +265,15 @@ def trace_outcomes(
     one, only the final act, as a direct ask-to-final relation. An amendment counts only when
     the link to it is published or unconfirmed and the ask came first: otherwise the ask is
     not that amendment's origin, so it is traced on its own wording instead of inheriting the
-    amendment's win. `versions` holds the provisions of every stage.
+    amendment's win. An ask to keep the text as it is (direction "keep") is never an
+    amendment's origin and is judged by whether its provision survived unchanged.
+    `versions` holds the provisions of every stage.
     """
     if (
         link is None
         or link.status in ("contradicted", "insufficient_evidence")
         or link.time_eligibility != "ask_first"
+        or ask.direction == "keep"
     ):
         amendment = None
     if amendment is None:

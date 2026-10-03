@@ -20,9 +20,9 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect atlas \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
-	check-frontend-build audit-frontend fix-frontend dev-frontend
+	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag
 
 # Audits come last: they need network access, and the local gates fail faster.
 check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
@@ -66,6 +66,10 @@ dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ ch
 
 # The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
 # EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
+atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
+	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
+	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
+
 collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make collect LAW='2021/0106(COD)'))
 	$(BACKEND) influence collect "$(LAW)" $(ARGS)
@@ -74,6 +78,10 @@ submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
 	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
 	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
+
+# The snapshot is pinned to a commit and verified against recorded SHA-256 digests.
+fetch-lobbyplag:  ## Download and verify LobbyPlag's data into data/lobbyplag/ (needs network).
+	$(BACKEND) python ../scripts/fetch_lobbyplag.py
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci

@@ -3,7 +3,7 @@
 import hashlib
 import json
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
 from compression import zstd
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -341,7 +341,7 @@ def test_committee_amendment_maps_every_field(tmp_path: Path) -> None:
         Amendment(
             amendment_id="am:2021-0106-COD:ENVI:PE704.585-68",
             procedure_id=AI_ACT,
-            document_id="doc:parltrack:PE704.585v01-00",
+            document_id="doc:parltrack:ep_amendments",
             stage="committee",
             committee="ENVI",
             number=68,
@@ -361,6 +361,24 @@ def test_committee_amendment_maps_every_field(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("name", "read"),
+    [
+        ("ep_amendments", parltrack.committee_amendments),
+        ("ep_plenary_amendments", parltrack.plenary_amendments),
+    ],
+)
+def test_an_amendment_cites_the_dump_it_was_read_from(
+    tmp_path: Path, name: str, read: Callable[..., Iterator[Amendment]]
+) -> None:
+    dump = write_dump(tmp_path / f"{name}.json.zst", [committee_record()])
+
+    (amendment,) = read(dump, AI_ACT, RETRIEVED_AT)
+
+    # The join a graph or evidence card makes: the cited document is a retrieved, hashed one.
+    assert amendment.document_id == parltrack.dump_source_document(dump, RETRIEVED_AT).document_id
+
+
 def test_plenary_amendment_keeps_the_responsible_committee_out_of_the_id(tmp_path: Path) -> None:
     record: Record = {
         "src": "https://www.europarl.europa.eu/doceo/document/A-9-2023-0188-AM-001-771_EN.pdf",
@@ -377,7 +395,7 @@ def test_plenary_amendment_keeps_the_responsible_committee_out_of_the_id(tmp_pat
     (amendment,) = parltrack.plenary_amendments(dump, AI_ACT, RETRIEVED_AT)
 
     assert amendment.amendment_id == "am:2021-0106-COD:PLENARY:A9-0188-2023-2"
-    assert amendment.document_id == "doc:parltrack:A9-0188-2023-2"
+    assert amendment.document_id == "doc:parltrack:ep_plenary_amendments"
     assert (amendment.stage, amendment.committee, amendment.number) == ("plenary", "IMCO", 2)
     assert amendment.target_provision == "Citation 4 a (new); Annex - point 1"
     assert amendment.old_text is None

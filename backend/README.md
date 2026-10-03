@@ -124,6 +124,38 @@ formats (`tests/test_collect.py`, 41 tests). It has not been run on real sources
 cloud session that wrote it, whose network policy blocks the EU hosts, so its real-data
 counts and timings are not measured yet.
 
+## Atlas Command and View API (Parts 3 to 8)
+
+`influence atlas <law>` (`make atlas LAW='2021/0106(COD)'`) runs `influence collect`, then
+`services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. The
+pipeline adds no logic of its own; it calls each part's code in order:
+
+| Step | Code | Writes into the view |
+| --- | --- | --- |
+| Asks | `asks_from_passages`: one ask per consultation passage, `extraction_method="passage-v0"` | asks the shown links reach |
+| Candidates | `services/retrieval.py` BM25, top 5 passages per amendment's changed words | (not shown) |
+| Verdicts | `services/assessment.py` on every candidate | links that are `published`, `unconfirmed` or `contradicted` |
+| Outcomes | `services/outcomes.py` for each ask's strongest published or unconfirmed link | outcomes |
+| Graph | `services/atlas_graph.py` from the same records as the bundle | `snapshot` |
+| Counts | `services/atlas_analysis.py`, final-act rows in its order | `rankings` |
+
+The view keeps every record the shown links reach and nothing else, so the frontend
+adapter (`frontend/lib/atlas.ts`) re-validates exactly what the graph shows.
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links}]}` for every law with an `atlas.json` |
+| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): coverage, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+
+The API reads the same data root as the command (`INFLUENCE_DATA_ROOT`, default the
+repository's `data/`; `create_app(atlas_data_root=...)` in tests).
+
+**Limits, stated in every view.** Ask extraction is a stand-in: every passage is one
+ask, so outcome counts count passages, not distinct requests. Link thresholds are part
+4's placeholders and unaudited. Outcomes are traced only for asks with a published or
+unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
+timed.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the

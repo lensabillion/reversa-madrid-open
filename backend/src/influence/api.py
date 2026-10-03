@@ -10,13 +10,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from influence.extraction.cli import default_data_root
 from influence.repositories.lobbyplag import (
     DatasetInvalidError,
     DatasetUnavailableError,
     DemoRepository,
     EntityNotFoundError,
 )
-from influence.routers import comparison, demo, documents, health, scoring
+from influence.routers import atlas, comparison, demo, documents, health, scoring
 from influence.services.demo import DemoService
 
 # Installed metadata makes pyproject.toml the single source for the API version.
@@ -25,8 +26,12 @@ LOCAL_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
 LOGGER = logging.getLogger(__name__)
 
 
-def create_app(data_dir: Path | None = None) -> FastAPI:
-    """Build an app whose dataset is loaded once, on its first data request."""
+def create_app(data_dir: Path | None = None, atlas_data_root: Path | None = None) -> FastAPI:
+    """Build an app whose dataset is loaded once, on its first data request.
+
+    `atlas_data_root` holds the law bundles `influence atlas` writes; it defaults to
+    `INFLUENCE_DATA_ROOT` or the repository's `data/`, as the command does.
+    """
     app = FastAPI(title="Influence Graph API", version=VERSION)
     app.add_middleware(
         CORSMiddleware,
@@ -51,11 +56,13 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
             return service
 
     app.state.demo_service_provider = demo_service
+    app.state.atlas_data_root = atlas_data_root or default_data_root()
     app.include_router(health.router)
     app.include_router(demo.router)
     app.include_router(scoring.router)
     app.include_router(documents.router)
     app.include_router(comparison.router)
+    app.include_router(atlas.router)
 
     @app.exception_handler(DatasetUnavailableError)
     async def unavailable(_request: Request, _error: DatasetUnavailableError) -> JSONResponse:

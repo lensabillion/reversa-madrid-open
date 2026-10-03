@@ -71,6 +71,15 @@ def test_offsets_always_index_the_unmodified_text(
             assert before.end <= after.start
 
 
+def test_a_window_that_cannot_grow_is_not_repeated_inside_the_one_before() -> None:
+    """Found by Hypothesis on a fresh checkout: the second window lay inside the first."""
+    text = "A" + chr(10) + "- A" + chr(10) + "- A"
+    result = split_passages(text, max_sentences=2, overlap=1, max_words=3)
+    assert [(item.start, item.end) for item in result] == [(0, 5), (6, 9)]
+    # Nothing is lost: every sentence's text is inside some passage.
+    assert all(any(item.start <= at < item.end for item in result) for at in (0, 2, 4, 6, 8))
+
+
 @given(text=st.one_of(st.text(), _TEXT))
 def test_sentences_never_overlap_and_cover_every_letter_once(text: str) -> None:
     found = split_sentences(text, max_words=5)

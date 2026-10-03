@@ -1,9 +1,10 @@
 """The `influence` command: the pipeline without the web server, thin over the services.
 
 `influence collect <law>` is Atlas part 1: it writes one law's public record under
-`data/laws/<procedure>/`. `influence submit` is the first brief's pairs command, kept until
-part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
-or output failure, 2 on a command-line usage error.
+`data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
+writes the view the explorer serves (`atlas.json`). `influence submit` is the first
+brief's pairs command, kept until part 4 replaces it. Exit status: 0 when every output
+was written, 1 on any input, source or output failure, 2 on a command-line usage error.
 """
 
 import argparse
@@ -30,6 +31,7 @@ from influence.services.collect import (
     collect_law,
     source_revision,
 )
+from influence.services.pipeline import PipelineError, build_view, load_collected, write_view
 from influence.services.submission import SubmissionError, run_submission
 
 # The brief's hidden test supplies 60 amendment-submission pairs.
@@ -82,7 +84,28 @@ def _print_collected(result: CollectResult, elapsed: float) -> None:
     print(f"manifest: {result.manifest_path.absolute()}")
 
 
-def _collect(query: str, data_root: Path | None, *, refresh: bool, attachments: bool) -> int:
+def _build_view(result: CollectResult) -> int:
+    try:
+        view = build_view(load_collected(result.bundle), generated_at=datetime.now(UTC))
+        path = write_view(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no view was written.", file=sys.stderr)
+        return 1
+    statuses = Counter(link.status for link in view.bundle.links)
+    print(
+        f"Atlas: {statuses['published']} published, {statuses['unconfirmed']} unconfirmed, "
+        f"{statuses['contradicted']} contradicted links; graph of "
+        f"{len(view.snapshot.nodes)} nodes and {len(view.snapshot.edges)} edges"
+    )
+    print(f"view:     {path.absolute()}")
+    print(f"explorer: http://localhost:3000/atlas?law={view.slug}")
+    return 0
+
+
+def _collect(
+    query: str, data_root: Path | None, *, refresh: bool, attachments: bool, view: bool = False
+) -> int:
     root = data_root if data_root is not None else default_data_root()
     settings = CollectSettings(
         data_root=root,
@@ -112,7 +135,7 @@ def _collect(query: str, data_root: Path | None, *, refresh: bool, attachments: 
         print("No manifest was published for this run.", file=sys.stderr)
         return 1
     _print_collected(result, perf_counter() - started)
-    return 0
+    return _build_view(result) if view else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -120,26 +143,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         prog="influence", description="Influence Atlas commands that run without the server."
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    collect = commands.add_parser(
-        "collect",
-        help="collect one law's public record into data/laws/<procedure>/",
-        description=(
-            "Resolve a law (procedure number, CELEX, COM reference or title) and collect "
-            "its texts, amendments, consultation submissions and actors."
-        ),
-    )
-    collect.add_argument("query", nargs="+", help="for example 2021/0106(COD) or AI Act")
-    collect.add_argument(
-        "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
-    )
-    collect.add_argument(
-        "--refresh", action="store_true", help="redo every stage and refetch cached answers"
-    )
-    collect.add_argument(
-        "--no-attachments",
-        action="store_true",
-        help="skip submission attachments (faster; the asks layer is then partial)",
-    )
+    for name, summary in (
+        ("collect", "collect one law's public record into data/laws/<procedure>/"),
+        ("atlas", "collect one law, then build the explorer's view of it (parts 1 to 7)"),
+    ):
+        command = commands.add_parser(
+            name,
+            help=summary,
+            description=(
+                "Resolve a law (procedure number, CELEX, COM reference or title) and "
+                f"{summary.split(' ', 1)[1]}."
+            ),
+        )
+        command.add_argument("query", nargs="+", help="for example 2021/0106(COD)")
+        command.add_argument(
+            "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
+        )
+        command.add_argument(
+            "--refresh", action="store_true", help="redo every stage and refetch cached answers"
+        )
+        command.add_argument(
+            "--no-attachments",
+            action="store_true",
+            help="skip submission attachments (faster; the asks layer is then partial)",
+        )
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -161,12 +188,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         help=f"exact number of pairs the input must hold (default {EXPECTED_PAIRS})",
     )
     args = parser.parse_args(argv)
-    if args.command == "collect":
+    if args.command in ("collect", "atlas"):
         return _collect(
             " ".join(cast("list[str]", args.query)),
             cast("Path | None", args.data_root),
             refresh=cast("bool", args.refresh),
             attachments=not cast("bool", args.no_attachments),
+            view=args.command == "atlas",
         )
     return _submit(
         cast("Path", args.pairs), cast("Path", args.out), cast("int", args.expected_pairs)

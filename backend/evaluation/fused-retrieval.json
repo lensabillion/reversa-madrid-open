@@ -1,0 +1,291 @@
+{
+  "amendments": 144,
+  "amendments_without_whole_text": 28,
+  "caveats": [
+    "Every candidate was first proposed by LobbyPlag's own lexical matcher, so verified pairs are lexically similar by construction; recall on real submissions can be lower.",
+    "One law (GDPR, 2013) and a pool of about 1,000 proposals; recall falls as the pool grows.",
+    "Weak negatives are proposals volunteers checked and never voted a copy; nobody confirmed they are wrong. Most shortlist members are unlabelled, which is not the same as wrong, so labelled precision describes only the labelled share of the shortlist.",
+    "An amendment with no new wording cannot be searched by its whole text. On the full set the whole_text row counts those as misses, and rrf and union fall back to delta alone."
+  ],
+  "corpus_passages": 1158,
+  "depth": 100,
+  "input_sha256": {
+    "amendments.json": "1ef4693a2b6e4101678f4fa0dc73c58d037b6a465ecbbd317d4e19b307ad1d9a",
+    "documents.json": "7f138e82d581fa5838119c272c93badf1d9c4d30ca3baf4d473a1ad25853f814",
+    "lobbyists.json": "e4613e538dab2de0c71fbb165c798f0c6e132aa0c42f17da8b28788c5382c323",
+    "plags.json": "fb21f05cc0c372fdc60a2117219262cb7b00d52196ebbb118b29fc786dfb9a3c",
+    "proposals.json": "5ba1a001c62f88d40d1a1ae29929eaca9177c1b579e36b65b0065f7e67f587af"
+  },
+  "kind": "fused-retrieval-v1",
+  "precision": [
+    {
+      "amendments": 144,
+      "k": 20,
+      "labelled_precision": 0.98125,
+      "mean_candidates": 19.694444444444443,
+      "mean_unlabelled": 18.583333333333332,
+      "mean_verified": 1.0902777777777777,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "delta"
+    },
+    {
+      "amendments": 144,
+      "k": 40,
+      "labelled_precision": 0.9813664596273292,
+      "mean_candidates": 39.076388888888886,
+      "mean_unlabelled": 37.958333333333336,
+      "mean_verified": 1.0972222222222223,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "delta"
+    },
+    {
+      "amendments": 144,
+      "k": 20,
+      "labelled_precision": 0.9784172661870504,
+      "mean_candidates": 16.11111111111111,
+      "mean_unlabelled": 15.145833333333334,
+      "mean_verified": 0.9444444444444444,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "whole_text"
+    },
+    {
+      "amendments": 144,
+      "k": 40,
+      "labelled_precision": 0.9785714285714285,
+      "mean_candidates": 32.22222222222222,
+      "mean_unlabelled": 31.25,
+      "mean_verified": 0.9513888888888888,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "whole_text"
+    },
+    {
+      "amendments": 144,
+      "k": 20,
+      "labelled_precision": 0.9819277108433735,
+      "mean_candidates": 20.0,
+      "mean_unlabelled": 18.84722222222222,
+      "mean_verified": 1.1319444444444444,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "rrf"
+    },
+    {
+      "amendments": 144,
+      "k": 40,
+      "labelled_precision": 0.9825581395348837,
+      "mean_candidates": 40.0,
+      "mean_unlabelled": 38.80555555555556,
+      "mean_verified": 1.1736111111111112,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "rrf"
+    },
+    {
+      "amendments": 144,
+      "k": 20,
+      "labelled_precision": 0.9824561403508771,
+      "mean_candidates": 27.1875,
+      "mean_unlabelled": 26.0,
+      "mean_verified": 1.1666666666666667,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "union"
+    },
+    {
+      "amendments": 144,
+      "k": 40,
+      "labelled_precision": 0.9825581395348837,
+      "mean_candidates": 54.208333333333336,
+      "mean_unlabelled": 53.013888888888886,
+      "mean_verified": 1.1736111111111112,
+      "mean_weakly_rejected": 0.020833333333333332,
+      "retriever": "union"
+    }
+  ],
+  "rows": [
+    {
+      "cap_for_target": null,
+      "mean_shortlist_size_at": {
+        "10": 9.972222222222221,
+        "20": 19.694444444444443,
+        "40": 39.076388888888886,
+        "5": 5.0,
+        "50": 48.729166666666664
+      },
+      "mean_shortlist_size_at_cap": null,
+      "mrr": 0.6272704545800831,
+      "pairs": 172,
+      "recall_at": {
+        "10": 0.877906976744186,
+        "20": 0.9127906976744186,
+        "40": 0.9186046511627907,
+        "5": 0.8197674418604651,
+        "50": 0.9244186046511628
+      },
+      "recall_at_depth": 0.9418604651162791,
+      "retriever": "delta",
+      "subset": "all_verified_pairs"
+    },
+    {
+      "cap_for_target": null,
+      "mean_shortlist_size_at": {
+        "10": 8.055555555555555,
+        "20": 16.11111111111111,
+        "40": 32.22222222222222,
+        "5": 4.027777777777778,
+        "50": 40.27777777777778
+      },
+      "mean_shortlist_size_at_cap": null,
+      "mrr": 0.635568698209035,
+      "pairs": 172,
+      "recall_at": {
+        "10": 0.7906976744186046,
+        "20": 0.7906976744186046,
+        "40": 0.7965116279069767,
+        "5": 0.7790697674418605,
+        "50": 0.7965116279069767
+      },
+      "recall_at_depth": 0.7965116279069767,
+      "retriever": "whole_text",
+      "subset": "all_verified_pairs"
+    },
+    {
+      "cap_for_target": 23,
+      "mean_shortlist_size_at": {
+        "10": 10.0,
+        "20": 20.0,
+        "40": 40.0,
+        "5": 5.0,
+        "50": 50.0
+      },
+      "mean_shortlist_size_at_cap": 23.0,
+      "mrr": 0.6858186391341168,
+      "pairs": 172,
+      "recall_at": {
+        "10": 0.9302325581395349,
+        "20": 0.9476744186046512,
+        "40": 0.9825581395348837,
+        "5": 0.8895348837209303,
+        "50": 0.9825581395348837
+      },
+      "recall_at_depth": 0.9825581395348837,
+      "retriever": "rrf",
+      "subset": "all_verified_pairs"
+    },
+    {
+      "cap_for_target": 5,
+      "mean_shortlist_size_at": {
+        "10": 13.20138888888889,
+        "20": 27.1875,
+        "40": 54.208333333333336,
+        "5": 6.548611111111111,
+        "50": 67.6875
+      },
+      "mean_shortlist_size_at_cap": 6.548611111111111,
+      "mrr": null,
+      "pairs": 172,
+      "recall_at": {
+        "10": 0.9767441860465116,
+        "20": 0.9767441860465116,
+        "40": 0.9825581395348837,
+        "5": 0.9651162790697675,
+        "50": 0.9825581395348837
+      },
+      "recall_at_depth": 0.9825581395348837,
+      "retriever": "union",
+      "subset": "all_verified_pairs"
+    },
+    {
+      "cap_for_target": null,
+      "mean_shortlist_size_at": {
+        "10": 9.96551724137931,
+        "20": 19.620689655172413,
+        "40": 38.85344827586207,
+        "5": 5.0,
+        "50": 48.422413793103445
+      },
+      "mean_shortlist_size_at_cap": null,
+      "mrr": 0.6267902987130045,
+      "pairs": 139,
+      "recall_at": {
+        "10": 0.8561151079136691,
+        "20": 0.8992805755395683,
+        "40": 0.9064748201438849,
+        "5": 0.7841726618705036,
+        "50": 0.9136690647482014
+      },
+      "recall_at_depth": 0.935251798561151,
+      "retriever": "delta",
+      "subset": "amendment_has_new_text"
+    },
+    {
+      "cap_for_target": 4,
+      "mean_shortlist_size_at": {
+        "10": 10.0,
+        "20": 20.0,
+        "40": 40.0,
+        "5": 5.0,
+        "50": 50.0
+      },
+      "mean_shortlist_size_at_cap": 4.0,
+      "mrr": 0.7864591085752088,
+      "pairs": 139,
+      "recall_at": {
+        "10": 0.9784172661870504,
+        "20": 0.9784172661870504,
+        "40": 0.9856115107913669,
+        "5": 0.9640287769784173,
+        "50": 0.9856115107913669
+      },
+      "recall_at_depth": 0.9856115107913669,
+      "retriever": "whole_text",
+      "subset": "amendment_has_new_text"
+    },
+    {
+      "cap_for_target": 23,
+      "mean_shortlist_size_at": {
+        "10": 10.0,
+        "20": 20.0,
+        "40": 40.0,
+        "5": 5.0,
+        "50": 50.0
+      },
+      "mean_shortlist_size_at_cap": 23.0,
+      "mrr": 0.6992384119741109,
+      "pairs": 139,
+      "recall_at": {
+        "10": 0.920863309352518,
+        "20": 0.9424460431654677,
+        "40": 0.9856115107913669,
+        "5": 0.8705035971223022,
+        "50": 0.9856115107913669
+      },
+      "recall_at_depth": 0.9856115107913669,
+      "retriever": "rrf",
+      "subset": "amendment_has_new_text"
+    },
+    {
+      "cap_for_target": 3,
+      "mean_shortlist_size_at": {
+        "10": 13.974137931034482,
+        "20": 28.92241379310345,
+        "40": 57.63793103448276,
+        "5": 6.922413793103448,
+        "50": 71.95689655172414
+      },
+      "mean_shortlist_size_at_cap": 4.017241379310345,
+      "mrr": null,
+      "pairs": 139,
+      "recall_at": {
+        "10": 0.9784172661870504,
+        "20": 0.9784172661870504,
+        "40": 0.9856115107913669,
+        "5": 0.9640287769784173,
+        "50": 0.9856115107913669
+      },
+      "recall_at_depth": 0.9856115107913669,
+      "retriever": "union",
+      "subset": "amendment_has_new_text"
+    }
+  ],
+  "rrf_constant": 60,
+  "target_recall": 0.95,
+  "verified_pairs": 172
+}

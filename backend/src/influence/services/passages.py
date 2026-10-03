@@ -174,7 +174,10 @@ def split_passages(
             last += 1
             words += sentences[last][2]
         start, end = sentences[first][0], sentences[last][1]
-        passages.append(TextSpan(start, end, text[start:end]))
+        # A window that cannot grow past the one before it (the next sentence would break
+        # the word limit) lies inside it, and repeating it would duplicate evidence.
+        if not passages or end > passages[-1].end:
+            passages.append(TextSpan(start, end, text[start:end]))
         if last + 1 == len(sentences):
             break
         first += max(1, last + 1 - first - overlap)

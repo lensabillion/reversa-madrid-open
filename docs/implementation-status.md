@@ -107,6 +107,26 @@ builds the Have Your Say index (follow-up bead); without the index, the consulta
 found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
 `not_collected`.
 
+## End to End: Atlas Command, View API and Explorer Page — 3 October 2026
+
+The first end-to-end check (14:00) found the pipeline's parts working alone but not
+together: the graph refused every amendment, whose source document no part had
+recorded, and no command, route or page joined collection to the explorer. Fixed:
+
+- Amendments cite the Parltrack dump they were read from (a retrieved, hashed
+  `SourceDocument`); a tabling MEP missing from the MEP dump keeps an identity.
+- `influence atlas <law>` (`make atlas LAW=...`) collects, runs parts 3 to 7 through
+  `services/pipeline.py` and writes `data/laws/<slug>/atlas.json`; `GET /api/v1/atlas`
+  and `GET /api/v1/atlas/{slug}` serve it ([backend README](../backend/README.md#atlas-command-and-view-api-parts-3-to-8)).
+- The explorer page at `/atlas` that renders it is in progress (frontend, same change).
+
+Verified offline (`measured`): on the test world with one genuinely matching pair, the
+command publishes one `copied` link with exact quotes, the graph has its `ECHOED_BY`
+edge, and the API serves the view; `make check-backend` passes with 673 tests and 100%
+branch coverage. **Not verified:** a real law, timings, and link precision. Ask
+extraction is a stand-in (one ask per passage, `passage-v0`) until part 3's extractor
+exists, so outcome counts count passages.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
