@@ -8,6 +8,17 @@ output instead of claims. See AGENTS.md, "The Four Project Rules".
 
 What this PR does, and why it is needed now.
 
+## Architecture and Agreed Decisions
+
+For each change: the part of the seven-part architecture it belongs to (explainer §11,
+`docs/explainer/influence-graph-primer.md`), what it takes from the part before and hands
+to the part after, and the agreed decision or design rule it follows (a row of the
+Decisions table in `docs/implementation-status.md`, a §11 design rule, or a §11 arrow).
+Say so when a change is outside the pipeline, such as tooling or docs.
+
+| Changed | Architecture part | Agreed decision or rule it follows |
+| --- | --- | --- |
+
 ## Background From First Principles
 
 The ideas a reader needs before the diff makes sense: the problem, the domain concepts,

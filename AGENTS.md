@@ -103,17 +103,21 @@ Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 1. **Find or create the bead.** `tbd ready` lists available work.
    Every piece of work, including discovered follow-ups, gets a bead.
 2. **Claim it.** `tbd sync --pull`, re-read the bead, `tbd start <id>`, `tbd sync`.
-3. **Load the guidelines** that match the change, in one call, before writing code:
+3. **Fit it into the architecture** before designing, with the
+   [influence-architecture skill](.agents/skills/influence-architecture/SKILL.md): name
+   the part of the seven-part design the work belongs to, and build on that part's
+   existing code. Code in `attic/` predates the architecture and is never a source.
+4. **Load the guidelines** that match the change, in one call, before writing code:
    always `general-eng-agent-principles`; then `python-rules python-modern-guidelines`
    for Python, `typescript-rules typescript-lint-format-rules` for TypeScript, and
    `ci-and-gates-rules supply-chain-hardening general-testing-rules` for tooling, gates,
    dependencies, or tests.
-4. **Branch per PR**, named `<type>/<short-topic>`, for example `feat/pair-scorer`.
-5. **Commit** with Conventional Commits (`tbd guidelines commit-conventions`): `feat`,
+5. **Branch per PR**, named `<type>/<short-topic>`, for example `feat/pair-scorer`.
+6. **Commit** with Conventional Commits (`tbd guidelines commit-conventions`): `feat`,
    `fix`, `test`, `refactor`, `chore`, `docs`, `plan`, `research`, `ops`, `process`.
-6. **Open the PR** with the template, then wait for every CI check to finish green.
+7. **Open the PR** with the template, then wait for every CI check to finish green.
    Absent CI is not passing CI.
-7. **Record the PR** on the bead (`tbd update <id> --notes`), close the bead when the PR
+8. **Record the PR** on the bead (`tbd update <id> --notes`), close the bead when the PR
    merges with the evidence in `--reason`, and `tbd sync`.
 
 When work naturally splits into layers that depend on each other, use a stack of PRs

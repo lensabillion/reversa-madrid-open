@@ -68,8 +68,8 @@ Open decisions are not settled until the project owner agrees.
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
+| D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on; each part is built fresh from the architecture | It was written before the architecture was decided; the [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | D1: language-model judge (none, Jev, Claude or a local model) | **Open** | Explainer §12–13; no API keys on the machine |
-| D3: the earlier prototype in `attic/` | **Open**; not an implementation source | Explainer §10 and §13 |
 | D4: team split | **Open** | Explainer §13 |
 | D5: organizer questions: input format, recall threshold, use of the final law's text, advance preparation | **Open**; ask before the event | Bead `rev-qvmx` |
 
