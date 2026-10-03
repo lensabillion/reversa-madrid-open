@@ -484,7 +484,8 @@ export function LineageFunnel({ steps }: { steps: readonly FunnelStep[] }) {
       <div className="mx-auto flex max-w-3xl flex-col items-stretch gap-3 sm:flex-row sm:items-center">
         <TextCard label="Commission proposal" step={proposal} />
         <span aria-hidden="true" className="text-center text-2xl text-stone-400">
-          →
+          <span className="sm:hidden">↓</span>
+          <span className="hidden sm:inline">→</span>
         </span>
         <TextCard label="Law as adopted" step={final} />
       </div>
