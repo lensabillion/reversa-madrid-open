@@ -5,7 +5,7 @@ title: Focus Atlas evidence on cited context so long documents remain comparable
 kind: bug
 status: in_progress
 priority: 1
-version: 2
+version: 3
 delegate: claude-code@vm
 labels: []
 dependencies: []
@@ -13,7 +13,7 @@ parent_id: is-01m40nw6ndb84q46r7gq1kyknj
 hold: null
 hold_until: null
 created_at: 2026-10-03T13:07:03.125Z
-updated_at: 2026-10-03T14:16:24.754Z
+updated_at: 2026-10-03T14:22:49.689Z
 started_at: 2026-10-03T14:16:24.749Z
 ---
 Architecture part 8 (Publish), using part 4 source spans and the shared Atlas evidence adapter; no scoring or source-text changes.
@@ -25,3 +25,7 @@ Relevant code: frontend/lib/atlas.ts excerpt() currently passes the complete sou
 Acceptance: selecting either a short fixture link or the real long Novartis link immediately exposes the relevant highlighted text beside its amendment. Every original quotation still matches exact source offsets; supplementary context can be expanded. Verify narrow/wide layouts and multi-span cases. Regression test must use a long source with a late highlight, not only short fixture text.
 
 Browser proof: /tmp/atlas-live-highlight-viewport.png (late quote with three blank parallel columns); /tmp/atlas-live-link-1.png (full Novartis page); /tmp/atlas-browser-verification.md. These are local session artifacts; all measured reproduction details above are retained in this bead. The old rules-2 snapshot is reproduction material, not a claim of current approved publication or influence accuracy.
+
+## Notes
+
+Fixed in 9085607, merged to claude/great-johnson-36vizc (697e736), PR https://github.com/lensabillion/reversa-madrid-open/pull/62. make check-frontend: 102 tests, build ok (Node 24.21.0). Not browser-verified on the real Novartis link.
