@@ -12,6 +12,7 @@ import type {
   AtlasSnapshotRecord,
   AtlasView,
 } from "../lib/atlas-api";
+import type { AtlasCoordinatedView } from "../lib/atlas-coordinated";
 
 // Next.js re-renders `useSearchParams` readers after `history.pushState`; outside its router,
 // this stand-in reads jsdom's URL and is notified by the pushState spy installed below.
@@ -153,6 +154,78 @@ const laws: AtlasLawList = {
   ],
 };
 
+const coordinatedPath = `/api/v1/atlas/${slug}/coordinated`;
+const amendment = (number: number, groups: string[]) => ({
+  amendment_id: `am:2099-0001-COD:IMCO:PE1.001-${number}`,
+  stage: "committee",
+  committee: "IMCO",
+  tabled_on: "2099-03-31",
+  target_provision: "Proposal for a regulation - Article 8 – paragraph 1",
+  author_ids: [`actor:mep:${number}`],
+  author_names: [`Member ${number}`],
+  political_groups: groups,
+  inserted: [
+    {
+      record_id: `am:2099-0001-COD:IMCO:PE1.001-${number}`,
+      field: "new_text" as const,
+      page: null,
+      start: 0,
+      end: 44,
+      text: "providers shall keep logs for at least six months",
+    },
+  ],
+});
+const coordinated: AtlasCoordinatedView = {
+  schema_version: "atlas-1",
+  procedure_id: procedure,
+  slug,
+  title: fixtureLaw.title,
+  run_id: "20991201T090000Z",
+  generated_at: "2099-12-01T09:00:00Z",
+  method: "shingle-jaccard-1",
+  min_inserted_words: 12,
+  shingle_words: 5,
+  similarity_threshold: 0.8,
+  counts: { amendments: 2, compared: 2, too_short: 0, not_comparable: 0 },
+  clusters: [
+    {
+      cluster_id: "coord:2099-0001-COD:IMCO:PE1.001-1",
+      members: [amendment(1, ["PPE"]), amendment(2, ["S&D"])],
+      political_groups: ["PPE", "S&D"],
+      cross_group: true,
+      inserted_words: 9,
+      min_similarity: 1,
+    },
+  ],
+  limitations: ["Both numbers are proposed, not calibrated."],
+};
+const noClusterFile = () => reply({ detail: "No coordinated amendments for 2099-0001-COD." }, 404);
+// The backend sends this for a real law today: candidates, but no published link or graph.
+const unpublished: AtlasView = {
+  ...view,
+  modes: ["Contextual evidence, not textual", "Negotiation in progress"],
+  bundle: {
+    ...bundle,
+    links: bundle.links.filter((link) => link.status !== "published"),
+    outcomes: bundle.outcomes.filter((outcome) => outcome.link_id !== "link:a-am1-makers"),
+  },
+  snapshot: { ...view.snapshot, nodes: [], edges: [] },
+  rankings: [],
+};
+
+/** Serves the law list and one law's view; `clusters` answers its coordinated route. */
+function serve(body: unknown, clusters: () => Response | Promise<Response> = noClusterFile) {
+  return installFetch((path) => {
+    if (path === "/api/v1/atlas") {
+      return reply(laws);
+    }
+    if (path === coordinatedPath) {
+      return clusters();
+    }
+    return path === `/api/v1/atlas/${slug}` ? reply(body) : unexpected(path);
+  });
+}
+
 function reply(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -205,6 +278,9 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     if (path === "/api/v1/atlas") {
       return reply(laws);
     }
+    if (path === coordinatedPath) {
+      return noClusterFile();
+    }
     return path === `/api/v1/atlas/${slug}` ? reply(view) : unexpected(path);
   });
   render(<AtlasPage />);
@@ -224,8 +300,18 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   fireEvent.click(law);
   expect(window.location.search).toBe(`?law=${slug}`);
   expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
-  expect(requested(fetchMock)).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`]);
+  expect(requested(fetchMock)).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`, coordinatedPath]);
   expect(law.getAttribute("aria-pressed")).toBe("true");
+  // A law with a published link opens on its graph and names no mode it was not given.
+  expect(
+    screen.getByRole("button", { name: "Explore the graph" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  const overview = screen.getByRole("region", { name: "Law overview" });
+  expect(
+    within(overview).getByRole("heading", { name: "Fixture Regulation on widget safety" }),
+  ).toBeDefined();
+  expect(within(overview).queryByRole("list", { name: "Result modes" })).toBeNull();
+  expect(within(overview).queryByText(/published no link/)).toBeNull();
   const notice = screen.getByRole("region", { name: "About these results" });
   expect(
     within(notice).getByText("Counts represent submission passages, not distinct requests."),
@@ -322,12 +408,7 @@ test("a failed consultation collection is explained on the opening graph, not on
     },
     rankings: [],
   };
-  installFetch((path) => {
-    if (path === "/api/v1/atlas") {
-      return reply(laws);
-    }
-    return path === `/api/v1/atlas/${slug}` ? reply(failed) : unexpected(path);
-  });
+  serve(failed);
   render(<AtlasPage />);
 
   const layers = await screen.findByRole("region", { name: "Source layers" });
@@ -349,12 +430,7 @@ test("a failed consultation collection is explained on the opening graph, not on
 
 test("a shared link reopens its law, and choosing it again adds no history entry", async () => {
   window.history.replaceState(null, "", `/atlas?law=${slug}`);
-  const fetchMock = installFetch((path) => {
-    if (path === "/api/v1/atlas") {
-      return reply(laws);
-    }
-    return path === `/api/v1/atlas/${slug}` ? reply(view) : unexpected(path);
-  });
+  const fetchMock = serve(view);
   render(<AtlasPage />);
 
   expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
@@ -362,8 +438,120 @@ test("a shared link reopens its law, and choosing it again adds no history entry
   expect(law.getAttribute("aria-pressed")).toBe("true");
   fireEvent.click(law);
   expect(window.history.pushState).not.toHaveBeenCalled();
-  expect(requested(fetchMock).sort()).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`]);
+  expect(requested(fetchMock).sort()).toEqual([
+    "/api/v1/atlas",
+    `/api/v1/atlas/${slug}`,
+    coordinatedPath,
+  ]);
 });
+
+test("a law with no published link names its modes, explains its empty graph and points to coordinated amendments", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  serve(unpublished, () => reply(coordinated));
+  render(<AtlasPage />);
+
+  // The opening view stays the graph, whose source layers say why it is empty.
+  const layers = await screen.findByRole("region", { name: "Source layers" });
+  expect(
+    screen.getByRole("button", { name: "Explore the graph" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(within(layers).getAllByRole("listitem")).toHaveLength(view.coverage.length);
+  expect(within(layers).getByText(/none met the publication bar/)).toBeDefined();
+  const overview = screen.getByRole("region", { name: "Law overview" });
+  expect(
+    within(within(overview).getByRole("list", { name: "Result modes" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Contextual evidence, not textual", "Negotiation in progress"]);
+  expect(within(overview).getByText(/This run published no link/).textContent).toContain(
+    "open Coordinated amendments",
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Coordinated amendments" }));
+  const panel = screen.getByRole("region", { name: "Coordinated amendments" });
+  expect(await within(panel).findByText("1 of 1 cluster spans political groups")).toBeDefined();
+  expect(screen.queryByRole("region", { name: "Influence graph" })).toBeNull();
+  const first = within(panel).getByRole("article", { name: "Cluster 1" });
+  expect(first.querySelector("blockquote")?.textContent).toBe(
+    "providers shall keep logs for at least six months",
+  );
+  expect(within(panel).getByText("Both numbers are proposed, not calibrated.")).toBeDefined();
+
+  // The candidates stay reachable.
+  fireEvent.click(screen.getByRole("button", { name: "Read the evidence" }));
+  fireEvent.click(screen.getByRole("button", { name: "Audit candidates" }));
+  expect(screen.getByRole("status").textContent).toBe("3 of 3 audit candidates shown");
+});
+
+test("a law without a cluster file says so in its coordinated panel and shows no mode", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  serve({ ...unpublished, modes: undefined, bundle: { ...bundle, links: [], outcomes: [] } });
+  render(<AtlasPage />);
+
+  const overview = await screen.findByRole("region", { name: "Law overview" });
+  expect(within(overview).getByText(/This run published no link/)).toBeDefined();
+  expect(within(overview).queryByRole("list", { name: "Result modes" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Coordinated amendments" }));
+  const panel = screen.getByRole("region", { name: "Coordinated amendments" });
+  expect(await within(panel).findByText("This law has no cluster file yet.")).toBeDefined();
+  expect(within(panel).getByText("No coordinated amendments for 2099-0001-COD.")).toBeDefined();
+  expect(panel.textContent).toContain("make atlas LAW='2099/0001(COD)'");
+});
+
+test("the coordinated panel loads once per law and is reachable from a law with links", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  let release: (response: Response) => void = () => undefined;
+  const fetchMock = serve(
+    view,
+    () =>
+      new Promise<Response>((resolveResponse) => {
+        release = resolveResponse;
+      }),
+  );
+  render(<AtlasPage />);
+
+  expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Coordinated amendments" }));
+  const panel = screen.getByRole("region", { name: "Coordinated amendments" });
+  expect(within(panel).getByRole("status").textContent).toBe("Loading coordinated amendments…");
+  release(reply(coordinated));
+  expect(await within(panel).findByText("1 of 1 cluster spans political groups")).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Explore the graph" }));
+  fireEvent.click(screen.getByRole("button", { name: "Coordinated amendments" }));
+  expect(screen.getByText("1 of 1 cluster spans political groups")).toBeDefined();
+  expect(requested(fetchMock).filter((path) => path === coordinatedPath)).toHaveLength(1);
+});
+
+test.each([
+  {
+    failure: "a server error",
+    respond: () => new Response("Internal Server Error", { status: 500, statusText: "Failure" }),
+    message: "The Atlas API answered 500: Failure",
+  },
+  {
+    failure: "a response that breaks the contract",
+    respond: () => reply({ ...coordinated, counts: { amendments: 2 } }),
+    message: "Invalid coordinated amendments data: counts.compared must be a non-negative integer.",
+  },
+])(
+  "coordinated amendments with $failure show the message and no cluster, and Retry recovers",
+  async ({ respond, message }) => {
+    window.history.replaceState(null, "", `/atlas?law=${slug}`);
+    let attempts = 0;
+    serve(unpublished, () => (attempts++ === 0 ? respond() : reply(coordinated)));
+    render(<AtlasPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Coordinated amendments" }));
+    const panel = screen.getByRole("region", { name: "Coordinated amendments" });
+    const failure = await within(panel).findByRole("alert");
+    expect(within(failure).getByText(message)).toBeDefined();
+    expect(within(panel).queryByRole("article")).toBeNull();
+    // The rest of the law's page is unaffected by this panel's failure.
+    expect(screen.getByRole("list", { name: "Result modes" })).toBeDefined();
+    fireEvent.click(within(failure).getByRole("button", { name: "Retry coordinated amendments" }));
+    expect(await within(panel).findByText("1 of 1 cluster spans political groups")).toBeDefined();
+  },
+);
 
 test("complete coverage and absent limitations are stated, not left blank", async () => {
   window.history.replaceState(null, "", `/atlas?law=${slug}`);
@@ -372,12 +560,7 @@ test("complete coverage and absent limitations are stated, not left blank", asyn
     coverage: view.coverage.map((row) => ({ ...row, status: "complete", reason: null })),
     limitations: [],
   };
-  installFetch((path) => {
-    if (path === "/api/v1/atlas") {
-      return reply(laws);
-    }
-    return path === `/api/v1/atlas/${slug}` ? reply(complete) : unexpected(path);
-  });
+  serve(complete);
   render(<AtlasPage />);
 
   const notice = await screen.findByRole("region", { name: "About these results" });
@@ -400,12 +583,7 @@ test("an unknown extraction method keeps neutral wording and its supplied limita
     coverage: [],
     limitations: [warning],
   };
-  installFetch((path) => {
-    if (path === "/api/v1/atlas") {
-      return reply(laws);
-    }
-    return path === `/api/v1/atlas/${slug}` ? reply(otherMethod) : unexpected(path);
-  });
+  serve(otherMethod);
   render(<AtlasPage />);
 
   const notice = await screen.findByRole("region", { name: "About these results" });

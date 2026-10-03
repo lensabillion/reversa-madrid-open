@@ -61,6 +61,8 @@ from influence.services.assessment import (
 )
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
+from influence.services.coordinated import cross_group_clusters
+from influence.services.modes import mode_labels
 from influence.services.outcomes import trace_outcomes
 from influence.services.prose_match import rarity_weights
 from influence.services.retrieval import PassageIndex
@@ -430,6 +432,7 @@ def build_view(
         generated_at=generated_at,
         ask_method=ASK_METHOD,
         coverage=law.coverage,
+        modes=mode_labels(law),
         bundle=bundle,
         snapshot=snapshot,
         rankings=rankings,
@@ -493,6 +496,7 @@ def list_views(data_root: Path) -> AtlasLawList:
                 title=view.title,
                 run_id=view.run_id,
                 published_links=sum(link.status == "published" for link in view.bundle.links),
+                cross_group_clusters=cross_group_clusters(data_root, view.slug),
             )
             for view in views
         )
