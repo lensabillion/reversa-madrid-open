@@ -1,3 +1,4 @@
+import type { AtlasLayer, AtlasLayerCoverage, AtlasLayerStatus } from "../lib/atlas-api";
 import type { LineageView } from "../lib/lineage-api";
 import { KindBadge } from "./lineage-kind";
 
@@ -63,6 +64,140 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
   ];
 }
 
+interface DataSource {
+  id: string;
+  name: string;
+  publisher: string;
+  url: string;
+  gives: string;
+  /** The coverage rows this source fills, each with the unit its count is in. */
+  layers: readonly { layer: AtlasLayer; unit: string }[];
+}
+
+const SOURCES: readonly DataSource[] = [
+  {
+    id: "texts",
+    name: "Commission proposal and final law",
+    publisher: "EU Publications Office (EUR-Lex / CELLAR)",
+    url: "https://eur-lex.europa.eu",
+    gives:
+      "The two official texts compared in step 1, split into recitals, articles, paragraphs, points and annexes.",
+    layers: [
+      { layer: "proposal", unit: "proposal provisions" },
+      { layer: "final_act", unit: "final-law provisions" },
+    ],
+  },
+  {
+    id: "amendments",
+    name: "Parliament amendments and Members",
+    publisher: "Parltrack, compiled from European Parliament records (ODbL licence)",
+    url: "https://parltrack.org/dumps",
+    gives:
+      "Each amendment's original and proposed wording, its tablers, date and committee, and each Member's political group on that date.",
+    layers: [
+      { layer: "committee_amendments", unit: "committee amendments" },
+      { layer: "plenary_amendments", unit: "plenary amendments" },
+    ],
+  },
+  {
+    id: "consultation",
+    name: "Public consultation submissions",
+    publisher: "European Commission, Have Your Say",
+    url: "https://ec.europa.eu/info/law/better-regulation/have-your-say",
+    gives:
+      "Feedback and attached position papers on this law, with publication date and submitter, searched in step 3.",
+    layers: [{ layer: "asks", unit: "feedback submissions" }],
+  },
+  {
+    id: "register",
+    name: "Organisation identities",
+    publisher: "EU Transparency Register (open data)",
+    url: "https://transparency-register.europa.eu",
+    gives: "Registered names and IDs, so a submission is credited to the right organisation.",
+    layers: [{ layer: "actors", unit: "Members and organisations identified" }],
+  },
+];
+
+const statusText: Record<AtlasLayerStatus, string> = {
+  complete: "complete",
+  partial: "partial",
+  missing: "missing at the source",
+  stale: "source no longer updated",
+  not_applicable: "not applicable",
+  not_collected: "not collected",
+};
+
+function coverageLine(
+  coverage: readonly AtlasLayerCoverage[],
+  layer: AtlasLayer,
+  unit: string,
+): { text: string; complete: boolean; reason: string | null } {
+  const row = coverage.find((item) => item.layer === layer);
+  if (row === undefined) {
+    return { text: `${unit}: not recorded`, complete: false, reason: null };
+  }
+  const amount = row.count === null ? "" : `${count.format(row.count)} `;
+  return {
+    text: `${amount}${unit}${row.status === "complete" ? "" : ` (${statusText[row.status]})`}`,
+    complete: row.status === "complete",
+    reason: row.reason,
+  };
+}
+
+/** The public sources behind the steps, with what this law's run took from each. */
+function Sources({ coverage }: { coverage: readonly AtlasLayerCoverage[] }) {
+  return (
+    <section aria-labelledby="lineage-sources" className="space-y-3">
+      <div className="max-w-3xl space-y-1">
+        <h4 id="lineage-sources" className="font-serif text-lg text-stone-900">
+          Where the data comes from
+        </h4>
+        <p className="text-sm leading-6 text-stone-600">
+          Public records only. Each downloaded file is kept with its address, download time and
+          fingerprint, so every number can be traced to the copy it came from.
+        </p>
+      </div>
+      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {SOURCES.map((source) => (
+          <li
+            key={source.id}
+            className="flex flex-col gap-2 rounded-md border border-stone-200 bg-white p-4"
+          >
+            <p className="font-medium text-stone-900">{source.name}</p>
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-teal-800 underline underline-offset-2"
+            >
+              {source.publisher}
+            </a>
+            <p className="text-sm leading-6 text-stone-700">{source.gives}</p>
+            <ul className="mt-auto space-y-1 rounded-sm bg-stone-100 px-3 py-2 text-sm">
+              {source.layers.map(({ layer, unit }) => {
+                const line = coverageLine(coverage, layer, unit);
+                return (
+                  <li key={layer} className="tabular-nums text-stone-900">
+                    {line.text}
+                    {!line.complete && line.reason !== null && (
+                      <span className="block text-xs leading-5 text-amber-900">{line.reason}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-stone-500">
+        Not used: meetings with lobbyists, votes, and the Council and trilogue records. The semantic
+        matches in step 3 are judged by Jev, a language model run by TypeSafe; it reads these
+        sources and adds no data of its own.
+      </p>
+    </section>
+  );
+}
+
 function Arrow() {
   return (
     <span aria-hidden="true" className="flex items-center justify-center text-2xl text-stone-400">
@@ -126,6 +261,7 @@ export function LineageMethod({ view }: { view: LineageView }) {
           </li>
         ))}
       </ol>
+      <Sources coverage={view.coverage} />
       <div className="max-w-3xl rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <p className="font-medium">What this does not prove</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">

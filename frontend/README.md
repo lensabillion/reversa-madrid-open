@@ -141,8 +141,10 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   draws no waffle.
 - **Method** (`components/lineage-method.tsx`): the pipeline in plain words as a four-step
   flowchart (compare the texts, find the amendment, find who said it first, rank and check),
-  each step with its rules and this law's result from `counts`, then what the evidence does
-  not prove. It restates the backend's rules and computes nothing.
+  each step with its rules and this law's result from `counts`; then "Where the data comes
+  from", one card per public source (EUR-Lex/CELLAR, Parltrack, Have Your Say, Transparency
+  Register) with what this run took from it, read from `coverage` (a partial layer shows its
+  reason); then what the evidence does not prove. It restates the backend's rules and computes nothing.
 - **The five questions**: WHO and HOW are answered from the view; WHAT and TOWARDS are
   marked "partly" (one law; direction labels come from `make directions`); NEXT is marked
   "not in this view", because no forecast is computed. Nothing is filled in to look complete.

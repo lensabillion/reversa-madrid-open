@@ -469,9 +469,14 @@ test("the Method tab walks the four steps with this law's own counts", async () 
     "Find the amendment",
     "Find who said it first",
     "Rank and check",
+    "Where the data comes from",
   ]);
   expect(within(method).getByText("103 new words")).toBeDefined();
   expect(within(method).getByText("1 phrases from 1 amendments")).toBeDefined();
   expect(within(method).getByText("1 of 5 documents")).toBeDefined();
   expect(within(method).getByText("What this does not prove")).toBeDefined();
+  const sources = within(method).getByRole("region", { name: "Where the data comes from" });
+  expect(within(sources).getByText("8 proposal provisions")).toBeDefined();
+  expect(within(sources).getByText("2 committee amendments")).toBeDefined();
+  expect(within(sources).getByRole("link", { name: /Have Your Say/ })).toBeDefined();
 });
