@@ -5,7 +5,7 @@ title: "Part 6 · Atlas graph: actor -> ask -> amendment -> final article, plus 
 kind: feature
 status: in_progress
 priority: 0
-version: 7
+version: 8
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -18,10 +18,11 @@ dependencies:
 parent_id: is-01m3ygrva6wcq297g7j12g99c2
 child_order_hints:
   - is-01m40m06dz2jynxdvbrydqr03z
+  - is-01m40m9petsrdhjvg47v8nx85f
 hold: null
 hold_until: null
 created_at: 2026-10-03T08:53:51.277Z
-updated_at: 2026-10-03T10:12:20.543Z
+updated_at: 2026-10-03T10:17:31.865Z
 started_at: 2026-10-03T10:00:59.971Z
 ---
 Atlas part 6. Built only from part 4's published links and part 5's outcomes, never from LobbyPlag labels. Store as plain files (JSONL/Parquet) per law plus one merged index; each edge carries its evidence record id. Serves the explorer, rankings and report. NetworkX for analysis; no graph database unless measured need.
