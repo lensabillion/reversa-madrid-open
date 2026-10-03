@@ -20,7 +20,7 @@ export interface AtlasLawList {
   laws: AtlasLawSummary[];
 }
 
-type AtlasLayer =
+export type AtlasLayer =
   | "metadata"
   | "proposal"
   | "parliament_position"
