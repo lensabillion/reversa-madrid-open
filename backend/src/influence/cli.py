@@ -6,7 +6,9 @@ Parltrack dumps, the register export and the Have Your Say index.
 `data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
 writes the view the explorer serves (`atlas.json`). `influence coordinated <law>` collects,
 then lists the near-identical amendments tabled by different political groups
-(`coordinated.json`). `influence channels <law>` collects, then counts the channels the law
+(`coordinated.json`). `influence lineage <law>` collects, then traces the final act's new
+wording to the amendments and consultation documents that carry it (`lineage.json`).
+`influence channels <law>` collects, then counts the channels the law
 was lobbied through: consultation stages, timing, tabling Members and coalitions
 (`channels.json`). `influence directions <law>` collects, then counts which way the
 amendments move the law and, through the atlas view's published links, each actor's asks
@@ -46,6 +48,7 @@ from influence.services.collect import (
 )
 from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.direction import build_directions, write_directions
+from influence.services.lineage_assembly import build_lineage, write_lineage
 from influence.services.pipeline import (
     PipelineError,
     build_view,
@@ -228,6 +231,39 @@ def _list_coordinated(result: CollectResult) -> int:
     return 0
 
 
+def _list_lineage(result: CollectResult) -> int:
+    try:
+        view = build_lineage(load_collected(result.bundle), generated_at=datetime.now(UTC))
+        path = write_lineage(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no lineage file was written.", file=sys.stderr)
+        return 1
+    counts = view.counts
+    if view.status == "unknown":
+        print(f"Lineage: unknown ({view.reason})")
+    else:
+        print(
+            f"Lineage: {counts.adopted_phrases} adopted phrases from {counts.amendments_adopting} "
+            f"of {counts.amendments} amendments; {counts.linked_units} of {counts.changed_units} "
+            "new words of the final act traced to an amendment"
+        )
+        documents = (
+            "origins unknown (no consultation text)"
+            if counts.documents_read is None
+            else f"{counts.documents_with_origin} of {counts.documents_read} consultation "
+            "documents say adopted or tabled wording first"
+        )
+        print(f"  {documents}")
+        for credit in [c for c in view.credits if c.holder_kind == "mep"][:CLUSTERS_SHOWN]:
+            print(
+                f"  {credit.name}: {credit.amendments} of {credit.amendments_tabled} amendments "
+                f"adopted, {credit.phrases} phrase(s) ({credit.joint_phrases} joint)"
+            )
+    print(f"lineage: {path.absolute()}")
+    return 0
+
+
 def _list_channels(result: CollectResult, index: Path) -> int:
     try:
         collected = load_collected(result.bundle)
@@ -404,6 +440,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "collect one law, then list near-identical amendments tabled by different "
             "political groups",
         ),
+        (
+            "lineage",
+            "collect one law, then trace the final act's new wording to the amendments and "
+            "consultation documents that carry it",
+        ),
         ("channels", "collect one law, then count the channels it was lobbied through"),
         (
             "directions",
@@ -464,6 +505,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "collect": None,
         "atlas": _build_view,
         "coordinated": _list_coordinated,
+        "lineage": _list_lineage,
         "channels": lambda result: _list_channels(
             result,
             CollectInputs.under(
