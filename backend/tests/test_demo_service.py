@@ -214,12 +214,7 @@ def test_source_details_are_bounded_but_counts_and_graph_are_complete(tmp_path: 
     for index in range(SOURCE_LIMIT + 2):
         records["proposals"].append({**records["proposals"][0], "uid": f"extra-{index}"})
         records["plags"].append(
-            {
-                "uid": f"extra-{index}",
-                "proposal": f"extra-{index}",
-                "amendment": "a1",
-                "verified": True,
-            }
+            {**records["plags"][0], "uid": f"extra-{index}", "proposal": f"extra-{index}"}
         )
     write_dataset(tmp_path, records)
     service = DemoService(DemoRepository.load(tmp_path))

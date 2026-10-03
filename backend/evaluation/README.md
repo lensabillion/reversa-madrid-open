@@ -1,3 +1,58 @@
+# Practice Harness
+
+The practice harness is the architecture's **practice loop**: it checks part 4's scores the
+way the hidden test will, before a change reaches `pairs.csv`. It labels LobbyPlag's public
+GDPR candidates, splits them into folds, scores every pair out of fold, and measures each
+scorer on 2,000 simulated hidden tests of 30 real pairs and 30 decoys. Every scorer change
+reports these numbers before and after, on the same folds and seeds (`AGENTS.md`, "Model
+changes are accepted on evaluation evidence").
+
+```sh
+uv run --directory backend --locked python -m influence.practice \
+    --data /absolute/path/to/data/lobbyplag --out evaluation/practice-results.json
+```
+
+`practice-results.json` is generated: the input files' SHA-256 digests, the label counts and
+rules, the folds, the settings and every pair's score. It records no paths or timings, so
+a rerun on the same snapshot reproduces it byte for byte.
+
+| Scorer | Precision in top 20 (p10) | Recall at 0.5 (p10) | AUC (p10) |
+| --- | ---: | ---: | ---: |
+| Lexical comparison on `main` (`lexical-delta-v1`) | 0.980 (0.950) | 0.814 (0.733) | 0.863 (0.802) |
+| LobbyPlag's stored match score (sanity baseline) | 0.857 (0.750) | 1.000 (1.000) | 0.810 (0.748) |
+
+Means over the 2,000 tests; p10 is the 10th percentile, the score of a bad draw. The
+stored match reproduces the explainer's 0.86 and 0.81. Its recall is 1.0 only because it
+never scores a candidate below 0.5; it exists only for pairs LobbyPlag's matcher proposed,
+so it cannot score the hidden test.
+
+**Labels.** Positive: a volunteer verified the copy (172 pairs). Weak negative: crowd
+volunteers checked the pair and none voted it a copy (100 pairs; 95 rest on one check).
+They are weaker than the positives (review finding R1). The other 1,685 candidates are
+unlabelled and excluded; no negative is invented (R2). No identical inputs carry opposite
+labels. A run takes 0.27 s on an Apple M5.
+
+**Folds.** No organization, amendment text or submission text appears on both sides of a
+split (R4). One linked group holds 10 organizations, 214 amendments and 170 of the 172
+positives, so the five folds are organizations, and training pairs sharing a text with the
+test fold are withheld from its training (8 to 23 per fold).
+
+**Read with care.** One law, in English, mostly word-for-word copies; the 2,000 tests reuse
+the same 272 pairs, so they are not independent samples. The per-fold numbers show where
+the lexical scorer is weak:
+
+| Fold | Organizations | Positives | Lexical AUC | Lexical recall |
+| ---: | --- | ---: | ---: | ---: |
+| 0 | edri, ekd-dbk, microsoft | 79 | 0.987 | 0.962 |
+| 1 | agoria, bitkom, bof, euroispa | 23 | 0.682 | 0.609 |
+| 2 | amcham, ebay | 24 | 0.655 | 0.542 |
+| 3 | amazon, eurofinas, telefonica | 23 | 0.969 | 0.957 |
+| 4 | accis, cocir, digitaleurope, ebf | 23 | 0.737 | 0.652 |
+
+Fold 0 is mostly European Digital Rights' near-verbatim copies. Where organizations' wording
+was adapted rather than copied, shared changed words alone separate real pairs from
+decoys much less well; that is what the passage finder and the next signals must improve.
+
 # Frozen semantic-agreement diagnostic
 
 The current lexical scorer prefers the intended match in **2 of 10 synthetic triplets**.
@@ -106,7 +161,9 @@ candidate IDs, 172 unique verified links, and 172 checked links (zero checked-bu
 Source: local public `data/lobbyplag/plags.json`, SHA-256
 `fb21f05cc0c372fdc60a2117219262cb7b00d52196ebbb118b29fc786dfb9a3c`.
 Unverified rows have no
-trusted negative label. Consequently this experiment cannot report real-world precision,
+trusted negative label. (The practice harness above uses a different field: 100 candidates
+have crowd checks in `processing.checked` and no yes vote, which it treats as weak
+negatives and labels as such.) Consequently this experiment cannot report real-world precision,
 calibration, or influence AUC from that snapshot. No candidate was converted to a
 negative merely because it was unverified.
 
