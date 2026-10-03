@@ -1,6 +1,7 @@
 """Origins: exact quotations, honest dates, citations flagged, coalition wording visible."""
 
 from datetime import UTC, date, datetime
+from functools import partial
 
 import pytest
 from hypothesis import given
@@ -15,16 +16,21 @@ from influence.schemas.atlas import (
     SourceSpan,
     span_matches,
 )
-from influence.schemas.lineage import AdoptedPhrase, AmendmentAdoption
+from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS, AdoptedPhrase, AmendmentAdoption
+from influence.services import origin
+from influence.services.lineage import Rarity
 from influence.services.origin import (
     OriginError,
     coalition_phrase_ids,
-    find_origins,
-    find_tabled_origins,
     is_citation,
     submitters_from,
 )
 from influence.services.prose_match import words_of
+
+# No word is common, so these tests see the run-length rules alone; rarity has its own tests.
+EVERY_WORD_RARE = Rarity(frozenset())
+find_origins = partial(origin.find_origins, rarity=EVERY_WORD_RARE)
+find_tabled_origins = partial(origin.find_tabled_origins, rarity=EVERY_WORD_RARE)
 
 SHA = "0" * 64
 RETRIEVED = datetime(2026, 10, 3, tzinfo=UTC)
@@ -104,7 +110,7 @@ def test_a_shorter_shared_run_still_counts_when_it_is_long_enough() -> None:
 
 
 def test_a_run_shorter_than_the_adopted_minimum_is_not_an_origin() -> None:
-    text = " ".join(REQUEST.split()[:10]) + " but nothing more"
+    text = " ".join(REQUEST.split()[: MIN_ADOPTED_RUN_WORDS - 1]) + " but nothing more"
     assert find_origins([phrase()], [adoption()], [document(text=text)]) == ()
 
 
@@ -411,7 +417,7 @@ def test_the_proposals_own_wording_and_short_runs_are_not_a_request() -> None:
         [amendment()], [document(text=REQUEST)], proposal_texts=[REQUEST]
     )
     assert (proposal.phrases, proposal.origins) == ((), ())
-    short = " ".join(REQUEST.split()[:10]) + " but nothing more"
+    short = " ".join(REQUEST.split()[: MIN_ADOPTED_RUN_WORDS - 1]) + " but nothing more"
     assert find_tabled_origins([amendment()], [document(text=short)]).origins == ()
 
 
@@ -451,3 +457,11 @@ def test_every_tabled_origin_quotes_its_document_and_names_carriers_of_its_phras
         assert span_matches(match.span, text)
         assert match.words >= 12
         assert set(match.amendment_ids) <= carriers[match.phrase_id]
+
+
+def test_a_run_of_the_laws_common_words_is_no_origin_adopted_or_tabled() -> None:
+    common = Rarity(frozenset(REQUEST.split()))
+    docs = [document(text=REQUEST)]
+    assert origin.find_origins([phrase()], [adoption()], docs, rarity=common) == ()
+    tabled = origin.find_tabled_origins([amendment()], docs, rarity=common)
+    assert (tabled.phrases, tabled.origins) == ((), ())
