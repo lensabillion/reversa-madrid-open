@@ -83,7 +83,7 @@ class RecallReport(Frozen):
 
 
 @dataclass(frozen=True, slots=True)
-class _Pair:
+class VerifiedPair:
     amendment_id: str
     amendment: RawText
     proposal_id: str
@@ -95,7 +95,7 @@ def _passage_text(proposal: RawText, corpus: Corpus) -> str:
     return proposal.old
 
 
-def _build_index(repository: DemoRepository, corpus: Corpus) -> PassageIndex:
+def build_index(repository: DemoRepository, corpus: Corpus) -> PassageIndex:
     passages = tuple(
         SourcePassage(document_id=uid, start=0, end=len(text), text=text)
         for uid, proposal in sorted(repository.proposals.items())
@@ -105,7 +105,7 @@ def _build_index(repository: DemoRepository, corpus: Corpus) -> PassageIndex:
 
 
 def _evaluate(
-    index: PassageIndex, pairs: Sequence[_Pair], query: Query
+    index: PassageIndex, pairs: Sequence[VerifiedPair], query: Query
 ) -> tuple[dict[str, float], float, int]:
     """Recall@k and mean reciprocal rank over `pairs`, one search per distinct amendment."""
     ranked: dict[str, list[str] | None] = {}
@@ -146,7 +146,7 @@ def measure_recall(
     configuration; 144 amendments and 1,159 proposals run in about a second.
     """
     pairs = [
-        _Pair(item.pair.amendment_id, item.pair.amendment, item.pair.proposal_id)
+        VerifiedPair(item.pair.amendment_id, item.pair.amendment, item.pair.proposal_id)
         for item in practice.pairs
         if item.influenced
     ]
@@ -154,12 +154,12 @@ def measure_recall(
         raise PracticeDataError("No verified pairs to measure retrieval on")
     with_text = [pair for pair in pairs if pair.amendment.new.strip()]
     indexes: dict[Corpus, PassageIndex] = {
-        "new_text_only": _build_index(repository, "new_text_only"),
-        "new_or_deleted_text": _build_index(repository, "new_or_deleted_text"),
+        "new_text_only": build_index(repository, "new_text_only"),
+        "new_or_deleted_text": build_index(repository, "new_or_deleted_text"),
     }
     sizes = {name: len(index) for name, index in indexes.items()}
     queries: tuple[Query, ...] = ("delta", "whole_text")
-    plan: list[tuple[Corpus, Query, Subset, list[_Pair]]] = [
+    plan: list[tuple[Corpus, Query, Subset, list[VerifiedPair]]] = [
         (corpus, "delta", "all_verified_pairs", pairs) for corpus in indexes
     ]
     plan.extend(
