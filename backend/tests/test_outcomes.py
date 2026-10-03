@@ -245,3 +245,50 @@ def test_every_observed_outcome_quotes_text_that_is_really_in_the_provision(
             assert all(span_matches(span, final) for span in outcome.spans)
         if outcome.result == "unknown":
             assert outcome.reason
+
+
+KEEP_TEXT = "Providers shall keep technical logs for the life of the product."
+
+
+def _keep_ask() -> Ask:
+    return _ask(KEEP_TEXT).model_copy(update={"direction": "keep"})
+
+
+def test_a_keep_ask_wins_when_its_provision_comes_through_word_for_word() -> None:
+    versions = [
+        _version("proposal", KEEP_TEXT, "Article 5(1)"),
+        _version("final_act", KEEP_TEXT.lower(), "Article 9(3)"),
+    ]
+    (final,) = trace_outcomes(_keep_ask(), None, None, versions)
+    assert (final.result, final.kind, final.relation) == ("full", "status_quo", "direct_to_final")
+    assert final.article_id == "art:final_act:Article-9(3)"
+    assert final.spans
+    assert all(span_matches(span, KEEP_TEXT.lower()) for span in final.spans)
+
+
+def test_a_keep_ask_loses_when_the_provision_was_changed() -> None:
+    versions = [
+        _version("proposal", KEEP_TEXT),
+        _version("final_act", "Providers shall keep technical logs for six months."),
+    ]
+    (final,) = trace_outcomes(_keep_ask(), None, None, versions)
+    assert (final.result, final.kind) == ("not_observed", None)
+    assert "changed" in (final.reason or "")
+
+
+def test_a_keep_ask_is_unknown_when_a_text_is_missing_or_does_not_line_up() -> None:
+    no_proposal = [_version("final_act", KEEP_TEXT)]
+    assert trace_outcomes(_keep_ask(), None, None, no_proposal)[0].result == "unknown"
+    no_final = [_version("proposal", KEEP_TEXT)]
+    assert trace_outcomes(_keep_ask(), None, None, no_final)[0].result == "unknown"
+    elsewhere = [_version("proposal", KEEP_TEXT), _version("final_act", "Pizza and gardening.")]
+    final = trace_outcomes(_keep_ask(), None, None, elsewhere)[0]
+    assert (final.result, "wants kept" in (final.reason or "")) == ("unknown", True)
+    far_proposal = [_version("proposal", "Pizza and gardening."), _version("final_act", KEEP_TEXT)]
+    assert "compare" in (trace_outcomes(_keep_ask(), None, None, far_proposal)[0].reason or "")
+
+
+def test_a_keep_ask_is_never_traced_through_an_amendment() -> None:
+    amendment = _amendment(OLD, NEW)
+    outcomes = trace_outcomes(_keep_ask(), amendment, _link(amendment), [])
+    assert [(o.stage, o.relation) for o in outcomes] == [("final_act", "direct_to_final")]
