@@ -31,6 +31,7 @@ WEIGHTS = Path("onnx") / "model_int8.onnx"
 TOKENIZER = Path("tokenizer.json")
 END_OF_TEXT = "<|endoftext|>"
 # Passages are about 200 tokens; a long amendment is cut here, keeping its end-of-text token.
+# The cut is counted in `QwenEmbedder.truncated`, so a run can say how many texts it shortened.
 MAX_TOKENS = 512
 BATCH_SIZE = 1
 CACHE_PREFIX = "past_key_values."
@@ -79,13 +80,18 @@ def _truncate(ids: Sequence[int]) -> list[int]:
 
 
 class QwenEmbedder:
-    """Callable `EmbedFunction`: `embedder(texts)` returns one raw vector per text."""
+    """Callable `EmbedFunction`: `embedder(texts)` returns one raw vector per text.
+
+    `truncated` counts the texts this embedder has cut at `MAX_TOKENS` so far (a text passed
+    twice counts twice), so callers can report the cut instead of hiding it.
+    """
 
     def __init__(self, session: Session, tokenizer: Tokenizer, arrays: Arrays, pad_id: int) -> None:
         self._session = session
         self._tokenizer = tokenizer
         self._arrays = arrays
         self._pad_id = pad_id
+        self.truncated = 0
         self._cache_inputs = [
             item for item in session.get_inputs() if item.name.startswith(CACHE_PREFIX)
         ]
@@ -93,7 +99,9 @@ class QwenEmbedder:
     def __call__(self, texts: Sequence[str]) -> list[list[float]]:
         if not texts:
             return []
-        rows = [_truncate(encoding.ids) for encoding in self._tokenizer.encode_batch(list(texts))]
+        encodings = self._tokenizer.encode_batch(list(texts))
+        self.truncated += sum(len(encoding.ids) > MAX_TOKENS for encoding in encodings)
+        rows = [_truncate(encoding.ids) for encoding in encodings]
         width = max(len(row) for row in rows)
         ids = [row + [self._pad_id] * (width - len(row)) for row in rows]
         mask = [[1] * len(row) + [0] * (width - len(row)) for row in rows]

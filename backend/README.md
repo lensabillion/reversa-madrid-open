@@ -256,6 +256,16 @@ Outcomes are traced only for asks with a published or
 unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
 timed.
 
+**Stale calibration artifacts.** `evaluation/link-calibration.json` (`link-calibration-v1`)
+and `evaluation/dense-meaning.json` (`dense-meaning-v1`) predate three practice-loop fixes:
+the reworded tier is now chosen and reported on its own band below the copied cut, identical
+inputs from different organizations now share one test fold, and the judge's and embedder's
+input cuts are counted. Their numbers (including the 0.32 reworded cut) are not current
+until regenerated: `make fetch-lobbyplag`, then `python -m influence.practice.calibrate` and,
+with the models fetched, `make evaluate-dense` (commands in the module docstrings). The fold
+change also touches every other fold-based result (`practice-results.json`,
+`calculation-*.json`): rerun `python -m influence.practice` and `benchmarks/calculation_plan.py`.
+
 ## Coordinated Amendments Command (Part 3)
 
 `influence coordinated <law>` (`make coordinated LAW='2021/0106(COD)'`) collects the law
