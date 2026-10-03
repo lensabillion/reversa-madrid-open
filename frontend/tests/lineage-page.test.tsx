@@ -248,7 +248,7 @@ test("a long list is paged, and an undated or citing submission is labelled as s
   fireEvent.click(screen.getByRole("button", { name: `Tabled, not adopted (${total})` }));
   expect(screen.getAllByRole("article")).toHaveLength(PHRASES_PER_PAGE);
   expect(screen.getByText("Order unknown")).toBeDefined();
-  expect(screen.getByText("Citation, not a request")).toBeDefined();
+  expect(screen.getByText("Quote of a legal title, not a request")).toBeDefined();
   expect(screen.getByText("Said after the first amendment")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Show more (3 left)" }));
   expect(screen.getAllByRole("article")).toHaveLength(total);

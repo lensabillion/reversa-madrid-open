@@ -45,7 +45,7 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
       rules: [
         "The document has the same 8 or more words, or Jev judges it asks for the same legal change (all four of its answers at 0.67 or more).",
         "It was published before every amendment carrying the wording.",
-        "Quotes of other laws are set aside.",
+        "Quotes of legal titles and Official Journal references are not counted: same words, but not a request.",
       ],
       result: `${known(counts.documents_with_origin)} of ${known(counts.documents_read)} documents`,
     },

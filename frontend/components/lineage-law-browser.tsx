@@ -113,7 +113,7 @@ function Timing({ origin }: { origin: LineageOriginRow }) {
   if (origin.isCitation) {
     return (
       <span className="rounded-sm bg-stone-200 px-2 py-0.5 text-stone-700">
-        Citation, not a request
+        Quote of a legal title, not a request
       </span>
     );
   }
