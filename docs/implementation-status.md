@@ -54,6 +54,34 @@ procedure references, streamed in 6 s with the standard library. The Have Your S
 EUR-Lex folders hold only GDPR samples: the consultation papers and final texts for
 2019–2026 are not downloaded yet. That is the first schedule risk.
 
+## Atlas Graph and Outcome Consumers — 3 October 2026
+
+Agent 3 implemented graph projection and descriptive outcome aggregation against the
+merged `atlas-1` contracts. `services/atlas_graph.py` builds published actor → request
+→ amendment paths and supported request → final article relations, preserving source
+spans, joint attribution and coverage. Invalid joins, inexact quotations, inconsistent
+chronology and contradictory outcomes fail explicitly. Audit candidates create no
+public paths; unknown final outcomes create no realization edge.
+
+`services/atlas_analysis.py` counts every supplied canonical request, including requests
+without published links. Full, partial, not-observed and unknown outcomes stay separate
+at each stage; the full-win rate is full outcomes divided by assessed requests. Repeated
+amendments cannot multiply wins. Coalition rows overlap, so sample totals cannot be
+computed by summing actor rows. Known inventory-count mismatches produce coverage gaps.
+The invented two-law fixture produces 11 nodes, 9 edges, 2 published origin links and
+1 final realization. Its 6 requests have 2 full, 1 partial, 2 not-observed and 1 unknown
+final outcome: 2/5 = 0.4 across assessed requests. These are synthetic contract results,
+not accuracy or causal claims. The [backend handoff](../backend/README.md#atlas-graph-and-outcome-consumers)
+documents interfaces, limitations and the reproducible fixture benchmark.
+
+`make check` passed on 3 October after integrating main through PR #27 (`8a03ca2`):
+274 backend tests; 100% coverage (1,563 statements, 390 branches); Ruff and strict
+basedpyright; 6/6 research catalogs; 37 frontend tests, Biome, TypeScript and production
+build. Backend audit found no known vulnerabilities or adverse statuses in 31 packages;
+frontend audit found 0 vulnerabilities. These services are not wired into a real-data
+pipeline, API or live explorer yet. Any-law latency, real links and public report
+findings remain unverified. Tracking: `rev-i006` and `rev-5yy6`.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
