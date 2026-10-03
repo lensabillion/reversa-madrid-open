@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend
 
@@ -63,6 +63,13 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+
+# The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
+# EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
+submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
+	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
+	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
+	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci
