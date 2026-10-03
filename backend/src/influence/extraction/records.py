@@ -39,7 +39,12 @@ def read_records[T: AtlasRecord](path: Path, model: type[T]) -> Iterator[T]:
         content = path.read_text(encoding="utf-8")
     except OSError as error:
         raise RecordError(f"Cannot read {path}") from error
-    for number, line in enumerate(content.splitlines(), start=1):
+    # Split on the line feed alone, as the writer ends records: str.splitlines() also breaks
+    # at U+2028, U+2029 and U+0085, which a submission's text can hold inside a JSON string.
+    lines = content.split("\N{LINE FEED}")
+    if lines[-1] == "":
+        lines.pop()
+    for number, line in enumerate(lines, start=1):
         try:
             yield model.model_validate_json(line)
         except ValidationError as error:

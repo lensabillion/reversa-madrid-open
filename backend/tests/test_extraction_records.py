@@ -14,7 +14,13 @@ from influence.extraction.records import (
     input_hash,
     read_records,
 )
-from influence.schemas.atlas import Amendment, LawRecord, RunManifest, StageReceipt
+from influence.schemas.atlas import (
+    Amendment,
+    DocumentText,
+    LawRecord,
+    RunManifest,
+    StageReceipt,
+)
 
 FIXTURE = build_fixture()
 STARTED = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
@@ -129,3 +135,44 @@ def test_current_rejects_an_invalid_manifest(tmp_path: Path) -> None:
     (tmp_path / MANIFEST_NAME).write_text("{}", encoding="utf-8")
     with pytest.raises(RecordError, match="is invalid"):
         StageStore(tmp_path).current()
+
+
+SEPARATORS = (
+    "\N{LINE SEPARATOR}",
+    "\N{PARAGRAPH SEPARATOR}",
+    "\N{NEXT LINE}",
+    "\N{LINE TABULATION}",
+    "\N{FORM FEED}",
+    "\N{INFORMATION SEPARATOR TWO}",
+)
+
+
+@pytest.mark.parametrize("separator", SEPARATORS)
+def test_a_text_holding_a_unicode_line_separator_survives_a_round_trip(
+    tmp_path: Path, separator: str
+) -> None:
+    """Real submissions hold U+2028; splitlines() cut such a record in half (AI Act run)."""
+    record = DocumentText(document_id="doc:hys_feedback:1", text=f"before{separator}after")
+    body, count = encode_records([record])
+    path = tmp_path / "document_texts.jsonl"
+    path.write_bytes(body)
+    assert count == 1
+    assert list(read_records(path, DocumentText)) == [record]
+
+
+def test_an_empty_file_has_no_records_and_a_blank_line_is_still_an_error(tmp_path: Path) -> None:
+    path = tmp_path / "empty.jsonl"
+    path.write_text("", encoding="utf-8")
+    assert list(read_records(path, DocumentText)) == []
+    body, _ = encode_records([DocumentText(document_id="doc:hys_feedback:1", text="x")])
+    path.write_bytes(body + b"\n" + body)
+    with pytest.raises(RecordError, match="line 2 is invalid"):
+        list(read_records(path, DocumentText))
+
+
+def test_a_file_without_a_final_line_feed_is_still_read_whole(tmp_path: Path) -> None:
+    record = DocumentText(document_id="doc:hys_feedback:1", text="no trailing newline")
+    body, _ = encode_records([record])
+    path = tmp_path / "document_texts.jsonl"
+    path.write_bytes(body.rstrip(b"\n"))
+    assert list(read_records(path, DocumentText)) == [record]
