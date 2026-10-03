@@ -5,7 +5,7 @@ title: "Challenge 03 Influence Atlas: design, build and demo our entry"
 kind: epic
 status: open
 priority: 1
-version: 50
+version: 51
 labels: []
 dependencies: []
 child_order_hints:
@@ -58,6 +58,10 @@ child_order_hints:
   - is-01m40fgh1nsehehafndm6xy85d
   - is-01m40fgh7rr8spaqfeat0v6qzm
 created_at: 2026-10-02T14:37:25.189Z
-updated_at: 2026-10-03T08:53:53.016Z
+updated_at: 2026-10-03T11:23:10.707Z
 ---
 Reversa Madrid Open, Sat 3 Oct 2026. The brief changed at kickoff on 3 October: 'The Influence Atlas' replaces the hidden-test brief (60 pairs, 20 proposals, CSVs). Deliver a graph the jury can explore live (actor -> ask -> amendment -> final article, every edge with its evidence), a short public report answering five questions (who, what, towards what, how, next) and an open-source repo anyone can rerun. Scored live at 19:30: real links 25 (3 random edges read side by side), any law 20 (a law named on the spot, no code changes, minutes), insight 25, report 15, ambition 15 (coverage since 2019 and forecast). Earlier children record the work done under the first brief.
+
+## Notes
+
+2026-10-03 13:25 CEST, state of main at bdb0c61 (recorded by cloud session claude/eloquent-allen-jbxbmy): Snapshot. Merged: #21 re-plan, #22 three-agent split, #23 consolidated plan, #25 shared contracts (atlas-1), #26 collection connectors (Parltrack, CELLAR, Have Your Say, register, actors), #27 BM25 retrieval. Open: #24 explorer UI and #28 graph and rankings, both on fixtures with CI green. Not started on main: the collect service and `influence collect` (rev-pjk2, owner to reassign), ask extraction and verify links (rev-nuk5, unclaimed), outcomes (rev-uhpq, unclaimed). No real link, score or graph exists yet; the plan's 13:30 checkpoint will be missed.
