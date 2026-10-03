@@ -86,3 +86,25 @@ test("empty input reports unavailable published evidence without claiming no inf
   expect(screen.getByText("No published links available in this snapshot.")).toBeDefined();
   expect(screen.getByText("Awaiting pipeline records")).toBeDefined();
 });
+
+test("keeps unavailable selected filters visible when a snapshot is replaced", () => {
+  const { rerender } = render(<AtlasExplorer links={[base]} coverageNotes={[]} />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Topic" }), {
+    target: { value: "Health" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: "Year" }), {
+    target: { value: "2024" },
+  });
+  rerender(
+    <AtlasExplorer
+      links={[{ ...base, id: "new", topic: "Energy", year: 2025 }]}
+      coverageNotes={[]}
+    />,
+  );
+  expect(screen.getByRole("option", { name: "Health (unavailable)" })).toBeDefined();
+  expect(screen.getByRole("option", { name: "2024 (unavailable)" })).toBeDefined();
+  expect(screen.getByText("No published links match these filters.")).toBeDefined();
+  fireEvent.change(screen.getByRole("combobox", { name: "Topic" }), { target: { value: "" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Year" }), { target: { value: "" } });
+  expect(screen.getByRole("button", { name: /Example association/ })).toBeDefined();
+});

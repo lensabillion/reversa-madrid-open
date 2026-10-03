@@ -151,6 +151,6 @@ state.
 
 Agent 3's isolated `feat/atlas-explorer` branch adds reusable evidence/explorer components
 under `rev-oodw`, with handoff details in [frontend README](../frontend/README.md#atlas-components-and-agent-3-handoff).
-The 46 frontend tests, production build and audits passed. Components use synthetic test
+The 48 frontend tests, production build and audits passed. Components use synthetic test
 records and await Agent 1's shared snapshot contract; no live Atlas route or graph is
 claimed. Broader work remains tracked in `rev-i006` and its dependent beads.

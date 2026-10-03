@@ -93,6 +93,9 @@ export function AtlasExplorer({
             className={inputStyle}
           >
             <option value="">All topics</option>
+            {topic && !topics.includes(topic) && (
+              <option value={topic}>{topic} (unavailable)</option>
+            )}
             {topics.map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -111,6 +114,9 @@ export function AtlasExplorer({
             className={inputStyle}
           >
             <option value="">All years</option>
+            {year && !years.includes(Number(year)) && (
+              <option value={year}>{year} (unavailable)</option>
+            )}
             {years.map((item) => (
               <option key={item} value={item}>
                 {item}

@@ -93,7 +93,8 @@ function Excerpt({
       )}
       {!valid && (
         <p role="alert" className="mt-3 text-sm text-amber-900">
-          Evidence highlight unavailable: the supplied quote does not match its source span.
+          Evidence verification failed: the supplied quote does not match its source span. The
+          upstream assessment has not been re-evaluated.
         </p>
       )}
       {excerpt && (
@@ -166,7 +167,9 @@ export function AtlasEvidence({
         <Excerpt
           title="Final legal text"
           excerpt={outcome.finalText}
-          empty="Final wording unavailable"
+          empty={
+            outcome.finalText === null ? "Final wording unavailable" : "Known empty final wording"
+          }
         />
       </div>
       <section aria-label="Legal outcome" className="mt-7 border-t border-stone-200 pt-5">

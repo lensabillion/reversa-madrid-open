@@ -60,7 +60,7 @@ test("rejects inaccurate quoted spans and unsafe source URLs", () => {
   );
   const ask = screen.getByRole("region", { name: "Lobby request" });
   expect(ask.querySelector("mark")).toBeNull();
-  expect(within(ask).getByRole("alert").textContent).toContain("Evidence highlight unavailable");
+  expect(within(ask).getByRole("alert").textContent).toContain("Evidence verification failed");
   expect(within(ask).queryByRole("link")).toBeNull();
   expect(ask.textContent).toContain(excerpt.text);
 });
@@ -105,4 +105,21 @@ test("renders partial outcome evidence without upgrading it to a full win", () =
   expect(final.querySelector("mark")?.textContent).toBe("shall");
   expect(screen.getByText("Partially reflected in final text")).toBeDefined();
   expect(screen.queryByText("Fully reflected in final text")).toBeNull();
+});
+
+test("distinguishes a known empty final provision from unavailable final text", () => {
+  render(
+    <AtlasEvidence
+      {...props}
+      outcome={{
+        status: "full",
+        explanation: "The requested deletion is reflected in the final act.",
+        finalText: { ...excerpt, text: "", spans: [] },
+      }}
+    />,
+  );
+  const final = screen.getByRole("region", { name: "Final legal text" });
+  expect(within(final).getByText("Known empty final wording")).toBeDefined();
+  expect(within(final).queryByText("Final wording unavailable")).toBeNull();
+  expect(within(final).getByRole("link", { name: "Published position paper" })).toBeDefined();
 });

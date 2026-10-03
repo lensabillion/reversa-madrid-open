@@ -117,7 +117,9 @@ existing evidence workspace until the shared snapshot adapter is implemented.
 - `AtlasLinkView` and `AtlasEvidenceProps` are component props, not an API schema.
   The adapter must preserve stable unique link IDs and map pipeline publication and
   outcome decisions without recalculating them. Supply excerpts from their recorded
-  source versions and express coverage gaps in `coverageNotes`.
+  source versions and express coverage gaps in `coverageNotes`. Component span offsets
+  are relative to the supplied excerpt: subtract its starting code-point offset from
+  document-relative offsets while retaining the original source provenance.
 
 Agent 3 branch: `feat/atlas-explorer`; component bead: `rev-oodw`; broader graph bead:
 `rev-i006`. Base: main `0518f17`. Shared schema revision: **pending Agent 1**. Tests use
@@ -129,7 +131,7 @@ route contract, plus Agent 2's publication decisions and outcomes (including unm
 asks). Agent 1 creates the separate UI integration child of `rev-qn6b`. Graph projection,
 ranking denominators, public-position enrichment, report and forecast views remain open.
 
-Verified on 3 October 2026: 46 frontend tests, Biome, TypeScript, production build and
+Verified on 3 October 2026: 48 frontend tests, Biome, TypeScript, production build and
 package audit passed. A temporary synthetic preview was inspected at desktop width and
 390-pixel mobile width; mobile content width was 390 pixels with no horizontal overflow.
 The preview route was removed. These checks verify presentation, not model accuracy,
