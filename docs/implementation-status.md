@@ -143,6 +143,28 @@ the delta query at 5 per amendment, which PR #41 measured at 0.82 recall@5 on Lo
 against 0.98 for the union of the delta and whole-text queries at about 6.5 candidates;
 adopting it is open.
 
+## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
+
+`influence coordinated <law>` (`make coordinated LAW=...`, bead `rev-637f`) lists the
+amendments of one law whose inserted wording is near-identical and that Members of
+different political groups tabled, from the Parltrack amendments and Members alone, and
+writes `data/laws/<procedure>/coordinated.json`. Method, parameters and limits: the
+[backend README](../backend/README.md#coordinated-amendments-command-part-3).
+
+`measured` on real sources (WSL2, Intel Core Ultra 7 258V, `--no-attachments`, HTTP
+cached): the AI Act has 83 clusters spanning groups of 269 (5,660 amendments, 2,967
+compared), the Digital Services Act 80 of 508, the Data Act 72 of 173; clustering takes
+about 4 s after collect. `make check-backend`'s commands pass with 999 tests and 100%
+branch coverage (5,734 statements, 1,472 branches). **Not verified:** the precision of the
+clusters (no audit, parameters proposed), and the group of a Member on the tabling date
+(the dump's latest group is used). The clusters are not yet in the view or the explorer.
+
+This closes plan gate 2's last open item. Its other two were already met: recall@20 on
+LobbyPlag for BM25, dense and fused (PRs #35, #41, #48), and candidates for the AI Act
+(PR #50's run: 12,996 candidate pairs). Still open under gate 2's beads: `pipeline.py`
+searches the delta query at 5 per amendment (0.82 recall@5 on LobbyPlag) instead of the
+union of the delta and whole-text queries (0.98 at about 6.5 candidates, PR #41).
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
