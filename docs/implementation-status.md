@@ -81,8 +81,9 @@ reranker does so in 8/10. The remaining deadline and obligation failures, and hi
 scores on contradictory submissions, prevent promotion to production. These are
 diagnostics, not held-out influence accuracy. See the [complete experiment and raw
 results](../backend/evaluation/README.md). The production API still uses the lexical
-baseline. The experiment is on `feat/pair-evaluation`; its heavyweight runtime is
-isolated and its dependency lock is audited by the normal gate.
+baseline. The experiment's heavyweight runtime was removed from the tree on 3 October
+because nothing in the pipeline uses it; the evaluation README links to its code in git
+history.
 
 Practice data needs independently justified negatives, including same-article proposals
 that ask for different changes. Unverified links remain unknown. Keep organizations,

@@ -76,19 +76,17 @@ These come from the project owner and override any default habit.
 
 ## Commands
 
-`make check` verifies the default gates and changes no source files.
+`make check` is the one gate: it verifies everything and changes nothing.
 CI runs the same targets, so a local pass predicts a CI pass.
 Each area adds its targets to the root `Makefile` and to this table when it lands.
 
 | Command | What it does |
 | --- | --- |
-| `make check` | All default checks and audits; excludes fixes, dev servers and the optional model runtime check |
+| `make check` | Every gate below except the dev servers; changes nothing |
 | `make check-scripts` | Ruff format and lint check of `scripts/` |
 | `make check-docs` | Validates every research catalog against its schema |
 | `make check-backend` | Locked install, Ruff format and lint, basedpyright strict, tests with gate probes and 100% branch coverage |
-| `make audit-backend` | Audits production and isolated evaluation dependency locks against OSV (needs network) |
-| `make audit-evaluation-runtime` | Audits the isolated model runtime lock without installing model dependencies |
-| `make check-evaluation-runtime` | Optional frozen install, Ruff and strict basedpyright for the heavyweight model experiment; does not run inference |
+| `make audit-backend` | Looks up every package in `backend/uv.lock` in the OSV vulnerability database (needs network) |
 | `make check-frontend` | Clean `npm ci`, Biome, Next.js route types and `tsc`, Vitest with gate probes, production build |
 | `make audit-frontend` | `npm audit` of `frontend/package-lock.json`; moderate severity or higher fails (needs network) |
 | `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |

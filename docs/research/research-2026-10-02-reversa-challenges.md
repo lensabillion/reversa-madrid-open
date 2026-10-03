@@ -336,7 +336,7 @@ three consequences:
 
 The brief’s numbers for 12 July 2022, when Spain announced temporary levies on banks and
 energy firms, were reproduced exactly from yfinance
-([c01_check.py](reversa-2026-10/evidence/c01_check.py)):
+([c01_check.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/c01_check.py)):
 
 | Company | Brief | Measured day-0 return | Abnormal return, day 0 + day 1 |
 | --- | --- | --- | --- |
@@ -470,7 +470,7 @@ people who control the agenda let it reach the vote. So the drivers are:
 This research downloaded every government bill (121) and group bill (122) for
 legislatures V–XV, plus Senate, regional and popular-initiative bills for legislatures X,
 XII, XIV and XV (4,148 initiatives in all), from the Congress search endpoint
-([scan.py](reversa-2026-10/evidence/scan.py), [base-rates.txt](reversa-2026-10/evidence/base-rates.txt)).
+([scan.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/scan.py), [base-rates.txt](reversa-2026-10/evidence/base-rates.txt)).
 For bills with a final outcome:
 
 | Legislature | Years | Govt bills passed | Group bills passed | Baseline accuracy |
@@ -496,7 +496,7 @@ It fails in two places:
   (“caducado”). Only 8 were rejected outright. Failures concentrate in short,
   fragmented legislatures (XII: 31 of 49; XIV: 66 of 155).
 - **Group bills that pass:** concentrated in a few kinds
-  ([explain.py](reversa-2026-10/evidence/explain.py)):
+  ([explain.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/explain.py)):
 
 | Kind of bill | Pass rate | Bills |
 | --- | --- | --- |
@@ -519,7 +519,7 @@ Note that in legislature XV, 90 of 115 government bills were still pending on
 #### 6.4 Measured: A Simple Model Beats the Baseline
 
 A logistic regression with 11 features, all known on the filing date, was tested by
-leaving each legislature out in turn ([experiment.py](reversa-2026-10/evidence/experiment.py)).
+leaving each legislature out in turn ([experiment.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/experiment.py)).
 Features: government bill; signed by the governing party’s group; number of signing
 groups; committee-authored; years since the legislature began; years beyond the third;
 organic law; majority government; and three interactions.
@@ -550,7 +550,7 @@ be harder than a random sample. Expect lower real scores, still with a clear mar
 #### 6.5 Measured: Timing
 
 Matching approved bills from legislatures XII, XIV and XV to their BOE laws by title
-(144 of 177 matched; [timing.py](reversa-2026-10/evidence/timing.py)):
+(144 of 177 matched; [timing.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/timing.py)):
 
 | Group | Bills | Median days filing → BOE | 10th–90th percentile | MAE of always guessing the median |
 | --- | --- | --- | --- | --- |
@@ -680,7 +680,7 @@ directly to MEPs, but the matching problem is the same.
 
 The table compares Amazon’s paper with five amendments to the same paragraph, using
 Python’s character-similarity ratio (0 means nothing in common, 1 means identical)
-([lobbyplag_example.py](reversa-2026-10/evidence/lobbyplag_example.py)):
+([lobbyplag_example.py](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/docs/research/reversa-2026-10/evidence/lobbyplag_example.py)):
 
 | Amendment to Article 26(1) | LobbyPlag status | Whole text | Only the changed words |
 | --- | --- | --- | --- |
