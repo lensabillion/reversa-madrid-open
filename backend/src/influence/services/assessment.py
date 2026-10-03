@@ -8,7 +8,7 @@ match their sources exactly, and the evidence tier is one the caller allows. Lin
 text length; the scorer's token diff is O(n*m) at 800 tokens per side.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from influence.schemas.atlas import (
@@ -34,10 +34,17 @@ from influence.schemas.scoring import (
     TextSpan,
 )
 from influence.services.passage_change import read_changes
+from influence.services.prose_match import (
+    ProseMatch,
+    Word,
+    match_prose,
+    negation_conflict,
+    words_of,
+)
 from influence.services.scoring import score_pair
 
 METHOD = "lexical-rules"
-METHOD_REVISION = "rules-2"
+METHOD_REVISION = "rules-3"
 # Proposed by the LobbyPlag calibration (PR #40, evaluation/link-calibration.json): the least
 # lexical score whose held-out precision, with a Wilson 95% lower bound, clears each tier's
 # floor on practice data. Proposals, not frozen values: the practice loop owner freezes them
@@ -47,6 +54,19 @@ METHOD_REVISION = "rules-2"
 COPIED_THRESHOLD = 0.75
 REWORDED_THRESHOLD = 0.32
 SHORT_EDIT_TOKENS = 3
+# Prose passages (no quoted instruction) are judged on shared phrases, not edit overlap. These
+# are placeholders: no prose labels exist yet, and the blind audit is what will set them. A
+# copy is a long verbatim run covering most of the changed words; a rewording is most of the
+# changed words in shorter runs.
+PROSE_COPIED_RUN_WORDS = 6
+PROSE_COPIED_COVERAGE = 0.8
+PROSE_REWORDED_RUN_WORDS = 4
+PROSE_REWORDED_COVERAGE = 0.5
+# The shared phrases must also carry this much rarity in absolute terms (the sum of their
+# words' inverse document frequencies), so a short insertion made only of the law's own
+# vocabulary ("before being placed on the market") cannot score as a full copy.
+PROSE_MIN_WEIGHT = 0.0
+_BREAK = "\x00"
 DEFAULT_PUBLISHABLE: frozenset[LinkTier] = frozenset({"copied"})
 
 _STRICTER_WORDS = frozenset({"shall", "must", "required", "least", "minimum"})
@@ -136,31 +156,100 @@ def _amendment_spans(amendment: Amendment, result: ScoreResult) -> tuple[SourceS
 
 
 def _ask_spans(ask: Ask, reading: _Reading) -> tuple[SourceSpan, ...]:
-    """The instruction itself, or the shared words located inside the ask's own quotation."""
+    """The quoted instruction itself, located inside the ask's own quotation."""
     base = ask.span.start
-    if reading.change.kind != "statement":
-        return (
-            SourceSpan(
-                record_id=ask.span.record_id,
-                field=ask.span.field,
-                start=base + reading.change.start,
-                end=base + reading.change.end,
-                text=reading.change.text,
-            ),
-        )
-    shift = base + reading.change.start
-    return tuple(
+    return (
         SourceSpan(
             record_id=ask.span.record_id,
             field=ask.span.field,
-            start=shift + start,
-            end=shift + end,
-            text=reading.change.new[start:end],
-        )
-        for start, end in _merge(
-            (item.submission for item in reading.result.evidence), reading.change.new
-        )
+            start=base + reading.change.start,
+            end=base + reading.change.end,
+            text=reading.change.text,
+        ),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _Prose:
+    """What the amendment's changed words share with a prose passage, with exact quotations."""
+
+    match: ProseMatch
+    amendment_spans: tuple[SourceSpan, ...]
+    ask_spans: tuple[SourceSpan, ...]
+    negation: bool
+
+
+def _amendment_words(amendment: Amendment, spans: Iterable[ChangeSpan]) -> list[Word]:
+    """Inserted words, offsets in `new_text`; a break word between spans stops a run crossing."""
+    flat: list[Word] = []
+    for span in spans:
+        if span.operation != "insert":
+            continue
+        if flat:
+            flat.append(Word(_BREAK, flat[-1].end, flat[-1].end))
+        flat.extend(
+            Word(word.text, span.start + word.start, span.start + word.end)
+            for word in words_of(span.text)
+        )
+    return flat
+
+
+def _prose(
+    amendment: Amendment,
+    ask: Ask,
+    change: PassageChange,
+    spans: Iterable[ChangeSpan],
+    rarity: Mapping[str, float] | None,
+) -> _Prose:
+    mine = _amendment_words(amendment, spans)
+    theirs = words_of(change.new)
+    match = match_prose([w.text for w in mine], [w.text for w in theirs], rarity)
+    shift = ask.span.start + change.start
+    amendment_spans = tuple(
+        SourceSpan(
+            record_id=amendment.amendment_id,
+            field="new_text",
+            start=mine[run.amendment_first].start,
+            end=mine[run.amendment_first + run.length - 1].end,
+            text=amendment.new_text[
+                mine[run.amendment_first].start : mine[run.amendment_first + run.length - 1].end
+            ],
+        )
+        for run in match.runs
+    )
+    ask_spans = tuple(
+        SourceSpan(
+            record_id=ask.span.record_id,
+            field=ask.span.field,
+            start=shift + theirs[run.passage_first].start,
+            end=shift + theirs[run.passage_first + run.length - 1].end,
+            text=change.new[
+                theirs[run.passage_first].start : theirs[run.passage_first + run.length - 1].end
+            ],
+        )
+        for run in match.runs
+    )
+    negation = any(
+        negation_conflict(
+            amendment.new_text,
+            mine[run.amendment_first].start,
+            change.new,
+            theirs[run.passage_first].start,
+        )
+        for run in match.runs
+    )
+    return _Prose(match, amendment_spans, ask_spans, negation)
+
+
+def _prose_tier(
+    match: ProseMatch, *, short_edit: bool, same_direction: bool, min_weight: float
+) -> LinkTier | None:
+    if not short_edit and match.shared_weight >= min_weight:
+        if match.longest >= PROSE_COPIED_RUN_WORDS and match.coverage >= PROSE_COPIED_COVERAGE:
+            return "copied"
+        if match.longest >= PROSE_REWORDED_RUN_WORDS and match.coverage >= PROSE_REWORDED_COVERAGE:
+            return "reworded"
+    return "same_direction" if same_direction and match.runs else None
 
 
 def _tier(score: float, *, short_edit: bool, same_direction: bool) -> LinkTier | None:
@@ -178,12 +267,24 @@ def assess_link(
     *,
     candidate_id: str | None = None,
     publishable: frozenset[LinkTier] = DEFAULT_PUBLISHABLE,
+    rarity: Mapping[str, float] | None = None,
+    publish_prose: bool = False,
 ) -> LinkAssessment:
     """Judge whether `ask` supports `amendment`, with signals, quotations and limitations.
 
     `ask_source_text` is the document the ask was quoted from, so the ask's quotation can be
     checked against it. Contradicted wins over everything; a link that is not publishable
     for another reason stays "unconfirmed" with the reason in `limitations`.
+
+    A passage that gives a quoted instruction ("replace 'shall' with 'may'") is compared as an
+    edit. Any other passage is prose and is compared as shared phrases (`prose_match`), with
+    `rarity` (inverse document frequency over the law's passages, `rarity_weights`) so
+    boilerplate counts for little; with no table every word weighs the same.
+
+    A shared-phrase match on prose is never published unless `publish_prose` is set: on the
+    AI Act the 7 links it published were all the law's own boilerplate, and no threshold
+    separates that from real copying without labels. It stays "unconfirmed" until the meaning
+    judge or the blind audit says otherwise.
     """
     amendment_change = TextChange(old=amendment.old_text or "", new=amendment.new_text)
     reading = _best_reading(ask, amendment_change)
@@ -191,18 +292,35 @@ def assess_link(
     spans = (*result.amendment_changes,)
     direction = amendment_direction(spans)
     same_direction = ask.direction == direction and direction != "unknown"
-    conflict = result.negation_conflict or _OPPOSITE.get(direction) == ask.direction
+    evidence = (
+        _prose(amendment, ask, reading.change, spans, rarity)
+        if reading.change.kind == "statement"
+        else None
+    )
+    negation = result.negation_conflict if evidence is None else evidence.negation
+    score = result.score if evidence is None else evidence.match.coverage
+    opposed = _OPPOSITE.get(direction) == ask.direction
     short_edit = sum(len(span.text.split()) for span in spans) < SHORT_EDIT_TOKENS
     eligibility = _time_eligibility(amendment, ask)
-    amendment_spans = _amendment_spans(amendment, result)
-    ask_spans = _ask_spans(ask, reading)
+    amendment_spans = (
+        _amendment_spans(amendment, result) if evidence is None else evidence.amendment_spans
+    )
+    ask_spans = _ask_spans(ask, reading) if evidence is None else evidence.ask_spans
 
     limitations: list[str] = [*result.limitations]
-    tier = (
-        None
-        if conflict
-        else _tier(result.score, short_edit=short_edit, same_direction=same_direction)
-    )
+    if evidence is None:
+        clean_tier = _tier(score, short_edit=short_edit, same_direction=same_direction)
+    else:
+        clean_tier = _prose_tier(
+            evidence.match,
+            short_edit=short_edit,
+            same_direction=same_direction,
+            min_weight=PROSE_MIN_WEIGHT if rarity is not None else 0.0,
+        )
+    # A negation cue is only a hint: it contradicts a link when the wording otherwise matches
+    # well enough to earn a tier. A weak match with a "not" nearby is just a weak match.
+    conflict = opposed or (negation and clean_tier is not None)
+    tier = None if conflict else clean_tier
     if short_edit:
         limitations.append("A short edit cannot pass the copied or reworded tier on words alone.")
     if conflict:
@@ -219,6 +337,11 @@ def assess_link(
     )
     if not quotes_valid:
         limitations.append("A quotation could not be located exactly in its source.")
+    if evidence is not None and not publish_prose:
+        limitations.append(
+            "A shared-phrase match on prose is not published: it cannot tell the law's own "
+            "wording from copying, and no prose threshold is calibrated yet."
+        )
 
     status: LinkStatus
     if conflict:
@@ -230,6 +353,7 @@ def assess_link(
         and eligibility == "ask_first"
         and amendment.old_text is not None
         and quotes_valid
+        and (evidence is None or publish_prose)
     ):
         status = "published"
     else:
@@ -242,12 +366,20 @@ def assess_link(
         ask_id=ask.ask_id,
         status=status,
         tier=tier,
-        support_score=0.0 if conflict else result.score,
+        support_score=0.0 if conflict else score,
         signals={
-            "lexical_overlap": result.score,
+            "lexical_overlap": score,
             "polarity_conflict": float(conflict),
             "same_direction": float(same_direction),
             "short_edit": float(short_edit),
+            **(
+                {}
+                if evidence is None
+                else {
+                    "longest_shared_run": float(evidence.match.longest),
+                    "shared_rarity": evidence.match.shared_weight,
+                }
+            ),
         },
         amendment_spans=amendment_spans,
         ask_spans=ask_spans if quotes_valid else (),

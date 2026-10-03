@@ -67,7 +67,9 @@ def collected(world: World) -> pipeline.Collected:
 
 
 def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path: Path) -> None:
-    view = pipeline.build_view(collected(matching_world(tmp_path)), generated_at=LATER)
+    view = pipeline.build_view(
+        collected(matching_world(tmp_path)), generated_at=LATER, publish_prose=True
+    )
 
     published = [link for link in view.bundle.links if link.status == "published"]
     assert len(published) == 1
@@ -117,7 +119,9 @@ def test_every_shown_record_is_reachable_and_every_quote_matches_its_source(
 
 
 def test_only_asks_with_a_link_they_could_have_caused_are_traced(tmp_path: Path) -> None:
-    view = pipeline.build_view(collected(matching_world(tmp_path)), generated_at=LATER)
+    view = pipeline.build_view(
+        collected(matching_world(tmp_path)), generated_at=LATER, publish_prose=True
+    )
 
     (link,) = (link for link in view.bundle.links if link.status == "published")
     stages = {(o.ask_id, o.stage): o.result for o in view.bundle.outcomes}
@@ -131,7 +135,9 @@ def test_only_asks_with_a_link_they_could_have_caused_are_traced(tmp_path: Path)
 
 
 def test_a_law_without_matches_has_an_empty_but_valid_view(tmp_path: Path) -> None:
-    view = pipeline.build_view(collected(make_world(tmp_path)), generated_at=LATER)
+    view = pipeline.build_view(
+        collected(make_world(tmp_path)), generated_at=LATER, publish_prose=True
+    )
 
     assert all(link.status != "published" for link in view.bundle.links)
     assert view.bundle.laws[0].procedure_id == AI_ACT
@@ -170,7 +176,7 @@ def test_a_graph_that_cannot_be_built_is_an_explicit_error(tmp_path: Path) -> No
     without_meps = replace(law, actors=tuple(a for a in law.actors if a.kind != "mep"))
 
     with pytest.raises(PipelineError, match="graph cannot be built"):
-        pipeline.build_view(without_meps, generated_at=LATER)
+        pipeline.build_view(without_meps, generated_at=LATER, publish_prose=True)
 
 
 # --- On disk ------------------------------------------------------------------------------
@@ -179,7 +185,9 @@ def test_a_graph_that_cannot_be_built_is_an_explicit_error(tmp_path: Path) -> No
 def test_the_view_is_written_with_the_frontend_names_and_read_back_equal(tmp_path: Path) -> None:
     world = matching_world(tmp_path)
     result = world.collect()
-    view = pipeline.build_view(pipeline.load_collected(result.bundle), generated_at=LATER)
+    view = pipeline.build_view(
+        pipeline.load_collected(result.bundle), generated_at=LATER, publish_prose=True
+    )
 
     path = pipeline.write_view(view, result.bundle)
 
@@ -244,7 +252,9 @@ def test_an_mep_missing_from_the_dump_still_has_an_identity(tmp_path: Path) -> N
 def built(tmp_path: Path) -> TestClient:
     world = matching_world(tmp_path)
     result = world.collect()
-    view = pipeline.build_view(pipeline.load_collected(result.bundle), generated_at=LATER)
+    view = pipeline.build_view(
+        pipeline.load_collected(result.bundle), generated_at=LATER, publish_prose=True
+    )
     pipeline.write_view(view, result.bundle)
     return TestClient(create_app(atlas_data_root=tmp_path))
 
@@ -301,7 +311,8 @@ def test_the_atlas_command_collects_builds_and_points_at_the_explorer(
 
     output = capsys.readouterr().out
     assert status == 0
-    assert "Atlas: 1 published, " in output
+    # The command does not publish prose matches: the match is shown as unconfirmed.
+    assert "Atlas: 0 published, 1 unconfirmed" in output
     assert f"explorer: http://localhost:3000/atlas?law={SLUG}" in output
     assert pipeline.read_view(tmp_path, SLUG) is not None
 
@@ -335,7 +346,9 @@ def test_an_amendment_too_long_to_search_is_a_labelled_gap_not_a_crash(tmp_path:
         }
     )
     view = pipeline.build_view(
-        replace(bundle, amendments=(*bundle.amendments, recital)), generated_at=LATER
+        replace(bundle, amendments=(*bundle.amendments, recital)),
+        generated_at=LATER,
+        publish_prose=True,
     )
 
     assert [link for link in view.bundle.links if link.status == "published"]
