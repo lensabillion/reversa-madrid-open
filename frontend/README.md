@@ -163,8 +163,11 @@ Chromium: the production build against the real backend serving a view that
 graph and quoted phrase rendered, a law without a view showed the 404 detail, and Back
 returned to the law. Not verified: a real law's run. The law overview and the coordinated
 amendments panel are covered by `tests/atlas-coverage.test.tsx`,
-`tests/atlas-coordinated.test.tsx` and `tests/atlas-page.test.tsx` with a mocked `fetch`
-only: they have not been opened in a browser against the real backend.
+`tests/atlas-coordinated.test.tsx` and `tests/atlas-page.test.tsx` with a mocked `fetch`.
+Checked once by hand in a browser with `next dev` against a stand-in API that served a
+synthetic view without links and the AI Act's real cluster file (269 clusters, 0.6 MB): the
+badges, modes, headline, side-by-side comparison and the no-cluster-file message rendered.
+Not verified: the real backend's two routes together in a browser.
 
 ## Atlas Components and Agent 3 Handoff
 
