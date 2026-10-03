@@ -71,3 +71,7 @@ beads, schema version, fixture paths, real commands/results and blockers at each
 Do not close consumer delivery beads merely because fixture tests pass. Open licence and
 public repository release remain the owner's D6 decision; prepare reproducible outputs
 and history/source review before that decision.
+
+Child beads of `rev-qn6b`, created 3 October: `rev-k9rm` (CLI and API, Agent 1) and
+`rev-ifao` (explorer UI, Agent 3). The shared contracts are `rev-lh4f`, PR #25. Current
+state: [agent-1-handoff.md](agent-1-handoff.md).
