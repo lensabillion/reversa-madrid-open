@@ -36,6 +36,7 @@ from influence.schemas.scoring import (
     TextChange,
     TextSpan,
 )
+from influence.services.masking import QuotedLaw
 from influence.services.passage_change import opposed_sentence, read_changes
 from influence.services.prose_match import (
     ProseMatch,
@@ -44,10 +45,10 @@ from influence.services.prose_match import (
     negation_conflict,
     words_of,
 )
-from influence.services.scoring import score_pair
+from influence.services.scoring import changed_spans, score_pair
 
 METHOD = "lexical-rules"
-METHOD_REVISION = "rules-3"
+METHOD_REVISION = "rules-4"
 # Proposed by the LobbyPlag calibration (PR #40, evaluation/link-calibration.json): the least
 # lexical score on a 0.01 grid whose precision on the development folds has a Wilson 95%
 # lower bound at or above each tier's floor; the held-out folds only check it. Copied (floor
@@ -76,7 +77,11 @@ PROSE_REWORDED_COVERAGE = 0.5
 # scoring as a full copy, but no prose labels exist to set one. Until they do, prose matches
 # are held back by `publish_prose`, not by this value.
 PROSE_MIN_WEIGHT = 0.0
+# Break words stop a shared run crossing a gap: between an amendment's separate insertions,
+# and where a proposal quotation was masked out of a passage. They differ so that a break on
+# one side can never match a break on the other.
 _BREAK = "\x00"
+_PASSAGE_BREAK = "\x01"
 DEFAULT_PUBLISHABLE: frozenset[LinkTier] = frozenset({"copied"})
 
 _STRICTER_WORDS = frozenset({"shall", "must", "required", "least", "minimum"})
@@ -142,6 +147,25 @@ def cue_mismatch(amendment: Iterable[ChangeSpan], ask: Iterable[ChangeSpan]) -> 
             }
         )
     )
+
+
+def requested_direction(text: str) -> Direction:
+    """The direction an ask's quoted instructions request, read like an amendment's change.
+
+    A quoted instruction ("replace 'may' with 'shall'") states its change, so its changed
+    words go through `amendment_direction`, the rule the calibration applied to LobbyPlag's
+    submissions (`practice/calibrate.py`, its direction features). Prose states no change:
+    counting cues over an argued passage reads "should not be required" as stricter, so
+    prose stays unknown until a reader is measured on labelled prose. An instruction past
+    the scorer's bounds is unknown too; `ask_limit_reason` reports it and it is never
+    assessed. Several instructions are read together, as an amendment's several spans are.
+    """
+    instructions = [change for change in read_changes(text) if change.kind != "statement"]
+    try:
+        changes = [TextChange(old=change.old or "", new=change.new) for change in instructions]
+    except ValidationError:
+        return "unknown"
+    return amendment_direction(span for change in changes for span in changed_spans(change))
 
 
 def _time_eligibility(amendment: Amendment, ask: Ask) -> TimeEligibility:
@@ -243,6 +267,8 @@ class _Prose:
     amendment_spans: tuple[SourceSpan, ...]
     ask_spans: tuple[SourceSpan, ...]
     negation: bool
+    # Characters of proposal quotation masked out of the passage; None when not masked.
+    masked_chars: int | None
 
 
 def _amendment_words(amendment: Amendment, spans: Iterable[ChangeSpan]) -> list[Word]:
@@ -260,15 +286,38 @@ def _amendment_words(amendment: Amendment, spans: Iterable[ChangeSpan]) -> list[
     return flat
 
 
+def _passage_words(text: str, quoted_law: QuotedLaw) -> tuple[list[Word], int]:
+    """Words outside proposal quotations, offsets in `text`, a break word at each masked gap.
+
+    Masking blanks the quotation in place, so the remaining words keep their offsets and
+    every quotation is still read from the original text. Also returns the masked length.
+    """
+    masked = quoted_law.mask(text)
+    gaps = iter(masked.spans)
+    gap = next(gaps, None)
+    flat: list[Word] = []
+    for word in words_of(masked.text):
+        while gap is not None and gap[1] <= word.start:
+            if flat:
+                flat.append(Word(_PASSAGE_BREAK, flat[-1].end, flat[-1].end))
+            gap = next(gaps, None)
+        flat.append(word)
+    return flat, sum(end - start for start, end in masked.spans)
+
+
 def _prose(
     amendment: Amendment,
     ask: Ask,
     change: PassageChange,
     spans: Iterable[ChangeSpan],
     rarity: Mapping[str, float] | None,
+    quoted_law: QuotedLaw | None,
 ) -> _Prose:
     mine = _amendment_words(amendment, spans)
-    theirs = words_of(change.new)
+    if quoted_law is None:
+        theirs, masked_chars = list(words_of(change.new)), None
+    else:
+        theirs, masked_chars = _passage_words(change.new, quoted_law)
     match = match_prose([w.text for w in mine], [w.text for w in theirs], rarity)
     shift = ask.span.start + change.start
     amendment_spans = tuple(
@@ -304,7 +353,7 @@ def _prose(
         )
         for run in match.runs
     )
-    return _Prose(match, amendment_spans, ask_spans, negation)
+    return _Prose(match, amendment_spans, ask_spans, negation, masked_chars)
 
 
 def _prose_tier(
@@ -337,6 +386,7 @@ def assess_link(
     publishable: frozenset[LinkTier] = DEFAULT_PUBLISHABLE,
     rarity: Mapping[str, float] | None = None,
     publish_prose: bool = False,
+    quoted_law: QuotedLaw | None = None,
 ) -> LinkAssessment:
     """Judge whether `ask` supports `amendment`, with signals, quotations and limitations.
 
@@ -347,7 +397,10 @@ def assess_link(
     A passage that gives a quoted instruction ("replace 'shall' with 'may'") is compared as an
     edit. Any other passage is prose and is compared as shared phrases (`prose_match`), with
     `rarity` (inverse document frequency over the law's passages, `rarity_weights`) so
-    boilerplate counts for little; with no table every word weighs the same.
+    boilerplate counts for little; with no table every word weighs the same. With
+    `quoted_law`, wording the passage quotes from the proposal (8 words or more) is masked
+    out first: an amendment may reuse the proposal's own wording, and a passage quoting the
+    proposal has not asked for it. Without it nothing is masked, and the caller says why.
 
     A shared-phrase match on prose is never published unless `publish_prose` is set: on the
     AI Act the 7 links it published were all the law's own boilerplate, and no threshold
@@ -374,7 +427,7 @@ def assess_link(
     spans = (*result.amendment_changes,)
     direction = amendment_direction(spans)
     evidence = (
-        _prose(amendment, ask, reading.change, spans, rarity)
+        _prose(amendment, ask, reading.change, spans, rarity, quoted_law)
         if reading.change.kind == "statement"
         else None
     )
@@ -460,6 +513,11 @@ def assess_link(
         )
     if conflict:
         limitations.append("The ask and the amendment pull in opposite directions.")
+    if evidence is not None and ask.direction == "unknown":
+        limitations.append(
+            "The ask is prose with no recorded direction, so the same-direction and "
+            "opposite-direction checks did not run."
+        )
     if eligibility != "ask_first":
         limitations.append("The ask is not dated before the amendment, so it cannot be an origin.")
     if amendment.old_text is None:
@@ -514,6 +572,11 @@ def assess_link(
                 else {
                     "longest_shared_run": float(evidence.match.longest),
                     "shared_rarity": evidence.match.shared_weight,
+                    **(
+                        {}
+                        if evidence.masked_chars is None
+                        else {"quoted_law_masked_chars": float(evidence.masked_chars)}
+                    ),
                 }
             ),
         },

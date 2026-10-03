@@ -6,6 +6,7 @@ a rare phrase, and a consultation submission, dated before it, that asks for tha
 
 import json
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,8 +16,8 @@ from fastapi.testclient import TestClient
 from test_collect import FEEDBACK, World, make_world, scripted_cli
 from test_collect import LATER as OTHER_LAW
 from test_collect import RECENT as RECENT_DAY
-from test_hys import as_json, feedback, feedback_page
-from test_parltrack import committee_record, mep_record, write_dump
+from test_hys import Json, as_json, feedback, feedback_page
+from test_parltrack import Record, committee_record, mep_record, write_dump
 
 from influence import cli
 from influence.api import create_app
@@ -40,7 +41,9 @@ RARE = "for at least six months after the system is placed on the market"
 LATER = datetime(2026, 10, 3, 12, 30, tzinfo=UTC)
 
 
-def matching_world(tmp_path: Path) -> World:
+def matching_world(
+    tmp_path: Path, extra_records: Sequence[Record] = (), extra_feedback: Sequence[Json] = ()
+) -> World:
     world = make_world(tmp_path)
     write_dump(
         world.inputs.committee_amendments,
@@ -55,6 +58,7 @@ def matching_world(tmp_path: Path) -> World:
             # Another law's recent amendment, as in make_world: the dump reaches past the
             # AI Act's end, so its amendment layer stays complete.
             committee_record(id="PE8-8", reference=OTHER_LAW, meps=[], date=RECENT_DAY),
+            *extra_records,
         ],
     )
     asking = feedback(
@@ -65,7 +69,7 @@ def matching_world(tmp_path: Path) -> World:
         userType="COMPANY",
         attachments=[],
     )
-    page = as_json(feedback_page([*FEEDBACK, asking], last=True))
+    page = as_json(feedback_page([*FEEDBACK, asking, *extra_feedback], last=True))
     world.scripted.script = [
         (fragment, page if fragment == hys.feedback_url(14488, 0) else response)
         for fragment, response in world.scripted.script
@@ -737,3 +741,83 @@ def test_one_invalid_view_does_not_hide_the_valid_ones(tmp_path: Path) -> None:
     assert listing.status_code == 200
     assert [law["slug"] for law in listing.json()["laws"]] == [SLUG]
     assert [entry["slug"] for entry in listing.json()["invalid"]] == ["2099-0001-COD"]
+
+
+# --- Part 4's inputs from part 3: the ask's direction and the proposal's wording -----------
+
+# Recital 1 of the proposal in `test_cellar.PROPOSAL`, which the collect world serves.
+RECITAL = "The purpose of this Regulation is to improve the functioning of the internal market"
+
+
+def _submission(feedback_id: int, text: str) -> Json:
+    return feedback(
+        feedback_id,
+        feedback=text,
+        organization=f"Lobby {feedback_id}",
+        trNumber=None,
+        userType="COMPANY",
+        attachments=[],
+    )
+
+
+def _links_for(view: pipeline.AtlasView, amendment_id: str, text: str) -> list[LinkAssessment]:
+    asks = {ask.ask_id for ask in view.bundle.asks if ask.span.text == text}
+    return [
+        link
+        for link in view.bundle.links
+        if link.amendment_id == amendment_id and link.ask_id in asks
+    ]
+
+
+def test_a_quoted_instruction_opposing_the_amendment_is_contradicted(tmp_path: Path) -> None:
+    """Asks used to carry no direction, so the opposite-direction check never ran."""
+    opposing = f"Please delete '{RARE}' from Article 12."
+    world = matching_world(tmp_path, extra_feedback=[_submission(5, opposing)])
+    law = collected(world)
+    asks = {ask.span.text: ask for ask in pipeline.asks_from_passages(law.passages)}
+    assert asks[opposing].direction == "weaker"
+    assert {ask.direction for text, ask in asks.items() if text != opposing} == {"unknown"}
+
+    view = pipeline.build_view(law, generated_at=LATER)
+    (link,) = _links_for(view, "am:2021-0106-COD:ENVI:PE7-7", opposing)
+    assert (link.status, link.tier, link.support_score) == ("contradicted", None, 0.0)
+    assert "The ask and the amendment pull in opposite directions." in link.limitations
+
+
+def test_a_submission_quoting_the_proposal_is_not_linked_to_an_amendment_reusing_it(
+    tmp_path: Path,
+) -> None:
+    quoting = f"We agree that {RECITAL.lower()}."
+    world = matching_world(
+        tmp_path,
+        extra_records=[
+            committee_record(
+                id="PE7-8",
+                seq=8,
+                old=["Providers shall keep the logs."],
+                new=[f"Providers shall keep the logs. {RECITAL}."],
+            )
+        ],
+        extra_feedback=[_submission(5, quoting)],
+    )
+    law = collected(world)
+    assert any(RECITAL in a.text for a in law.articles if a.stage == "proposal")
+    view = pipeline.build_view(law, generated_at=LATER, publish_prose=True)
+
+    assert _links_for(view, "am:2021-0106-COD:ENVI:PE7-8", quoting) == []
+    (rare,) = (link for link in view.bundle.links if link.status == "published")
+    assert rare.amendment_id == "am:2021-0106-COD:ENVI:PE7-7"
+    assert rare.signals["quoted_law_masked_chars"] == 0.0
+    assert not any("not masked" in note for note in view.limitations)
+
+
+def test_a_law_without_the_proposal_text_says_its_quotations_were_not_masked(
+    tmp_path: Path,
+) -> None:
+    law = collected(matching_world(tmp_path))
+    unproposed = replace(law, articles=tuple(a for a in law.articles if a.stage != "proposal"))
+    view = pipeline.build_view(unproposed, generated_at=LATER, publish_prose=True)
+    (note,) = (note for note in view.limitations if "not masked" in note)
+    assert note.startswith("The proposal's text is missing")
+    (rare,) = (link for link in view.bundle.links if link.status == "published")
+    assert "quoted_law_masked_chars" not in rare.signals

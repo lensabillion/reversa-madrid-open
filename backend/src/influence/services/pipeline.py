@@ -62,10 +62,12 @@ from influence.services.assessment import (
     METHOD_REVISION,
     ask_limit_reason,
     assess_link,
+    requested_direction,
 )
 from influence.services.atlas_analysis import MIN_ASSESSED_ASKS, aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.coordinated import CoordinationError, cross_group_clusters
+from influence.services.masking import QuotedLaw
 from influence.services.modes import mode_labels
 from influence.services.outcomes import trace_outcomes
 from influence.services.prose_match import rarity_weights
@@ -107,8 +109,14 @@ LIMITATIONS = (
     "in the sentence two overlapping passages share is not shown twice. For counting, asks "
     "of one actor that request the same normalised text (a feedback text and its "
     "attachment, for example) count as one ask.",
-    "Ask extraction v0 records no direction, so an ask to keep the proposal's text unchanged "
-    "is not recognised and is never judged as a defence of the status quo.",
+    "Ask extraction v0 reads a direction only from quoted instructions (\"replace 'may' "
+    "with 'shall'\"): prose asks have none, so part 4's direction checks do not run on them, "
+    "and an ask to keep the proposal's text unchanged is never judged as a defence of the "
+    "status quo.",
+)
+UNMASKED = (
+    "The proposal's text is missing, so wording that submissions quote from it was not masked "
+    "out of their shared-phrase matches."
 )
 
 
@@ -167,7 +175,11 @@ def load_collected(bundle: Path) -> Collected:
 
 
 def asks_from_passages(passages: Iterable[Passage]) -> tuple[Ask, ...]:
-    """One ask per passage, quoting the passage whole: the stand-in for ask extraction."""
+    """One ask per passage, quoting the passage whole: the stand-in for ask extraction.
+
+    The direction is read from the passage's quoted instructions (`requested_direction`),
+    so part 4 can compare it with the amendment's; a prose passage's is unknown.
+    """
     return tuple(
         Ask(
             ask_id=f"ask:{id_part(passage.passage_id)}",
@@ -178,6 +190,7 @@ def asks_from_passages(passages: Iterable[Passage]) -> tuple[Ask, ...]:
             span=passage.span,
             submitted_at=passage.submitted_at,
             language=passage.language,
+            direction=requested_direction(passage.span.text),
             extraction_method=ASK_METHOD,
         )
         for passage in passages
@@ -265,12 +278,16 @@ def assess_candidates(
     texts: Mapping[str, str],
     background: Iterable[str] = (),
     publish_prose: bool = False,
+    *,
+    quoted_law: QuotedLaw | None,
 ) -> tuple[LinkAssessment, ...]:
     """Part 4's verdict on every candidate, quoting the ask against its document's text.
 
     Word rarity is measured over the law's own passages and its provisions (`background`),
     so a phrase every submission or the Act itself uses ("placed on the market") counts for
-    little against one that only a few use.
+    little against one that only a few use. `quoted_law` is the proposal's wording, masked
+    out of prose before shared phrases are found; it is required so that a caller cannot
+    skip masking by omission, and None only when the proposal's text is missing.
     """
     rarity = rarity_weights(chain((ask.span.text for ask in asks.values()), background))
     verdicts: list[LinkAssessment] = []
@@ -284,6 +301,7 @@ def assess_candidates(
                 candidate_id=candidate.candidate_id,
                 rarity=rarity,
                 publish_prose=publish_prose,
+                quoted_law=quoted_law,
             )
         )
     return tuple(verdicts)
@@ -518,6 +536,8 @@ def _view(collected: Collected, *, generated_at: datetime, publish_prose: bool) 
     texts = {text.document_id: text.text for text in collected.document_texts}
     unsearchable: list[str] = []
     unsearchable_asks: dict[str, str] = {}
+    proposal = tuple(article.text for article in collected.articles if article.stage == "proposal")
+    quoted_law = QuotedLaw(proposal) if proposal else None
     links = assess_candidates(
         find_candidates(
             collected.amendments, asks, unsearchable, unsearchable_asks=unsearchable_asks
@@ -527,6 +547,7 @@ def _view(collected: Collected, *, generated_at: datetime, publish_prose: bool) 
         texts,
         (article.text for article in collected.articles),
         publish_prose,
+        quoted_law=quoted_law,
     )
     shown = deduplicate_links((link for link in links if link.status in SHOWN_STATUSES), asks_by_id)
     outcomes = trace(asks, amendments, shown, collected.articles)
@@ -602,6 +623,7 @@ def _view(collected: Collected, *, generated_at: datetime, publish_prose: bool) 
         rankings=rankings,
         limitations=(
             *LIMITATIONS,
+            *((UNMASKED,) if quoted_law is None else ()),
             *ranking_notes,
             *(
                 (
