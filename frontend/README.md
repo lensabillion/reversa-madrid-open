@@ -129,10 +129,26 @@ by these components. No route, lockfile, scorer or shared backend schema is chan
 Integration needs Agent 1's frozen `GraphSnapshot`, source/evidence fixtures and API
 route contract, plus Agent 2's publication decisions and outcomes (including unmatched
 asks). Agent 1 creates the separate UI integration child of `rev-qn6b`. Graph projection,
-ranking denominators, public-position enrichment, report and forecast views remain open.
+ranking calculations, public-position enrichment, report generation and real forecast
+integration remain open.
 
-Verified on 3 October 2026: 48 frontend tests, Biome, TypeScript, production build and
-package audit passed. A temporary synthetic preview was inspected at desktop width and
+Verified on 3 October 2026: 56 frontend tests, Biome, TypeScript, production build and
+package audit passed. A temporary synthetic explorer/evidence preview was inspected at desktop width and
 390-pixel mobile width; mobile content width was 390 pixels with no horizontal overflow.
 The preview route was removed. These checks verify presentation, not model accuracy,
 live data joins, any-law runtime or jury readiness.
+
+### Analysis and Report Presentation
+
+`AtlasAnalysis` renders supplied counts and findings for WHO, WHAT, TOWARDS, HOW and
+NEXT. The backend supplies row order and all counts: full wins, assessed asks, total
+observed asks, partial outcomes, not-reflected outcomes and unknowns. Full-win counts
+are shown against assessed asks; unknowns remain separate and total observed asks show
+coverage. With no assessed outcomes, a rate is unavailable. This view neither computes
+rates nor turns partial outcomes into fractional wins.
+
+Report prose requires at least one usable public citation before display; a usable URL
+does not validate its claim. The upstream report builder must supply reproducible
+queries, denominators and supporting passages. Missing findings or forecasts show
+evidence gaps. These components use synthetic tests and await a shared analysis adapter
+under `rev-1jc4`; they do not fulfill the backend rankings or public-report deliverable.
