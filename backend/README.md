@@ -59,6 +59,71 @@ INFLUENCE_DATA_DIR=/absolute/path/to/lobbyplag make dev-backend
 The local frontend origins `http://localhost:3000` and `http://127.0.0.1:3000` are allowed
 by CORS. This is a local public-data demo without authentication or deployment hardening.
 
+## Collect Command (Atlas Part 1)
+
+`influence collect <law>` turns what a person types into one law's public record, as the
+shared `atlas-1` records of `schemas/atlas.py`. It is plan gate 1 (`docs/plan.md`, §8)
+and bead `rev-pjk2`. It joins the connectors that already exist and adds no source of its
+own:
+
+| Step | Connector | Writes |
+| --- | --- | --- |
+| Resolve the query | `services/law_query.py` over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a title is unclear |
+| `texts` | `repositories/cellar.py`: identifiers by SPARQL, acts as XHTML, split into provisions | `documents`, `document_texts`, `articles` |
+| `amendments` | `repositories/parltrack.py`: committee and plenary dumps, then the MEPs who tabled them | `documents` (the dumps), `amendments`, `actors` |
+| `asks` | `repositories/hys.py` joined by COM reference only; `services/passages.py`; `services/actors.py` over `repositories/register.py` | `documents`, `document_texts`, `passages`, `actors` |
+| `law` | merges the stages | `laws.jsonl` (one `LawRecord` with ten typed coverage rows), `actors.jsonl` |
+
+From the repository root:
+
+```sh
+make collect LAW='2021/0106(COD)'
+make collect LAW='AI Act' ARGS=--no-attachments   # faster; the asks layer is then partial
+# equivalent: uv run --directory backend --locked influence collect "2021/0106(COD)"
+```
+
+**Inputs.** Five files must exist under the data root (`INFLUENCE_DATA_ROOT`, default the
+repository's `data/`, or `--data-root`); the command stops before any request, naming the
+missing ones:
+
+| File | Source |
+| --- | --- |
+| `raw/parltrack/ep_dossiers.json.zst`, `ep_amendments.json.zst`, `ep_plenary_amendments.json.zst`, `ep_meps.json.zst` | `https://parltrack.org/dumps/<name>` (ODbL) |
+| `raw/registry/register.xml` | `https://ec.europa.eu/transparencyregister/public/files/ODP/download/XML/latest` |
+
+`catalog/hys-index.jsonl` (the Have Your Say initiatives by COM reference) is optional.
+Without it the consultation is found by a title search, and the coverage row says so. No
+command builds the index or downloads the dumps yet; that is a follow-up bead.
+
+**Outputs.** Under `data/laws/<procedure slug>/`: `stages/<stage>/<input hash>/` holds each
+stage's JSON Lines files and its receipt; `runs/<run id>.json` and `manifest.json` hold the
+`RunManifest`, written last, after every output re-verifies against its hash. Downloads
+are cached under `data/cache/`.
+
+**Coverage.** `LawRecord.coverage` has one row per layer, in a fixed order: `metadata`,
+`proposal`, `parliament_position`, `final_act`, `committee_amendments`,
+`plenary_amendments`, `asks`, `actors`, `meetings`, `votes`. Each row is `complete`,
+`partial`, `missing` (the source lacks it), `not_applicable` (no final act while a
+procedure is ongoing) or `not_collected` (this run did not obtain it), with a reason and a
+count that is `null` when nothing was counted. `parliament_position`, `meetings` and
+`votes` are `not_collected` until their connectors exist.
+
+**Reruns.** A stage is reused when its inputs are unchanged: the procedure, the hash of
+every Python file of the package (`source_revision`), and the hashes of the dumps,
+register and index it read. A code edit therefore redoes the stages. `--refresh` redoes
+every stage and refetches answers the HTTP cache holds.
+
+**Stops.** Exit 1, with no manifest published, when a required file is missing or
+unreadable, the query names no procedure or several (the choices are printed), or the
+law has neither amendments nor consultation submissions. An optional source that fails
+(CELLAR, a publication the API does not serve, an attachment) becomes a labelled
+coverage gap instead.
+
+**Not verified.** The command is tested offline on a small world written in the real
+formats (`tests/test_collect.py`, 41 tests). It has not been run on real sources from the
+cloud session that wrote it, whose network policy blocks the EU hosts, so its real-data
+counts and timings are not measured yet.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
