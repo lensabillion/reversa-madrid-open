@@ -12,7 +12,10 @@ it (`lineage.json`). `influence channels <law>` collects, then counts the channe
 was lobbied through: consultation stages, timing, tabling Members and coalitions
 (`channels.json`). `influence directions <law>` collects, then counts which way the
 amendments move the law and, through the atlas view's published links, each actor's asks
-(`directions.json`). `influence submit` is the first brief's pairs command, kept until
+(`directions.json`). `influence audit sample <law>` draws a seeded blind sample of the
+view's links into two readers' sheets and a private key under `data/audit/`, and
+`influence audit score <dir>` scores the filled sheets with Wilson intervals; neither
+writes to a law's view. `influence submit` is the first brief's pairs command, kept until
 part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
 or output failure, 2 on a command-line usage error.
 """
@@ -32,10 +35,19 @@ import influence
 from influence.extraction.cache import CacheError, HttpCache
 from influence.extraction.cli import default_data_root
 from influence.extraction.fetching import CachedFetcher, UrllibFetcher
+from influence.extraction.layout import LayoutError, procedure_slug
 from influence.extraction.records import RecordError
 from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
+from influence.schemas.atlas import LinkTier
 from influence.schemas.coordinated import CoordinatedCluster, CoordinatedView
+from influence.services.audit_sheets import (
+    AuditFileError,
+    SampledStatus,
+    score_sample,
+    write_result,
+    write_sample,
+)
 from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
@@ -384,6 +396,76 @@ def _list_directions(result: CollectResult) -> int:
     return 0
 
 
+def _slug(value: str) -> str:
+    """A procedure number or a slug as the slug of the law's directory."""
+    try:
+        return procedure_slug(value)
+    except LayoutError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+
+
+def _audit_sample(
+    slug: str,
+    data_root: Path | None,
+    *,
+    size: int,
+    seed: int,
+    status: SampledStatus,
+    tier: LinkTier | None,
+) -> int:
+    root = data_root if data_root is not None else default_data_root()
+    try:
+        view = read_view(root, slug)
+        if view is None:
+            raise AuditFileError(
+                f"No atlas view at {root / 'laws' / slug}; run `make atlas` for the law first "
+                "and name it by procedure number or slug"
+            )
+        files = write_sample(view, root / "audit", size=size, seed=seed, status=status, tier=tier)
+    except (PipelineError, AuditFileError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    key = files.key
+    strata = Counter(item.stratum for item in key.items)
+    print(
+        f"Sampled {len(key.items)} of {key.population} {status} links of {key.procedure_id} "
+        f"(run {key.run_id}) with seed {seed}: "
+        + ", ".join(f"{name} {count}" for name, count in sorted(strata.items()))
+    )
+    print(key.purpose)
+    for reader in ("a", "b"):
+        print(f"reader {reader}: {(files.directory / f'reader-{reader}.csv').absolute()}")
+    print(f"key:      {(files.directory / 'key.json').absolute()}  (keep it from the readers)")
+    print("Each reader fills verdict (yes, no or unsure) and note alone; then run audit score.")
+    return 0
+
+
+def _audit_score(directory: Path) -> int:
+    try:
+        result = score_sample(directory)
+        data, summary = write_result(result, directory)
+    except (AuditFileError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    for row in (*result.strata, result.overall):
+        precision = "n/a" if row.precision is None else f"{row.precision:.3f}"
+        print(
+            f"  {row.stratum}: {row.agreed_correct} agreed correct, {row.agreed_incorrect} "
+            f"agreed incorrect, {row.disagreements} split, {row.unlabelled} unlabelled; "
+            f"precision {precision} (95% {row.low:.3f} to {row.high:.3f})"
+        )
+    if result.threshold is not None:
+        cut = result.threshold.proposed_cut
+        print(
+            "Proposed prose threshold (a proposal, not applied): "
+            + ("none reaches" if cut is None else f"{cut:.2f} is the lowest cut reaching")
+            + f" a lower bound of {result.threshold.floor:.2f}"
+        )
+    print(f"result:  {data.absolute()}")
+    print(f"summary: {summary.absolute()}")
+    return 0
+
+
 def _collect(
     query: str,
     data_root: Path | None,
@@ -497,6 +579,49 @@ def main(argv: Sequence[str] | None = None) -> int:
             action="store_true",
             help="skip submission attachments (faster; the asks layer is then partial)",
         )
+    audit = commands.add_parser(
+        "audit",
+        help="blind audit: draw two readers' sheets from a view, then score them",
+        description="Blind audit of a law's links; labels live under data/audit/ only.",
+    )
+    audits = audit.add_subparsers(dest="audit_command", required=True)
+    sample = audits.add_parser(
+        "sample",
+        help="draw a seeded stratified sample into two blind sheets and a private key",
+        description=(
+            "Read the law's atlas.json and write data/audit/<slug>/<sample id>/reader-a.csv, "
+            "reader-b.csv and key.json. The sheets carry no link ID, score, tier or status."
+        ),
+    )
+    sample.add_argument(
+        "law", type=_slug, help="procedure number or slug, for example 2021/0106(COD)"
+    )
+    sample.add_argument("--size", type=_count, default=40, help="links to draw (default 40)")
+    sample.add_argument("--seed", type=int, required=True, help="seed of the draw, recorded")
+    sample.add_argument(
+        "--status",
+        choices=("published", "unconfirmed"),
+        default="published",
+        help=(
+            "published (default, gate 7) or unconfirmed (the PROPOSED re-scope: sample held-back "
+            "prose links to propose a threshold)"
+        ),
+    )
+    sample.add_argument(
+        "--tier", choices=("copied", "reworded"), default=None, help="sample one tier only"
+    )
+    sample.add_argument(
+        "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
+    )
+    score = audits.add_parser(
+        "score",
+        help="score two filled sheets against the key: precision with Wilson intervals",
+        description=(
+            "Read reader-a.csv, reader-b.csv and key.json in DIRECTORY and write "
+            "audit-result.json and audit-summary.md beside them."
+        ),
+    )
+    score.add_argument("directory", type=Path, help="the sample directory audit sample wrote")
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -523,6 +648,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("Path | None", args.data_root),
             cast("tuple[SetupGroup, ...]", args.only),
             refresh=cast("bool", args.refresh),
+        )
+    if args.command == "audit":
+        if args.audit_command == "score":
+            return _audit_score(cast("Path", args.directory))
+        return _audit_sample(
+            cast("str", args.law),
+            cast("Path | None", args.data_root),
+            size=cast("int", args.size),
+            seed=cast("int", args.seed),
+            status=cast("SampledStatus", args.status),
+            tier=cast("LinkTier | None", args.tier),
         )
     after: dict[str, Callable[[CollectResult], int] | None] = {
         "collect": None,
