@@ -1,0 +1,16 @@
+entity_id: is-01m40f5kr88w2kqb1a95m0kr99
+timestamp: 2026-10-03T09:51:03.204Z
+field: notes
+lost_value: '"PR #22 opened with exactly three assignment Markdown files:
+  https://github.com/lensabillion/reversa-madrid-open/pull/22. Isolated branch
+  docs/agent-assignments from latest main; local links reference merged
+  architecture/design. Local link and whitespace checks passed; waiting for CI. User
+  requested Astra review of consolidated plan and assignment feasibility; read-only
+  Astra agent reviewing before final handoff."'
+winner_source: local
+loser_source: remote
+context:
+  local_version: 8
+  remote_version: 9
+  local_updated_at: 2026-10-03T09:51:00.673Z
+  remote_updated_at: 2026-10-03T09:49:49.640Z
