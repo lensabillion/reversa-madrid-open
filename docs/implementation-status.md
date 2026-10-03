@@ -99,13 +99,19 @@ with ten typed coverage rows. The manifest is published last. Details: the
 Verified offline (`measured`, cloud container, Python 3.14.7): 41 tests in
 `tests/test_collect.py` on a small world in the real source formats, covering every
 coverage status and stop; `make check-backend` passes with 636 tests and 100% branch
-coverage (3,947 statements, 994 branches). **Not verified:** a run on real sources. The
-cloud session that wrote it cannot reach the EU hosts, so the AI Act counts and the
-cached and uncached timings must be measured on a laptop: `make collect
-LAW='2021/0106(COD)'`. No command yet downloads the Parltrack dumps and the register or
-builds the Have Your Say index (follow-up bead); without the index, the consultation is
-found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
-`not_collected`.
+coverage (3,947 statements, 994 branches). First real run (`measured` by Agent 2 on
+Windows 11, PR #47, `--no-attachments`): the AI Act collected in 39.4 s uncached and
+18.5 s cached, with 4,852 committee and 808 plenary amendments, 376 proposal and 712
+final-act provisions, 437 asks and 583 actors. Not yet run: a second procedure, and a
+run with attachments. `parliament_position`, `meetings` and `votes` stay
+`not_collected`; without the Have Your Say index, the consultation is found by a
+labelled title search.
+
+Setup (bead `rev-6c1o`): `make setup` streams the four Parltrack dumps and the register
+export into `data/raw/` (atomic, with a `<name>.source.json` provenance record each) and
+builds `data/catalog/hys-index.jsonl`, so a fresh checkout needs no hand downloads.
+Tested offline (`tests/test_setup.py`) and on local files of the real sizes; not yet run
+against the real hosts ([backend README](../backend/README.md#setup-command-atlas-part-1-inputs)).
 
 ## End to End: Atlas Command, View API and Explorer Page — 3 October 2026
 
