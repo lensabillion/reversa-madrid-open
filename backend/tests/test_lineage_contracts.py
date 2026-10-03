@@ -14,6 +14,7 @@ from influence.schemas.lineage import (
     LineageCounts,
     LineageView,
     OriginMatch,
+    TabledPhrase,
 )
 
 WORDS = " ".join(f"word{i}" for i in range(MIN_ADOPTED_RUN_WORDS))
@@ -143,7 +144,7 @@ def test_references_must_resolve() -> None:
         view(adopted_phrases=(other,))
     with pytest.raises(ValidationError, match="names a phrase"):
         view(adoptions=(), origins=(origin(),), adopted_phrases=(other,))
-    with pytest.raises(ValidationError, match="no adoption"):
+    with pytest.raises(ValidationError, match="does not carry"):
         view(origins=(origin("am:2099-0001-COD:IMCO:9"),))
 
 
@@ -153,3 +154,44 @@ def test_credits_are_listed_from_most_to_least() -> None:
     semantic = credit(0.2).model_copy(update={"basis": "semantic"})
     assert view(credits=(credit(1.0), credit(0.5), semantic)).credits[-1].basis == "semantic"
     assert view(credits=()).credits == ()
+
+
+TABLED_ID = "phrase:aaaaaaaaaaaaaaaa"
+
+
+def tabled(amendment_id: str = "am:2099-0001-COD:IMCO:9") -> TabledPhrase:
+    text = WORDS.replace("word", "other")
+    return TabledPhrase(
+        phrase_id=TABLED_ID, text=text, words=len(text.split()), amendment_ids=(amendment_id,)
+    )
+
+
+def test_an_origin_can_tie_a_document_to_an_amendment_that_was_never_adopted() -> None:
+    loser = "am:2099-0001-COD:IMCO:9"
+    link = origin(loser).model_copy(update={"phrase_id": TABLED_ID})
+    resolved = view(tabled_phrases=(tabled(loser),), origins=(origin(), link))
+    assert resolved.origins[1].amendment_ids == (loser,)
+    stray = origin().model_copy(update={"phrase_id": TABLED_ID})
+    with pytest.raises(ValidationError, match="does not carry"):
+        view(tabled_phrases=(tabled(),), origins=(stray,))
+    with pytest.raises(ValidationError, match="adopted or only tabled"):
+        view(tabled_phrases=(tabled().model_copy(update={"phrase_id": PHRASE_ID}),))
+    with pytest.raises(ValidationError, match="Duplicate"):
+        view(tabled_phrases=(tabled(), tabled()))
+    with pytest.raises(ValidationError, match="number of words"):
+        TabledPhrase(phrase_id=TABLED_ID, text="a b", words=5, amendment_ids=("am:x",))
+
+
+def test_coverage_counts_cannot_link_more_than_changed() -> None:
+    fields = {
+        "amendments": 5,
+        "amendments_adopting": 2,
+        "adopted_phrases": 3,
+        "documents_read": 4,
+        "documents_with_origin": 1,
+        "changed_units": 10,
+        "linked_units": 7,
+    }
+    assert view(counts=LineageCounts.model_validate(fields)).counts.linked_units == 7
+    with pytest.raises(ValidationError, match="cannot exceed"):
+        LineageCounts.model_validate(fields | {"linked_units": 11})

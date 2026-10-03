@@ -12,7 +12,9 @@ Pieces and who produces what:
 * adoption (`services/lineage.py`): verbatim `AdoptedPhrase`, `AmendmentAdoption`, `Credit`;
 * semantic adoption (`services/lineage_semantic.py`): the same records with kind "semantic",
   for wording that was reworded, found with Qwen embeddings and judged by the meaning judge;
-* origin (`services/origin.py`): `OriginMatch`, verbatim and semantic;
+* origin (`services/origin.py`): `OriginMatch`, verbatim and semantic. Origin and adoption are
+  two independent facts: an organisation's document can be the origin of an amendment that
+  was never adopted (`TabledPhrase`), and an adopted phrase can have no known origin;
 * review (`practice/lineage_review.py`): reads a `LineageView`, never writes one;
 * assembly (`services/lineage_pipeline.py`, `influence lineage`): `LineageView`.
 
@@ -79,6 +81,25 @@ class AdoptedPhrase(FrozenModel):
         return self
 
 
+class TabledPhrase(FrozenModel):
+    """Wording that amendments insert and a document also says, whether or not it was adopted.
+
+    It lets an `OriginMatch` tie a document to an amendment that did not reach the final act.
+    Adopted wording is an `AdoptedPhrase`; a phrase is one or the other, never both.
+    """
+
+    phrase_id: PhraseId
+    text: NonEmpty
+    words: int = Field(ge=1)
+    amendment_ids: tuple[AmendmentId, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def words_count_the_text(self) -> Self:
+        if self.words != len(self.text.split()):
+            raise ValueError("`words` must equal the number of words in `text`")
+        return self
+
+
 class AmendmentAdoption(FrozenModel):
     """One amendment whose inserted wording reached the final act, verbatim or reworded.
 
@@ -91,6 +112,8 @@ class AmendmentAdoption(FrozenModel):
     committee: str | None = None
     author_ids: tuple[ActorId, ...] = ()
     author_names: tuple[str, ...] = ()
+    # The political group of each author, in the same order as `author_ids`; empty if unknown.
+    author_groups: tuple[str, ...] = ()
     tabled_on: date | None = None
     phrase_ids: tuple[PhraseId, ...] = Field(min_length=1)
     adopted_words: int = Field(ge=1)
@@ -146,11 +169,26 @@ class OriginMatch(FrozenModel):
 
 
 class LineageCounts(FrozenModel):
+    """Sizes the reader needs to judge a result against how much the law changed.
+
+    `changed_units` counts the units of wording the final act has that the proposal lacks and
+    `linked_units` those of them traced to an amendment, so coverage is linked over changed
+    and a law that barely changed says so instead of looking like a failure.
+    """
+
     amendments: int = Field(ge=0)
     amendments_adopting: int = Field(ge=0)
     adopted_phrases: int = Field(ge=0)
     documents_read: int = Field(ge=0)
     documents_with_origin: int = Field(ge=0)
+    changed_units: int = Field(default=0, ge=0)
+    linked_units: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def links_fit_inside_the_changes(self) -> Self:
+        if self.linked_units > self.changed_units:
+            raise ValueError("Linked units cannot exceed the units that changed")
+        return self
 
 
 class LineageView(FrozenModel):
@@ -167,6 +205,7 @@ class LineageView(FrozenModel):
     coverage: tuple[LayerCoverage, ...] = ()
     counts: LineageCounts
     adopted_phrases: tuple[AdoptedPhrase, ...] = ()
+    tabled_phrases: tuple[TabledPhrase, ...] = ()
     adoptions: tuple[AmendmentAdoption, ...] = ()
     origins: tuple[OriginMatch, ...] = ()
     credits: tuple[Credit, ...] = ()
@@ -174,18 +213,25 @@ class LineageView(FrozenModel):
 
     @model_validator(mode="after")
     def references_resolve(self) -> Self:
-        known = {phrase.phrase_id for phrase in self.adopted_phrases}
-        if len(known) != len(self.adopted_phrases):
+        adopted = {phrase.phrase_id for phrase in self.adopted_phrases}
+        tabled = {phrase.phrase_id for phrase in self.tabled_phrases}
+        if len(adopted) != len(self.adopted_phrases) or len(tabled) != len(self.tabled_phrases):
             raise ValueError("Duplicate phrase identifiers")
+        if adopted & tabled:
+            raise ValueError("A phrase is adopted or only tabled, not both")
+        carriers: dict[str, set[str]] = {phrase_id: set() for phrase_id in adopted | tabled}
         for adoption in self.adoptions:
-            if not set(adoption.phrase_ids) <= known:
+            if not set(adoption.phrase_ids) <= adopted:
                 raise ValueError(f"{adoption.amendment_id} names a phrase that is not listed")
+            for phrase_id in adoption.phrase_ids:
+                carriers[phrase_id].add(adoption.amendment_id)
+        for phrase in self.tabled_phrases:
+            carriers[phrase.phrase_id] |= set(phrase.amendment_ids)
         for origin in self.origins:
-            if origin.phrase_id not in known:
+            if origin.phrase_id not in carriers:
                 raise ValueError(f"{origin.document_id} names a phrase that is not listed")
-        amendments = {adoption.amendment_id for adoption in self.adoptions}
-        if any(not set(origin.amendment_ids) <= amendments for origin in self.origins):
-            raise ValueError("An origin names an amendment that has no adoption")
+            if not set(origin.amendment_ids) <= carriers[origin.phrase_id]:
+                raise ValueError("An origin names an amendment that does not carry its phrase")
         for basis in ("verbatim", "semantic"):
             scores = [credit.phrases for credit in self.credits if credit.basis == basis]
             if scores != sorted(scores, reverse=True):
@@ -203,4 +249,5 @@ __all__ = [
     "LineageCounts",
     "LineageView",
     "OriginMatch",
+    "TabledPhrase",
 ]
