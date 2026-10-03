@@ -53,6 +53,7 @@ from influence.services.pipeline import (
     build_view,
     load_collected,
     read_view,
+    remove_stale_view,
     write_view,
 )
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
@@ -206,6 +207,9 @@ def _build_view(result: CollectResult) -> int:
     except (PipelineError, RecordError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         print("The collected bundle is kept; no view was written.", file=sys.stderr)
+        # A view of an earlier collect run would otherwise be served beside this run's records.
+        if remove_stale_view(result.bundle, result.manifest.run_id):
+            print("The view of an earlier collect run was removed.", file=sys.stderr)
         return 1
     statuses = Counter(link.status for link in view.bundle.links)
     print(

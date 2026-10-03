@@ -161,11 +161,10 @@ def test_rankings_count_every_ask_not_only_the_shown_ones(tmp_path: Path) -> Non
     assert (lobby.observed_asks, lobby.not_observed, lobby.unknown) == (2, 0, 2)
     notes = view.limitations[len(pipeline.LIMITATIONS) :]
     assert notes[0] == "Final-act outcome counts cover all 5 ask(s): 0 assessed and 5 unknown."
-    # The analysis's coverage gaps reach the view instead of being dropped.
-    assert notes[1] == (
-        f"Final-act counts may be incomplete: {AI_ACT}: ask inventory mismatch: "
-        "coverage reports 4, supplied 5 canonical asks"
-    )
+    assert notes[1].startswith("Actors with fewer than 3 assessed asks are listed after")
+    # Regression: the asks layer counts feedback items (4) and passage-v0 asks are passages
+    # (5), so comparing them reported an "ask inventory mismatch" on every real law.
+    assert not any("ask inventory mismatch" in note for note in view.limitations)
     assert not any(note.startswith(("heard: ", "parliament_position: ")) for note in notes)
 
 
@@ -389,7 +388,7 @@ def test_the_api_lists_built_laws_and_serves_a_view(tmp_path: Path) -> None:
 def test_the_api_answers_unknown_malformed_and_broken_views(tmp_path: Path) -> None:
     client = TestClient(create_app(atlas_data_root=tmp_path))
 
-    assert client.get("/api/v1/atlas").json() == {"laws": []}
+    assert client.get("/api/v1/atlas").json() == {"laws": [], "invalid": []}
     missing = client.get("/api/v1/atlas/2099-0001-COD")
     assert missing.status_code == 404
     assert "make atlas" in missing.json()["detail"]
@@ -397,7 +396,13 @@ def test_the_api_answers_unknown_malformed_and_broken_views(tmp_path: Path) -> N
     (tmp_path / "laws" / SLUG).mkdir(parents=True)
     (tmp_path / "laws" / SLUG / pipeline.VIEW_FILE).write_text("{}")
     assert client.get(f"/api/v1/atlas/{SLUG}").status_code == 500
-    assert client.get("/api/v1/atlas").status_code == 500
+    # Regression: one invalid view made the list a 500 for every law. It is listed apart.
+    listing = client.get("/api/v1/atlas")
+    assert listing.status_code == 200
+    assert listing.json()["laws"] == []
+    (invalid,) = listing.json()["invalid"]
+    assert invalid["slug"] == SLUG
+    assert "is invalid" in invalid["reason"]
 
 
 # --- The command ----------------------------------------------------------------------------
@@ -511,3 +516,219 @@ def test_dot_leader_ask_is_excluded_before_retrieval_and_reported(tmp_path: Path
     assert unsupported.model_dump_json() == original
     assert original_document.text[unsupported.span.start : unsupported.span.end] == dotted
     assert len(with_unsupported.passages) == len(bundle.passages) + 1
+
+
+# --- Review fixes: counting, duplicates, stale and broken views ----------------------------
+
+
+def with_final_wording(law: pipeline.Collected) -> pipeline.Collected:
+    """The matching world plus a final-act provision that holds the asked-for wording."""
+    final = next(article for article in law.articles if article.stage == "final_act")
+    extra = final.model_copy(
+        update={
+            "article_id": "art:32024R1689:article-99-1",
+            "provision": "Article 99(1)",
+            "kind": "paragraph",
+            "text": f"Providers shall keep the logs {RARE}.",
+        }
+    )
+    return replace(law, articles=(*law.articles, extra))
+
+
+def test_an_unconfirmed_link_never_counts_a_win_in_the_rankings(tmp_path: Path) -> None:
+    """Regression (review e2e): an unconfirmed link ranked "Acme 1 of 1" with no graph edge."""
+    view = pipeline.build_view(
+        with_final_wording(collected(matching_world(tmp_path))), generated_at=LATER
+    )
+
+    (link,) = view.bundle.links
+    assert link.status == "unconfirmed"
+    # The audit view keeps the outcome traced through the unconfirmed link ...
+    finals = {o.result for o in view.bundle.outcomes if o.stage == "final_act"}
+    assert finals == {"full"}
+    # ... but the rankings never count it: the ask is unknown there.
+    (lobby,) = (row for row in view.rankings if row.actor_name == "Acme Unknown Lobby")
+    assert (lobby.assessed_asks, lobby.full, lobby.unknown) == (0, 0, 2)
+    assert all(row.assessed_asks == 0 for row in view.rankings)
+    assert (
+        "1 ask(s) have only unconfirmed links and count as unknown in the rankings until a "
+        "link is published."
+    ) in view.limitations
+    published = pipeline.build_view(
+        with_final_wording(collected(matching_world(tmp_path / "published"))),
+        generated_at=LATER,
+        publish_prose=True,
+    )
+    (lobby,) = (row for row in published.rankings if row.actor_name == "Acme Unknown Lobby")
+    assert (lobby.assessed_asks, lobby.full) == (1, 1)
+    assert not any("only unconfirmed links" in note for note in published.limitations)
+
+
+def _published(ask_id: str, amendment_id: str, when: str, score: float = 0.5) -> LinkAssessment:
+    return LinkAssessment.model_validate(
+        {
+            "link_id": f"link:{id_part(amendment_id)}:{id_part(ask_id)}",
+            "procedure_id": AI_ACT,
+            "amendment_id": amendment_id,
+            "ask_id": ask_id,
+            "status": "published",
+            "tier": "copied",
+            "support_score": score,
+            "time_eligibility": when,
+            "method": "m",
+            "method_revision": "r",
+            "amendment_spans": [{"record_id": amendment_id, "start": 0, "end": 1, "text": "x"}],
+            "ask_spans": [{"record_id": "doc:x:1", "start": 0, "end": 1, "text": "x"}],
+        }
+    )
+
+
+def test_ranked_outcomes_keep_only_asks_with_a_published_link(tmp_path: Path) -> None:
+    law = collected(matching_world(tmp_path))
+    first, second = pipeline.asks_from_passages(law.passages)[:2]
+    early, late = law.amendments[0].amendment_id, law.amendments[-1].amendment_id
+    amendments = {amendment.amendment_id: amendment for amendment in law.amendments}
+    links = (
+        # The first ask's published link wins its origin over a stronger unconfirmed one.
+        _published(first.ask_id, early, "ask_first", score=0.2),
+        _link(first.ask_id, late, 0.9, "ask_first"),
+        _link(second.ask_id, early, 0.9, "ask_first"),
+    )
+    shown = pipeline.trace((first, second), amendments, links, law.articles)
+
+    ranked = pipeline.ranked_outcomes(links, shown)
+
+    assert {o.ask_id for o in shown} == {first.ask_id, second.ask_id}
+    assert ranked == tuple(o for o in shown if o.ask_id == first.ask_id)
+    assert {o.link_id for o in ranked if o.link_id is not None} == {links[0].link_id}
+
+
+def test_one_instruction_quoted_from_overlapping_passages_is_one_link(tmp_path: Path) -> None:
+    """Regression: passages share a sentence, so one instruction was published twice."""
+    law = collected(matching_world(tmp_path))
+    first = pipeline.asks_from_passages(law.passages)[0]
+    twin = first.model_copy(update={"ask_id": "ask:twin"})
+    amendment = law.amendments[0].amendment_id
+    strong = _published(first.ask_id, amendment, "ask_first", score=0.9)
+    weak = _published(twin.ask_id, amendment, "ask_first", score=0.6)
+    unquoted = _link(twin.ask_id, law.amendments[-1].amendment_id, 0.3, "ask_first")
+    asks = {first.ask_id: first, twin.ask_id: twin}
+
+    assert pipeline.deduplicate_links((weak, unquoted, strong), asks) == (unquoted, strong)
+    other_actor = twin.model_copy(update={"actor_id": "actor:name:hys.other"})
+    assert pipeline.deduplicate_links((weak, strong), {**asks, twin.ask_id: other_actor}) == (
+        weak,
+        strong,
+    )
+
+
+def test_one_actor_asking_for_the_same_text_twice_counts_once(tmp_path: Path) -> None:
+    """Regression: a feedback text and its attachment were two asks in the rankings."""
+    law = collected(matching_world(tmp_path))
+    first, other = pipeline.asks_from_passages(law.passages)[:2]
+    attachment = first.model_copy(
+        update={
+            "ask_id": "ask:zz-attachment",
+            "document_id": "doc:hys_attachment:1",
+            "span": first.span.model_copy(
+                update={"record_id": "doc:hys_attachment:1", "text": f"  {first.span.text.upper()}"}
+            ),
+        }
+    )
+    amendment = law.amendments[0]
+    link = _published(attachment.ask_id, amendment.amendment_id, "ask_first")
+    traced = pipeline.trace(
+        (attachment,), {amendment.amendment_id: amendment}, (link,), law.articles
+    )
+    asked = (first, other, attachment)
+
+    asks, outcomes = pipeline.counted_asks(asked, (), traced)
+
+    # The repeat with an outcome is the one kept, so its assessed outcome is not hidden.
+    assert [ask.ask_id for ask in asks] == [other.ask_id, attachment.ask_id]
+    assert outcomes == traced
+    alone, _ = pipeline.counted_asks(asked, (), ())
+    assert [ask.ask_id for ask in alone] == [first.ask_id, other.ask_id]
+    # Two asks whose published origins quote the same words are one request too.
+    quoted = (_published(first.ask_id, amendment.amendment_id, "ask_first"), link)
+    both, _ = pipeline.counted_asks(asked, quoted, ())
+    assert [ask.ask_id for ask in both] == [first.ask_id, other.ask_id]
+
+
+def test_an_amendment_changing_only_case_is_reported_unsearchable(tmp_path: Path) -> None:
+    """Regression: a case-only change gave an empty query, no candidates and no notice."""
+    law = collected(matching_world(tmp_path))
+    recased = law.amendments[0].model_copy(
+        update={
+            "old_text": "Providers shall keep the logs.",
+            "new_text": "PROVIDERS shall keep the LOGS.",
+        }
+    )
+    asks = pipeline.asks_from_passages(law.passages)
+    unsearchable: list[str] = []
+
+    assert pipeline.find_candidates([recased], asks, unsearchable) == ()
+    assert unsearchable == [recased.amendment_id]
+    assert pipeline.find_candidates([recased], asks) == ()
+
+
+def test_records_that_do_not_fit_are_a_pipeline_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: a ValueError (validation, conflicting outcomes) escaped as a traceback."""
+    law = collected(matching_world(tmp_path))
+
+    def conflicting(**_: object) -> None:
+        raise ValueError("Conflicting outcomes for ask x")
+
+    monkeypatch.setattr(pipeline, "aggregate_outcomes", conflicting)
+    with pytest.raises(PipelineError, match="cannot be built from this run: Conflicting"):
+        pipeline.build_view(law, generated_at=LATER)
+
+
+def test_a_failed_build_after_a_new_collect_run_removes_the_stale_view(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Regression: the old view stayed and was served beside the newer run's records."""
+    scripted_cli(monkeypatch, matching_world(tmp_path))
+    assert cli.main(["atlas", AI_ACT, "--data-root", str(tmp_path)]) == 0
+    capsys.readouterr()
+    view_path = tmp_path / "laws" / SLUG / pipeline.VIEW_FILE
+
+    def broken(_collected: pipeline.Collected, *, generated_at: datetime) -> pipeline.AtlasView:
+        raise PipelineError(f"no view at {generated_at:%H}")
+
+    monkeypatch.setattr(cli, "build_view", broken)
+    assert cli.main(["atlas", AI_ACT, "--data-root", str(tmp_path)]) == 1
+
+    assert "The view of an earlier collect run was removed." in capsys.readouterr().err
+    assert not view_path.exists()
+    assert StageStore(view_path.parent).current() is not None
+
+
+def test_only_a_view_of_another_run_or_an_unreadable_one_is_removed(tmp_path: Path) -> None:
+    result = matching_world(tmp_path).collect()
+    view = pipeline.build_view(pipeline.load_collected(result.bundle), generated_at=LATER)
+    run_id = result.manifest.run_id
+
+    assert not pipeline.remove_stale_view(result.bundle, run_id)
+    pipeline.write_view(view, result.bundle)
+    assert not pipeline.remove_stale_view(result.bundle, run_id)
+    assert (result.bundle / pipeline.VIEW_FILE).is_file()
+    assert pipeline.remove_stale_view(result.bundle, "run:newer")
+    (result.bundle / pipeline.VIEW_FILE).write_text("{}")
+    assert pipeline.remove_stale_view(result.bundle, run_id)
+    assert not (result.bundle / pipeline.VIEW_FILE).exists()
+
+
+def test_one_invalid_view_does_not_hide_the_valid_ones(tmp_path: Path) -> None:
+    client = built(tmp_path)
+    broken = tmp_path / "laws" / "2099-0001-COD"
+    broken.mkdir()
+    (broken / pipeline.VIEW_FILE).write_text("{}")
+
+    listing = client.get("/api/v1/atlas")
+
+    assert listing.status_code == 200
+    assert [law["slug"] for law in listing.json()["laws"]] == [SLUG]
+    assert [entry["slug"] for entry in listing.json()["invalid"]] == ["2099-0001-COD"]

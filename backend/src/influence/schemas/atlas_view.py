@@ -103,5 +103,13 @@ class AtlasLawSummary(FrozenModel):
     cross_group_clusters: int | None = Field(default=None, ge=0)
 
 
+class InvalidAtlasView(FrozenModel):
+    """A law directory whose view cannot be read, listed so one broken law hides no other."""
+
+    slug: NonEmpty
+    reason: NonEmpty
+
+
 class AtlasLawList(FrozenModel):
     laws: tuple[AtlasLawSummary, ...]
+    invalid: tuple[InvalidAtlasView, ...] = ()

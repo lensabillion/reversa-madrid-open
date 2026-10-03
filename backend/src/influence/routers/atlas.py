@@ -23,10 +23,8 @@ DataRoot = Annotated[Path, Depends(get_atlas_data_root)]
 
 @router.get("/atlas")
 def laws(data_root: DataRoot) -> AtlasLawList:
-    try:
-        return list_views(data_root)
-    except (PipelineError, CoordinationError) as error:
-        raise HTTPException(status_code=500, detail=str(error)) from error
+    """Every readable view; an unreadable one is listed under `invalid`, never a 500."""
+    return list_views(data_root)
 
 
 @router.get("/atlas/{slug}")

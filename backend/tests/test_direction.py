@@ -355,7 +355,7 @@ def test_actor_directions_come_only_from_published_links(tmp_path: Path) -> None
         }
     )
 
-    view = direction.build_directions(law(), "run-2", [], (), atlas, generated_at=LATER)
+    view = direction.build_directions(law(), atlas.run_id, [], (), atlas, generated_at=LATER)
 
     assert (view.actors_status, view.actors_reason, view.atlas_run_id) == (
         "from_published_links",
@@ -394,7 +394,7 @@ def test_a_joint_ask_counts_once_for_each_actor_and_an_unnamed_actor_keeps_its_i
     )
     atlas = atlas.model_copy(update={"bundle": atlas.bundle.model_copy(update={"asks": asks})})
 
-    view = direction.build_directions(law(), "run-2", [], (), atlas, generated_at=LATER)
+    view = direction.build_directions(law(), atlas.run_id, [], (), atlas, generated_at=LATER)
 
     lead = next(ask.actor_id for ask in asks if ask.ask_id == link.ask_id)
     # Ties on links are ordered by actor ID.
@@ -412,7 +412,7 @@ def test_a_view_without_published_links_gives_no_actor_directions(tmp_path: Path
     links = tuple(link.model_copy(update={"status": "unconfirmed"}) for link in atlas.bundle.links)
     atlas = atlas.model_copy(update={"bundle": atlas.bundle.model_copy(update={"links": links})})
 
-    view = direction.build_directions(law(), "run-2", [], (), atlas, generated_at=LATER)
+    view = direction.build_directions(law(), atlas.run_id, [], (), atlas, generated_at=LATER)
 
     assert (view.actors_status, view.actors) == ("no_published_links", ())
     assert view.actors_reason is not None
@@ -424,7 +424,29 @@ def test_a_published_link_to_a_record_the_view_lacks_is_an_error(tmp_path: Path)
     atlas = atlas.model_copy(update={"bundle": atlas.bundle.model_copy(update={"asks": ()})})
 
     with pytest.raises(PipelineError, match="its bundle lacks"):
-        direction.build_directions(law(), "run-2", [], (), atlas, generated_at=LATER)
+        direction.build_directions(law(), atlas.run_id, [], (), atlas, generated_at=LATER)
+
+
+def test_a_view_of_another_run_is_used_only_while_its_amendments_are_unchanged(
+    tmp_path: Path,
+) -> None:
+    """Regression: a view of an older run once mixed its links with newer amendments."""
+    atlas = published_view(tmp_path)
+    same = atlas.bundle.amendments
+
+    fresh = direction.build_directions(law(), "run-new", same, (), atlas, generated_at=LATER)
+    changed = tuple(a.model_copy(update={"new_text": "Something else."}) for a in same)
+    stale = direction.build_directions(law(), "run-new", changed, (), atlas, generated_at=LATER)
+
+    assert fresh.actors_status == "from_published_links"
+    assert (stale.actors_status, stale.actors, stale.atlas_run_id) == (
+        "stale_atlas_view",
+        (),
+        atlas.run_id,
+    )
+    assert stale.actors_reason is not None
+    assert "run-new" in stale.actors_reason
+    assert "have changed since" in stale.actors_reason
 
 
 def test_the_view_round_trips_through_its_file(tmp_path: Path) -> None:

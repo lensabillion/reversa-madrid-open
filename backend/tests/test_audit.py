@@ -85,8 +85,20 @@ def test_sample_is_spread_over_law_and_tier_in_proportion() -> None:
         for link in sample
     }
     assert sum(counts.values()) == 10
-    assert counts[("2099/0001(COD)", "copied")] == 9
+    # Regression: the one link of the second law had an exact share of 0.1 and got no seat,
+    # so a weak stratum could hide. It now takes one from the stratum most over its share.
+    assert counts[("2099/0001(COD)", "copied")] == 8
     assert counts[("2099/0001(COD)", "reworded")] == 1
+    assert counts[("2099/0002(COD)", "copied")] == 1
+
+
+def test_every_stratum_has_a_seat_even_when_seats_are_fewer_than_strata() -> None:
+    links = [_link(f"l{i}", law=f"2099/{i:04d}(COD)") for i in range(1, 6)] + [
+        _link(f"x{i}") for i in range(20)
+    ]
+    sample = draw_sample(links, 3, seed=4)
+    assert len(sample) == 5
+    assert len({link.procedure_id for link in sample}) == 5
 
 
 def test_a_short_pool_is_returned_whole() -> None:
@@ -99,7 +111,7 @@ def _labels(**verdicts: dict[str, Verdict]) -> dict[str, dict[str, Verdict]]:
     return {f"link:{key}": value for key, value in verdicts.items()}
 
 
-def test_precision_counts_only_links_both_readers_agree_on() -> None:
+def test_a_split_verdict_counts_as_incorrect_in_the_headline_precision() -> None:
     sample = [_link(key) for key in "abcde"] + [_link("f", tier="reworded")]
     labels = _labels(
         a={"r1": "correct", "r2": "correct"},
@@ -111,14 +123,17 @@ def test_precision_counts_only_links_both_readers_agree_on() -> None:
     report = summarise(sample, labels)
     assert (report.sampled, report.resolved, report.correct) == (6, 3, 2)
     assert (report.unresolved, report.unlabelled) == (1, 2)
-    assert report.precision == pytest.approx(2 / 3)
-    assert (report.low, report.high) == wilson_interval(2, 3)
+    # Regression: the split link was dropped from the denominator, biasing precision up.
+    assert report.precision == pytest.approx(2 / 4)
+    assert (report.low, report.high) == wilson_interval(2, 4)
+    assert report.agreed_precision == pytest.approx(2 / 3)
     assert report.by_tier == {"copied": (2, 3)}
 
 
 def test_an_audit_with_no_resolved_links_has_no_precision() -> None:
     report = summarise([_link("a")], {})
     assert report.precision is None
+    assert report.agreed_precision is None
     assert (report.low, report.high) == (0.0, 1.0)
     assert report.unlabelled == 1
 

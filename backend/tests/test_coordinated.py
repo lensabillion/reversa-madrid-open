@@ -521,6 +521,12 @@ def test_the_api_answers_unknown_malformed_and_broken_clusters(
     broken = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
     assert broken.status_code == 500
     assert "are invalid" in broken.json()["detail"]
-    # The list counts clusters from the same file, so it refuses a broken one too.
-    assert client.get("/api/v1/atlas").status_code == 500
+    # A broken cluster file leaves the law listed with an unknown count, and says why.
+    listing = client.get("/api/v1/atlas")
+    assert listing.status_code == 200
+    (listed,) = listing.json()["laws"]
+    assert (listed["slug"], listed["cross_group_clusters"]) == (SLUG, None)
+    (invalid,) = listing.json()["invalid"]
+    assert invalid["slug"] == SLUG
+    assert "are invalid" in invalid["reason"]
     assert client.get(f"/api/v1/atlas/{SLUG}").status_code == 200
