@@ -240,6 +240,100 @@ must not automatically become negative training labels. No trained model or exte
 model call is hidden behind this demo's score. Adoption prediction needs its own target,
 time cutoff, labels and evaluation, tracked separately in tbd.
 
+## Extraction Pipeline Foundations
+
+The demo above reads one downloaded snapshot. The competition demo has to answer for a
+law the jury names on stage, which means fetching EU public sources during the event.
+`influence.extraction` is the layer that does the fetching and the on-disk bookkeeping.
+Its design comes from the
+[data extraction playbook](../docs/explainer/Influence%20Atlas%20%E2%80%94%20Data%20Extraction%20Playbook.pdf);
+the five rules in that document are restated in `src/influence/extraction/__init__.py`
+and every module here obeys them.
+
+**What a source is.** A source is one public dataset or site: the EU Transparency
+Register, the Commission's published lobby meetings, the European Parliament's open data
+API, EUR-Lex, and so on. `catalog.py` lists all thirteen (A to M) with, for each, its
+scope (fetched once, per law, or optional enrichment), what it feeds, and its
+verification status. Verification status is part of the contract: `confirmed` means the
+provider documents it, `third_party` means a community tool reaches it, `unverified`
+means nobody has checked, and `build_yourself` means no feed exists.
+
+**No URL in the catalog has yet been confirmed by a live request from this repository.**
+That is why there are no parsers in this layer: a parser written against an imagined
+response shape is worse than no parser. `probe` records what each base URL actually
+returns, and parsers are written from those recordings.
+
+```sh
+# List the catalog; nothing is fetched.
+uv run --directory backend --locked python -m influence.extraction sources
+
+# Fetch every base URL in a scope and record status, content type and a 200-character
+# sniff of each response. Exits non-zero if any source is unreachable.
+uv run --directory backend --locked python -m influence.extraction probe --scope global
+
+# Fetch one URL and keep the untouched bytes plus a provenance file under its source.
+uv run --directory backend --locked python -m influence.extraction \
+  fetch A https://example.europa.eu/register.xml --name register.xml
+```
+
+Data goes under the repository's `data/` directory, which Git ignores. Set
+`INFLUENCE_DATA_ROOT` or pass `--data-root` to put it elsewhere. The layout, enforced by
+`layout.py`, keeps global sources apart from per-law directories so adding a law never
+touches another law's files:
+
+```
+data/
+  cache/                     # every HTTP response, keyed by SHA-256 of method, URL, body
+  raw/
+    registry/ meetings_ec/ meetings_mep/ ep_opendata/ probe/
+    laws/<procedure-slug>/   # 2021/0106(COD) becomes 2021-0106-COD
+      manifest.json
+  parsed/                    # one file per table below
+```
+
+**The cache is not an optimisation.** A second identical request never leaves the
+machine, so a parser can be re-run at 17:00 without re-downloading 400 PDFs, and a rate
+limit plus a User-Agent carrying a contact address keeps the team from being blocked
+mid-event. `fetching.py` is the only module that touches the network: two requests per
+second, standard library only, and a non-2xx response raises instead of being cached, so
+a source that returns 503 at 10:00 and works at 11:00 is not remembered as broken.
+
+**The manifest is how a law enters the pipeline.** One procedure identifier resolves
+into `manifest.json`, which lists the derived CELEX numbers, the lead committee, the
+rapporteurs, the consultation identifier, the document URLs, and an `available` block.
+Nothing downstream carries a hardcoded identifier, and the `available` block is the
+fail-soft switch: a law with no public consultation still produces a graph from
+amendments alone, and the coverage report can say what was missing rather than leaving a
+silent hole.
+
+**The six parsed tables** are defined in `tables.py` as typed row models: `actors`,
+`meetings`, `asks`, `amendments`, `articles` and `links`. Three choices in them matter.
+An `asks` row is one text chunk from one submission, not one submission, because a
+position paper carries thirty distinct asks and matching a whole PDF is worthless. Every
+row carries `source_url`, `fetched_at` and `extraction_method`, because the jury picks
+edges at random and asks to see the original. And rows reject undeclared fields, so a
+parser cannot quietly invent a column.
+
+Rows are stored as JSON Lines rather than CSV, because legal text contains every
+delimiter, and rather than Parquet, because Parquet needs a new dependency (pyarrow)
+that the supply-chain policy has not cleared. The row models are the contract, so
+changing the container later changes no parser.
+
+**Entity resolution** (`names.py`) is the join nothing else can do. Only the register and
+the Commission's meetings carry a registration identifier; MEP meetings and consultation
+submissions carry free text, and roughly half of MEP entries do not use the register's
+official name, so a join on name alone looks right and is wrong. `ActorIndex.resolve`
+tries four layers in order — registration identifier, normalised exact name, acronym,
+then fuzzy token-set similarity above 0.90 — and records which layer fired and with what
+score. Two outcomes are deliberately not matches: `ambiguous`, when several registered
+organisations fit equally (one parent with twelve national entries), and `unresolved`,
+below the threshold. A visible unresolved count is more defensible than a silently wrong
+join, and the jury can ask about it.
+
+Not in this layer yet: response parsers for any source, the proposal-to-final-act diff,
+amendment PDF parsing, candidate link scoring, and the per-law coverage report. They are
+the next work, and each needs a probed response shape first.
+
 ## Verification
 
 Run `make check-backend` for locked dependencies, Ruff, strict basedpyright, unit/API

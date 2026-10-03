@@ -70,3 +70,6 @@ and route contract requests. Rehearse three random published links with Agent 2'
 and a five-minute presentation once real records arrive. Report uncovered questions or
 missing statement/forecast evidence candidly. Each handoff includes branch/PR, bead IDs,
 commands/results, schema revision, fixture versus real-data status and blockers.
+
+UI child bead of `rev-qn6b`, created 3 October: `rev-ifao`. Claim it, not the parent.
+Contracts and fixtures: PR #25, branch `feat/atlas-contracts`, commit `f1525db`.
