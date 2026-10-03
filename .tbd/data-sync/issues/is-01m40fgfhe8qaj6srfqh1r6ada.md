@@ -5,7 +5,7 @@ title: "Part 6 · Atlas graph: actor -> ask -> amendment -> final article, plus 
 kind: feature
 status: in_progress
 priority: 0
-version: 11
+version: 12
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -22,11 +22,11 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-03T08:53:51.277Z
-updated_at: 2026-10-03T10:41:36.237Z
+updated_at: 2026-10-03T11:06:39.579Z
 started_at: 2026-10-03T10:00:59.971Z
 ---
 Atlas part 6. Built only from part 4's published links and part 5's outcomes, never from LobbyPlag labels. Store as plain files (JSONL/Parquet) per law plus one merged index; each edge carries its evidence record id. Serves the explorer, rankings and report. NetworkX for analysis; no graph database unless measured need.
 
 ## Notes
 
-Implementation started against merged atlas-1 at c5365dc. Backend isolated worktree atlas-calculations branch feat/atlas-graph-analysis; graph subagent owns services/atlas_graph.py and test, rankings subagent owns services/atlas_analysis.py and test under rev-5yy6. Parent owns integration/docs/gates. UI feat/atlas-explorer merged main and adapter subagent consumes shared fixtures. Services have no HTTP/dependencies/shared-schema changes. Need deterministic joins/exact spans/publication boundary; per actor-stage distinct asks, including unmatched requests; assessed denominator excludes unknown; same-result repeated outcomes count once; conflicting classifications error. Procedure year is canonical procedure-reference year in both backend and UI. Real collection/scoring integration remains pending Agent1/2.
+Agent 3 graph consumer implemented against merged atlas-1 in isolated atlas-calculations worktree, branch feat/atlas-graph-analysis. PR https://github.com/lensabillion/reversa-madrid-open/pull/28 at cac0f29; all 9 CI checks passed. Pure services/atlas_graph.py preserves published actor/request/amendment paths and supported final outcomes, exact quotes, chronology, joint attribution, coverage and deterministic IDs. Rejects conflicting IDs/results and invalid published joins; audit candidates cannot become public paths. Synthetic fixture only: 11 nodes, 9 edges, 2 published origin links and 1 final realization. make check passed: 274 backend tests, 100% coverage (1563 statements/390 branches), 37 frontend tests/build, 6/6 catalogs, both audits clean. No shared schema/API/CLI/dependency changes. Real Agent1/2 pipeline and UI integration remain pending; do not close broader graph work from fixture success. Parent owns integration and frontend branch.
