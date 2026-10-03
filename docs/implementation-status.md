@@ -24,6 +24,7 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 | LobbyPlag browsing and historical graph | All 4,867 amendment detail/graph records rehearsed; 1,957 unique candidate links, 172 verified | Historical verification is separate from computed similarity; unverified links are not negative labels |
 | PDF/text ingestion | 16-page organizers' PDF yields 10,569 characters; byte, page, text and expansion limits tested | No OCR, column reconstruction, automatic passage selection or hard parser process isolation |
 | Supplied-text comparison | Known originals select edit overlap; unknown originals select whole-passage overlap; explicit validation and Unicode evidence offsets | English lexical baseline, 12,000 characters and 800 tokens per supplied text; passage overlap can reward boilerplate |
+| Extraction foundations (data layout, HTTP cache, rate-limited fetcher, per-law manifest, six typed tables, entity resolution, source catalog, probe/fetch CLI) | `make check-backend`: 174 backend tests, 100% branch coverage (986 statements, 182 branches) | No response parser for any source: no catalog URL has been hit by a live request from this repository, and parsers wait on probed shapes. No proposal-to-final diff, no amendment PDF parsing, no coverage report |
 | Backend ingestion gate | `make check`: 106 backend tests, 100% coverage (475 statements, 104 branches); baseline frontend 19 tests; both audits clean | Tests establish behavior, not predictive accuracy |
 
 The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
@@ -68,6 +69,8 @@ Open decisions are not settled until the project owner agrees.
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
+| Parsed tables are JSON Lines, not Parquet | Decided 2026-10-03 | The playbook asks for Parquet; pyarrow is a new dependency the 14-day cool-off and `no-build` policy have not cleared, and JSON Lines is equally safe against delimiters in legal text. The typed row models in `backend/src/influence/extraction/tables.py` are the contract, so the container can change without touching a parser |
+| Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D1: language-model judge (none, Jev, Claude or a local model) | **Open** | Explainer §12–13; no API keys on the machine |
 | D3: the earlier prototype in `attic/` | **Open**; not an implementation source | Explainer §10 and §13 |
 | D4: team split | **Open** | Explainer §13 |
@@ -99,6 +102,13 @@ quotations, report failures and truncation, and time a complete 60-pair run on a
 hardware; under ten minutes is a proposed target, not a measurement. Fine-tuning and
 probability calibration require adequate independent labels. Adoption remains a separate
 target with separate labels and AUC evaluation.
+
+Extraction has foundations but no parsers. The order the playbook sets, and the order to
+keep: probe every catalog URL and record the real response shapes, resolve one procedure
+identifier into a manifest, split the proposal and final act into units and diff them,
+chunk consultation submissions into one ask per passage, parse committee amendment PDFs,
+then write the per-law coverage report. Nothing in that sequence should be written before
+the step it depends on has a recorded response shape. Create a bead per step.
 
 1. `rev-p2rd`: establish practice labels with provenance and lobbyist-grouped folds;
    compare lexical and pretrained semantic candidates using top-20 precision and recall.
