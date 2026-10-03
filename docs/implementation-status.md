@@ -493,6 +493,49 @@ the source fingerprint and assessor/pipeline/matcher hashes were captured before
 Artifacts remain under ignored `data/laws/2021-0106-COD/`; earlier view/audit artifacts
 are preserved separately under `gate3-runs/rules-2-0741e0e3d9fb/`.
 
+## Part 4 Inputs: Ask Direction and Proposal Masking (`rules-4`) — 3 October 2026
+
+Two inputs part 4's rules were written for never reached them on the live atlas path
+(`rev-jesy`, `rev-805l`). Asks carried no direction, so the same-direction tier and the
+opposite-direction contradiction never ran. `services/masking.py` existed, but only
+`services/calculation.py` called it (it is off the live path), so prose could match an
+amendment on wording that both took from the proposal. The assessor is now `rules-4`.
+
+- **Direction.** `asks_from_passages` records `assessment.requested_direction`: a quoted
+  instruction's change, read by `amendment_direction`, the cue rule the calibration applied
+  to LobbyPlag's submissions. Prose keeps `unknown`, and every prose link says its direction
+  checks did not run. On LobbyPlag's 272 labelled pairs, the rule finds no opposed pair at
+  the copied tier. Across all pairs it marks 2 positives and 5 weak negatives opposed, and
+  the same direction in 72 positives and 10 weak negatives. On the AI Act it changes no
+  verdict: 29,055 of 29,061 asks are prose, and the 6 quoted instructions hold no
+  obligation cue (for example "AI" to "electricity"). A measured prose reader is `rev-0vi1`.
+- **Masking.** `QuotedLaw` indexes the proposal's provisions once per law (385 provisions,
+  236,809 characters, 12 ms on an Apple M5). Part 4 masks 8-word quotations out of prose
+  before shared phrases are found, with a break word at each gap so no run bridges it.
+  Evidence offsets stay on the original text. A law without proposal text says so in its
+  view.
+
+Same collected run (`20261003T144014Z`), same 28,229 candidates (byte-identical), before
+on `main` `8c50f35` and after on this branch:
+
+| Verdict | `rules-3` | `rules-4` |
+| --- | ---: | ---: |
+| Published | 0 | 0 |
+| Unconfirmed, copied tier | 188 | 42 |
+| Unconfirmed, reworded tier | 671 | 252 |
+| Contradicted | 82 | 36 |
+| Shown in the view | 941 | 330 |
+
+Masking removed proposal wording from 13,667 verdicts (48%). Five removed copied-tier
+matches (seed 0 of 138) were all proposal wording that the amendment reuses or moves. 83
+of the 138 come from amendments whose original wording is unknown, so their whole text
+counted as inserted. That is an agent reading, not an audit. All 36 remaining
+contradictions come from the sentence-level negation check. Assessment took 29.2 s on
+cached candidates against 31.3 s before (single runs; masking all asks costs 0.62 s).
+**Gate 3 is still open**: no link is published. The audit view now holds 330 instead of
+941 candidates, with the proposal-quotation matches removed. Masking before BM25 is
+`rev-yfc0`. Ligatures extracted as U+0000 in 144 passages are `rev-obw8`.
+
 ## Frontend Coverage Notice — 3 October 2026
 
 `rev-jc78` fixes the oversized diagnostic wall in the Atlas header (part 8). The visible
