@@ -11,7 +11,13 @@ export interface AtlasDataNotice {
   details: readonly string[];
 }
 
-/** Explain the investigation before offering evidence and supplied outcome calculations. */
+type WorkspaceView = "graph" | "evidence" | "outcomes" | "coordinated";
+
+/**
+ * Explain the investigation before offering evidence and supplied outcome calculations.
+ * `coordinated` adds a fourth view. The workspace always opens on the graph, whose source
+ * layers say why a graph is empty.
+ */
 export function AtlasWorkspace({
   snapshot,
   links,
@@ -19,6 +25,7 @@ export function AtlasWorkspace({
   coverageNotes,
   dataNotice,
   analysis,
+  coordinated = null,
 }: {
   snapshot: AtlasGraphSnapshot;
   links: readonly AtlasLinkView[];
@@ -26,8 +33,17 @@ export function AtlasWorkspace({
   coverageNotes: readonly string[];
   dataNotice: AtlasDataNotice;
   analysis: ReactNode;
+  coordinated?: ReactNode;
 }) {
-  const [view, setView] = useState<"graph" | "evidence" | "outcomes">("graph");
+  const [view, setView] = useState<WorkspaceView>("graph");
+  const views: (readonly [WorkspaceView, string])[] = [
+    ["graph", "Explore the graph"],
+    ["evidence", "Read the evidence"],
+    ["outcomes", "See the outcomes"],
+  ];
+  if (coordinated !== null) {
+    views.push(["coordinated", "Coordinated amendments"]);
+  }
   const [selectedLink, setSelectedLink] = useState<string | null>(null);
   const selectedUnavailable =
     selectedLink !== null &&
@@ -93,13 +109,7 @@ export function AtlasWorkspace({
       </header>
       <div className="mx-auto max-w-[1600px] px-5 py-6 sm:px-8">
         <nav aria-label="Atlas workspace" className="mb-6 flex flex-wrap gap-2">
-          {(
-            [
-              ["graph", "Explore the graph"],
-              ["evidence", "Read the evidence"],
-              ["outcomes", "See the outcomes"],
-            ] as const
-          ).map(([value, label]) => (
+          {views.map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -148,6 +158,7 @@ export function AtlasWorkspace({
             {analysis}
           </section>
         )}
+        {view === "coordinated" && coordinated}
       </div>
     </main>
   );

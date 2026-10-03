@@ -1030,9 +1030,10 @@ Rehearse it twice with a timer, once with a teammate naming an obscure law.
   do not redistribute whole PDFs.
 - **Privacy**: organizations and public office holders only; individual citizens'
   submissions are aggregated, never named.
-- **One-command rerun**: `make atlas` (download with dated, hashed provenance; build;
-  serve) and `make atlas-sample` (about five laws, minutes on a clean machine), with the
-  hardware and timings measured today.
+- **One-command rerun**: `make setup` once (downloads the global inputs with dated,
+  hashed provenance), then `make atlas LAW='AI Act'` (collects the law and builds its view
+  in `data/laws/<procedure>/atlas.json`; `make dev-backend` serves it), with the hardware
+  and timings measured today. A multi-law `make atlas-sample` was proposed but never built.
 
 ## 12. Today's Plan
 

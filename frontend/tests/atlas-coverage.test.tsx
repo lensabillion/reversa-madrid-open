@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
+import { AtlasModes } from "../components/atlas-coverage";
 import { AtlasWorkspace } from "../components/atlas-workspace";
 import { type AtlasBundle, atlasLinkViews } from "../lib/atlas";
 import type { AtlasLayerCoverage, AtlasLayerStatus } from "../lib/atlas-api";
@@ -204,4 +205,18 @@ test("a run with no coverage rows says so instead of showing an empty badge list
   const layers = renderWorkspace([]);
   expect(within(layers).getByText("This run recorded no source coverage.")).toBeDefined();
   expect(within(layers).queryByRole("list")).toBeNull();
+});
+
+test("mode labels are listed verbatim, and no list is drawn without them", () => {
+  render(<AtlasModes modes={["Contextual evidence, not textual", "Negotiation in progress"]} />);
+  const modes = screen.getByRole("list", { name: "Result modes" });
+  expect(
+    within(modes)
+      .getAllByRole("listitem")
+      .map((item) => item.textContent),
+  ).toEqual(["Contextual evidence, not textual", "Negotiation in progress"]);
+  cleanup();
+  const { container } = render(<AtlasModes modes={[]} />);
+  expect(container.textContent).toBe("");
+  expect(screen.queryByRole("list")).toBeNull();
 });

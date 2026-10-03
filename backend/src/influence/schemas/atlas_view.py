@@ -32,6 +32,13 @@ VIEW_SCHEMA_VERSION = "atlas-view-1"
 # `procedure_slug` of a procedure reference: 2021/0106(COD) is 2021-0106-COD.
 SLUG_PATTERN = r"^\d{4}-\d{4}[A-Z]?-[A-Z]{3}$"
 Slug = Annotated[str, StringConstraints(pattern=SLUG_PATTERN)]
+# The labels of docs/plan.md, section 6: what a law's missing layers mean for a reader.
+type ModeLabel = Literal[
+    "Contextual evidence, not textual",
+    "No amendment stage",
+    "Negotiation in progress",
+    "Partial amendment coverage",
+]
 
 
 class AtlasBundleView(FrozenModel):
@@ -77,6 +84,9 @@ class AtlasView(FrozenModel):
     # How asks were made; "passage-v0" means every consultation passage is one ask.
     ask_method: NonEmpty
     coverage: tuple[LayerCoverage, ...]
+    # Derived from `coverage` and the law's status by `services/modes.py`; empty when no
+    # gap changes how the view is read, and in views written before the field existed.
+    modes: tuple[ModeLabel, ...] = ()
     bundle: AtlasBundleView
     snapshot: GraphSnapshot
     rankings: tuple[RankingRow, ...]
@@ -89,7 +99,17 @@ class AtlasLawSummary(FrozenModel):
     title: NonEmpty
     run_id: NonEmpty
     published_links: int = Field(ge=0)
+    # None: the law has no `coordinated.json`, which is not the same as zero clusters.
+    cross_group_clusters: int | None = Field(default=None, ge=0)
+
+
+class InvalidAtlasView(FrozenModel):
+    """A law directory whose view cannot be read, listed so one broken law hides no other."""
+
+    slug: NonEmpty
+    reason: NonEmpty
 
 
 class AtlasLawList(FrozenModel):
     laws: tuple[AtlasLawSummary, ...]
+    invalid: tuple[InvalidAtlasView, ...] = ()

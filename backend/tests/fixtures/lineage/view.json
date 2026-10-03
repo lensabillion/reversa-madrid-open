@@ -5,8 +5,8 @@
   "title": "Artificial Intelligence Act",
   "run_id": "20261003T120000Z",
   "generated_at": "2026-10-03T12:30:00Z",
-  "method": "lineage-verbatim",
-  "method_revision": "verbatim-8w-3rare-v1",
+  "method": "verbatim-adopted-phrases",
+  "method_revision": "lineage-1.1",
   "coverage": [
     {
       "layer": "metadata",
@@ -79,33 +79,40 @@
       "source_updated_on": null
     }
   ],
+  "status": "computed",
+  "reason": null,
   "counts": {
     "amendments": 3,
     "amendments_adopting": 1,
     "adopted_phrases": 1,
+    "phrases_without_group": 0,
     "documents_read": 5,
     "documents_with_origin": 1,
-    "changed_units": 0,
-    "linked_units": 0
+    "changed_units": 103,
+    "linked_units": 18
   },
   "adopted_phrases": [
     {
-      "phrase_id": "phrase:52e459c5406f739b",
+      "phrase_id": "phrase:97d079c4c308f874",
       "kind": "verbatim",
-      "text": "for at least six months after the system is placed on the market",
-      "words": 13,
+      "text": "providers shall keep the logs for at least six months after the system is placed on the market",
+      "words": 18,
       "final_spans": [
         {
           "record_id": "art:32024R1689:article-12",
           "field": "text",
           "page": null,
-          "start": 30,
+          "start": 0,
           "end": 94,
-          "text": "for at least six months after the system is placed on the market"
+          "text": "Providers shall keep the logs for at least six months after the system is placed on the market"
         }
       ],
       "similarity": null,
-      "judge_probability": null
+      "judge_probability": null,
+      "holders": [
+        "actor:mep:125042",
+        "actor:mep:197721"
+      ]
     }
   ],
   "tabled_phrases": [],
@@ -124,19 +131,23 @@
         "Javi López",
         "Margrete Auken on behalf of the Verts/ALE Group"
       ],
-      "author_groups": [],
+      "author_groups": [
+        "S&D",
+        "S&D"
+      ],
       "tabled_on": "2022-01-25",
       "phrase_ids": [
-        "phrase:52e459c5406f739b"
+        "phrase:97d079c4c308f874"
       ],
-      "adopted_words": 13,
+      "adopted_words": 18,
       "inserted_words": 13,
-      "longest_run": 13
+      "new_words": 18,
+      "longest_run": 18
     }
   ],
   "origins": [
     {
-      "phrase_id": "phrase:52e459c5406f739b",
+      "phrase_id": "phrase:97d079c4c308f874",
       "document_id": "doc:hys_feedback:4",
       "actor_id": "actor:name:hys_feedback.acme-unknown-lobby",
       "organisation": "Acme Unknown Lobby",
@@ -145,55 +156,58 @@
         "record_id": "doc:hys_feedback:4",
         "field": "text",
         "page": null,
-        "start": 40,
+        "start": 26,
         "end": 104,
-        "text": "for at least six months after the system is placed on the market"
+        "text": "keep the logs for at least six months after the system is placed on the market"
       },
       "kind": "verbatim",
       "similarity": null,
-      "words": 13,
+      "words": 16,
       "amendment_ids": [
         "am:2021-0106-COD:ENVI:PE7-7"
       ],
       "earliest_amendment_on": "2022-01-25",
       "precedes": true,
+      "eligibility": "ask_first",
       "is_citation": false
     }
   ],
   "credits": [
     {
-      "holder_id": "S&D",
-      "basis": "verbatim",
-      "holder_kind": "group",
-      "name": "S&D",
-      "phrases": 1.0,
-      "distinct_phrases": 1,
-      "amendments": 1
-    },
-    {
       "holder_id": "actor:mep:125042",
       "basis": "verbatim",
       "holder_kind": "mep",
       "name": "Margrete AUKEN",
-      "phrases": 0.5,
-      "distinct_phrases": 1,
-      "amendments": 1
+      "phrases": 1,
+      "joint_phrases": 1,
+      "amendments": 1,
+      "amendments_tabled": 2
     },
     {
       "holder_id": "actor:mep:197721",
       "basis": "verbatim",
       "holder_kind": "mep",
       "name": "Brando BENIFEI",
-      "phrases": 0.5,
-      "distinct_phrases": 1,
-      "amendments": 1
+      "phrases": 1,
+      "joint_phrases": 1,
+      "amendments": 1,
+      "amendments_tabled": 2
+    },
+    {
+      "holder_id": "S&D",
+      "basis": "verbatim",
+      "holder_kind": "group",
+      "name": "S&D",
+      "phrases": 1,
+      "joint_phrases": 0,
+      "amendments": 1,
+      "amendments_tabled": 2
     }
   ],
   "limitations": [
-    "Verbatim matching only: a phrase is a run of at least 8 identical words holding at least 3 of the law's rare words; reworded adoptions are not found yet.",
-    "Shared wording is evidence of shared text, not of authorship: the final act is also shaped by the Council and the trilogues, and the same wording can come from a common draft, a coalition or a quotation.",
-    "Credit splits each phrase equally among the holders of the amendments that carry it; it measures adopted wording, not political weight.",
-    "These claims have not passed the human review gate (practice/lineage_review.py) yet.",
+    "Verbatim wording only: a request the final act says in other words is not traced.",
+    "Shared wording is evidence, not proof of authorship: the Council, the trilogues, a common draft or a coalition can explain the same words.",
+    "Every holder of a phrase is credited with the whole phrase (no fractional credit); a phrase with several holders is joint. Members are ranked by their rate per amendment tabled.",
     "1 amendment(s) have no original wording; their whole text was treated as inserted."
   ]
 }

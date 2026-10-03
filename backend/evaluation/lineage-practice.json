@@ -1,0 +1,25 @@
+{
+  "pairs": 272,
+  "positives": 172,
+  "folds": 5,
+  "draws": 2000,
+  "seed": 0,
+  "verbatim": {
+    "min_run_words": 8,
+    "full_set_auc": 0.746,
+    "precision_at_20_mean": 0.8347,
+    "rule": {
+      "selected": 97,
+      "true_positives": 92,
+      "false_positives": 5,
+      "precision": 0.9485,
+      "precision_wilson95": [
+        0.885,
+        0.9778
+      ],
+      "recall": 0.5349
+    }
+  },
+  "bm25_recall_at_5": 0.6628,
+  "jev": "0 of 272 pairs judged; run with --execute"
+}

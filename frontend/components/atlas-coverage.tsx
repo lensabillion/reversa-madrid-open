@@ -198,3 +198,22 @@ export function AtlasSourceLayers({
     </section>
   );
 }
+
+/** The run's mode labels (plan §6): what this law's Atlas cannot show, said before the data. */
+export function AtlasModes({ modes }: { modes: readonly string[] }) {
+  if (modes.length === 0) {
+    return null;
+  }
+  return (
+    <ul aria-label="Result modes" className="flex flex-wrap gap-2">
+      {modes.map((mode) => (
+        <li
+          key={mode}
+          className="rounded-full border border-amber-400 bg-amber-100 px-4 py-1.5 text-sm font-semibold text-amber-950"
+        >
+          {mode}
+        </li>
+      ))}
+    </ul>
+  );
+}

@@ -1,6 +1,6 @@
 # Implementation Status and Handoff
 
-Updated October 3, 2026, 11:55 CEST. Update this file when a capability or its
+Updated 3 October 2026, 17:00 CEST. Update this file when a capability or its
 verification changes. Issue ownership and PR state live in tbd; implementation contracts
 live in the [backend README](../backend/README.md). The
 [Influence Atlas brief](brief/influence-atlas-challenge-brief.pdf) defines the
@@ -8,7 +8,7 @@ competition. The [Atlas explainer](explainer/influence-atlas-primer.md) explains
 first principles: what changed, the architecture, the data, the models and the plan. The
 [technical design](design/influence-atlas-design.md) gives the record contracts and
 acceptance tests for the same eight parts. The [consolidated execution plan](plan.md)
-(`rev-f090`) settles where those documents and the uploaded
+(`rev-f090`, decided and on `main`) settles where those documents and the uploaded
 [technical plan](brief/PLAN.md) disagree, and orders the work as acceptance gates.
 `attic/` is not an implementation source.
 
@@ -158,29 +158,69 @@ the delta query at 5 per amendment, which PR #41 measured at 0.82 recall@5 on Lo
 against 0.98 for the union of the delta and whole-text queries at about 6.5 candidates;
 adopting it is open.
 
+## Lineage on the AI Act and the Explorer Fed by Lineage — 3 October 2026
+
+Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with attachments in
+9 min 19 s (asks layer partial: one publication unread, Have Your Say index not built).
+
+- **Verbatim adoption** (`lineage.adopt`, 2.4 s): 363 of 5,660 amendments inserted 397
+  phrases (12+ words, absent from the proposal) that stand in the final act. Credit: the
+  committee's own text 232.7 phrase shares, PPE 53.3, S&D 44.2, RE 33.9. Only 22.6% of the
+  final act's 12-word windows are in the proposal (annexes 48.9%, now that CELLAR annex
+  streams are collected).
+- **Verbatim origin** (`origin.find_origins`, 4.0 s over 788 submissions): only 4 matches,
+  three of them boilerplate ("to the European Parliament, the Council and the European
+  Economic and Social Committee", the AI HLEG principles). The citation filter misses the
+  first formula. Organisations ask in their own words, so origins need a meaning judge.
+- **Local Qwen is too slow here**: embedding 4.5 passages/s (29,061 passages ≈ 2 h),
+  reranker 0.8 pairs/s.
+- **Jev for reworded origins** (`backend/benchmarks/lineage_jev.py`): BM25 (part 3's
+  `find_candidates`) shortlists 5 passages per adopting amendment; Jev answers the four Gate 3
+  questions unchanged. Dry run before the merge: 1,805 pairs, 1,724 distinct requests, 8.46 MB,
+  about 0.09 USD estimated at 4 bytes a token; the run stops before the cumulative charge could
+  pass `--max-cost-usd` (default 1). **Not executed yet**: the session had no
+  `TYPESAFE_API_KEY`.
+- **Explorer fed by lineage** (`backend/benchmarks/lineage_view.py`): writes the same
+  `atlas.json` from verbatim links (published when dated first and not a citation) and Jev
+  links (always unconfirmed), reusing `build_view` for outcomes, graph and rankings; the
+  explorer renders it unchanged (6 verbatim links on the AI Act, checked in a browser).
+- `services/jev.py` and its offline tests come from `feat/jev-gate-three` (PR #63) unchanged.
+
+- **After merging main** (8-word runs holding the law's rare words, `5ff514c`): on the AI Act
+  512 amendments adopt wording, `lineage_view.py` writes 110 verbatim links (109 published),
+  and the Jev dry run has 2,550 pairs, 2,430 distinct requests, 11.95 MB, about 0.13 USD.
+- **Practice set** (`backend/benchmarks/lineage_practice.py`, LobbyPlag 272 pairs, same folds
+  and draws as the harness; `evaluation/lineage-practice.json`): the verbatim rule (8+ words,
+  3+ rare) selects 97 pairs, 92 right (precision 0.949, Wilson 95% 0.885–0.978), recall
+  0.535; as a score its AUC is 0.746 and mean P@20 0.835 (lexical-delta-v1: AUC 0.862, P@20
+  0.980). BM25 recall@5 on the proposals' new wording is 0.663, so the Jev stage can reach at
+  most that share of verified pairs. Jev on the same pairs: 222 distinct requests, about
+  0.008 USD; not run yet (no key in the session). PR #63 measured `same_legal_change` alone at
+  AUC 0.904.
+
+Next: run `lineage_jev.py --execute`, rebuild the view, read a sample of the reworded links,
+and fix the citation filter for the institutional formula.
+
 ## Explorer Reads the Lineage View — 3 October 2026
 
 The owner asked to connect the frontend to lineage instead of the Atlas view (bead
-`rev-658l`). The lineage pieces (adoption, origin, tabled origin, review) were merged but
-nothing assembled them into a `LineageView`. Now:
+`rev-658l`). `influence lineage <law>` (`make lineage LAW=...`,
+`services/lineage_assembly.py`) writes `data/laws/<slug>/lineage.json`; this change serves
+it and shows it:
 
-- `influence lineage <law>` (`make lineage LAW=...`) collects, runs adoption and both origin
-  searches through `services/lineage_pipeline.py`, and writes
-  `data/laws/<slug>/lineage.json`; `GET /api/v1/lineage` and `GET /api/v1/lineage/{slug}`
-  serve it ([backend README](../backend/README.md#lineage-command-and-view-api-the-explorers-view)).
+- `GET /api/v1/lineage` and `GET /api/v1/lineage/{slug}` (`services/lineage_views.py`,
+  `routers/lineage.py`) read the written views
+  ([backend README](../backend/README.md#lineage-view-api-the-explorers-view)); the command
+  now also prints the explorer URL.
 - The page `/lineage` lists the laws with a lineage view and shows each adopted or tabled
-  phrase beside its final-act quotation, the amendments that carry it and the submissions
-  that say it, with the date order, plus credit by political group and Member
-  ([frontend README](../frontend/README.md#lineage-explorer-page)). The evidence
-  workspace's header now links to `/lineage`; `/atlas` still works by URL.
+  phrase beside its final-act quotation, the amendments that carry it and the consultation
+  documents that say it, with the date order, plus credit by political group and Member as
+  "N of M amendments adopted" ([frontend README](../frontend/README.md#lineage-explorer-page)).
+  The evidence workspace's header now links to `/lineage`; `/atlas` still works by URL.
 
-Verified offline (`measured`, cloud container): `make check-backend` passes with 1,245
-tests and 100% branch coverage; `make check-frontend` passes with 132 tests, Biome, `tsc`
-and the production build. In headless Chromium, the production build against the real
-backend serving the test world's view showed the phrase, its amendment and the earlier
-submission. Not verified: a real law (`make lineage LAW='AI Act'` has not been run), its
-time, or the precision of the claims (the review gate in `practice/lineage_review.py`
-has not been run). Semantic adoption is not part of the view yet.
+Verified offline only, on the backend's test world (see the PR for commands and output).
+Not verified: a real law's view in the page, and the precision of the claims (the review
+gate in `practice/lineage_review.py` has not been run).
 
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
@@ -203,6 +243,48 @@ LobbyPlag for BM25, dense and fused (PRs #35, #41, #48), and candidates for the 
 (PR #50's run: 12,996 candidate pairs). Still open under gate 2's beads: `pipeline.py`
 searches the delta query at 5 per amendment (0.82 recall@5 on LobbyPlag) instead of the
 union of the delta and whole-text queries (0.98 at about 6.5 candidates, PR #41).
+
+## Channels, Directions, Demo Fixes and Lineage — 3 October 2026, Afternoon
+
+Merged on `main` since the sections above (`9e1049b`):
+
+- **PR #62** (gate 7b minimum, bead `rev-rg6l`): `make channels` (HOW: consultation
+  stage, timing against the proposal, tabling Members and groups, co-signed and
+  coordinated amendments) and `make directions` (TOWARDS: a rule-based direction per
+  amendment, `direction-rules-1`, and per actor through published links only). Details:
+  [backend README](../backend/README.md#channels-command-part-7-how). Verified offline
+  (`measured` in the PR): `make check-backend` on `cf27ac1`, 1,142 tests, 100% branch
+  coverage, with unit, Hypothesis and fixture end-to-end tests. **Not verified:** no real
+  law has been run through either command (no counts, no timing); direction labels are
+  English-only and not audited against human labels; actor directions stay empty while
+  no link is published; public-voice cards are not started; neither file is in
+  `atlas.json` or the explorer.
+- **PR #67** (gate 6 demo blockers, beads `rev-48sd`, `rev-7lfp`, `rev-539s`): evidence
+  windows of 300 code points either side of each quoted span, with a toggle for the full
+  source; one badge per source layer on the graph view, and an empty-graph message that
+  says whether a layer failed or nothing passed the publication bar; rankings now count
+  every ask and actor (untraced asks as `unknown`), and only links that pass the
+  chronology check can be an origin. Verified offline (`measured` in the PR): `make check`
+  on `c330458`, 1,152 backend and 115 frontend tests, clean audits. **Not verified:** no
+  real law in the explorer, rendering of hundreds of ranking rows, and the size of
+  `atlas.json` at 29,000 asks. Direct tracing of unlinked asks stays off (about 130 ms per
+  ask, over an hour for the AI Act).
+- **Lineage PRs #58–#61 and #66**: an outcome-first path that starts from the final act.
+  #58 adds the `lineage-1` contracts (`schemas/lineage.py`); #59 and #66 trace runs of 12
+  or more words that stand in the final act, are absent from the proposal and were
+  inserted by an amendment, back to those amendments, and share each phrase's credit among
+  its tablers (`services/lineage.py`; PR #59 reports 3.3 s, 395 adopting amendments and
+  434 phrases on the AI Act); #61 finds which submitted documents contain that adopted
+  wording, with dates and citations flagged (`services/origin.py`; on the AI Act with
+  attachments and a stand-in for the adoption step, 42 matches from 16 organisations, which the author read as mostly the
+  Commission's own annex wording quoted back, not lobbyists' asks); #60 adds the human
+  review gate (a seeded sample, two readers' labels kept in a separate file, precision
+  with a Wilson lower bound). These figures are as reported in the PRs, not re-measured
+  here. **Not verified:** no lineage claim is audited, shared wording is not authorship,
+  and no `make` target runs the lineage steps yet (a `lineage` command is in progress).
+
+The last real AI Act run of `make atlas` (`rules-3`, below) published **0 links**, so
+gate 3 still fails and a blind audit of published links (gate 7) has nothing to sample.
 
 ## Architecture Assessment
 
@@ -241,8 +323,8 @@ Open decisions are not settled until the project owner agrees.
 | The Influence Atlas brief replaces the first Challenge 03 brief | Reported by the owner 2026-10-03 | The new brief's rules ("We hand out nothing"), schedule (demos 19:30, no 19:00 inputs) and scoring leave no hidden test |
 | Architecture: eight parts plus a practice loop (Atlas) | Decided 2026-10-03: the owner merged PR [#21](https://github.com/lensabillion/reversa-madrid-open/pull/21) at 11:33 | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
-| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) |
-| Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | **Proposed** 2026-10-03; decided when the owner merges the PR that adds it | [docs/plan.md](plan.md), §3 for each choice and its reason; bead `rev-f090` | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |
 | The explorer reads the lineage view (`/lineage`), not the Atlas view | Asked by the owner 2026-10-03; decided when the owner merges the PR (bead `rev-658l`) | Lineage starts from the final law, so every shown claim is wording that reached the law; `/atlas` and `make atlas` stay until a separate change removes them |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
@@ -250,42 +332,47 @@ Open decisions are not settled until the project owner agrees.
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
 | Parsed tables are JSON Lines, not Parquet | Decided 2026-10-03 | The playbook asks for Parquet; pyarrow is a new dependency the 14-day cool-off and `no-build` policy have not cleared, and JSON Lines is equally safe against delimiters in legal text. The typed row models in `backend/src/influence/extraction/tables.py` are the contract, so the container can change without touching a parser |
-| Common-name aliases live in code (`LAW_ALIASES` in `backend/src/influence/services/law_query.py`, started by PR #49 in `collect.py`), not in `data/catalog/aliases.jsonl` as plan §5 proposed | **Proposed** 2026-10-03 with branch `feat/law-aliases`; decided when the owner merges it | `data/` is never committed, so a data file would need its own build script before anyone could rerun it; a reviewed table under `backend/src` is versioned with the code that reads it and checked by a test |
+| Common-name aliases live in code (`LAW_ALIASES` in `backend/src/influence/services/law_query.py`, started by PR #49 in `collect.py`), not in `data/catalog/aliases.jsonl` as plan §5 proposed | Decided 2026-10-03: PR #53 (`feat/law-aliases`) merged | `data/` is never committed, so a data file would need its own build script before anyone could rerun it; a reviewed table under `backend/src` is versioned with the code that reads it and checked by a test |
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
 | D1: language-model judge | **Local evaluation authorized; no paid API** by the owner, 3 October 2026 | A pinned local DeBERTa NLI model scored 17/24 on a separate synthetic legal diagnostic. Evaluation is authorized; automatic publication is not validated. Raw outputs and labels stay separate. See [calculation handoff](design/calculation-handoff.md), `rev-jaig` and `rev-qs6i`. |
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
-| D5: organizer questions of the first brief | **Superseded**; one question remains: may we use code written before today? | Bead `rev-qvmx` |
+| D5: organizer questions of the first brief | **Superseded**; the remaining question is answered: the organizers allow code written before today (3 October) | Bead `rev-qvmx`, closed |
+| No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
+| Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
 
 ## Next Work in Competition Order
 
-The beads below are children of the epic `rev-i2dl` and depend on each other in this
-order (`tbd ready` shows what is unblocked). Points are the brief's criteria each one
-carries. [Plan §8](plan.md#8-acceptance-gates-in-order) gives each step its completion
-test and target time.
+As of 17:00 on 3 October; code freeze 18:30, demos 19:30. Beads are children of the epic
+`rev-i2dl`; `tbd ready` shows what is unblocked, and the beads, not this list, hold
+ownership. [Plan §8](plan.md#8-acceptance-gates-in-order) gives each gate's test.
 
-1. `rev-pjk2` Part 1 · Collect one law from its procedure number; start the downloads
-   for the flagship laws now, in the background (every criterion depends on it).
-2. `rev-aapn` Part 3 · Find candidates; `rev-637f` coordinated amendments from Parltrack
-   alone (a first insight with no new downloads).
-3. `rev-nuk5` Part 4 · Verify links, with `rev-zzur` (threshold), `rev-sbrp` (legal
-   polarity) and `rev-jaig` (D1). Real links, 25.
-4. `rev-uhpq` Part 5 · Trace outcomes: heard, adopted by Parliament, won.
-5. `rev-1vxz` Part 2 · Resolve actors, and `rev-i006` Part 6 · Atlas graph.
-6. `rev-qn6b` Part 8 · Any-law command and explorer. Any law, 20.
-7. `rev-sn3u` Blind audit of published links: precision with a Wilson interval.
-8. `rev-5yy6` Rank; `rev-fod0` Report. Insight, 25; report, 15.
-9. `rev-0who` Batch over all 2019+ laws; `rev-104q` Forecast. Ambition, 15.
-10. `rev-rg6l` Explain: channels and public statements against asks.
-11. `rev-nzqr` D6 licence and public repository, before 19:30; `rev-p61s` rerun from a
-    fresh checkout.
+Done or merged: gate 1's collection (the AI Act with attachments; the Digital Services
+Act and Data Act without), gate 2 (candidates and coordinated amendments), the `make
+atlas` command and view API, the gate 7b commands (`make channels`, `make directions`, PR #62), the gate 6 demo fixes (PR #67) and
+the lineage steps (PRs #58–#61, #66).
 
-Cut lines and the hour-by-hour plan are in
-[explainer §12](explainer/influence-atlas-primer.md#12-todays-plan).
-Public-source coverage, the any-law runtime and forecast quality are unverified until
-those beads report measurements.
+1. **Real links (gates 3 and 7).** `rules-3` publishes 0 AI Act links. The **Proposed**
+   gate 7 re-scope (a seeded audit of unconfirmed prose links to set the prose threshold)
+   needs the owner's decision before anyone labels (`rev-nuk5`, `rev-zzur`, `rev-sn3u`).
+   Audit labels stay apart from model output.
+2. **Lineage command.** Join the merged lineage steps into one command and run it on the
+   AI Act (in progress in another session); no lineage claim is shown before PR #60's
+   review gate passes.
+3. **Real runs of gate 7b.** `make channels LAW='AI Act'` and `make directions LAW='AI
+   Act'` have never run on a real law (`rev-rg6l`); record counts and timings.
+4. **Report** (`rev-fod0`, `rev-5yy6`): every number from a recorded command output; text
+   until 18:30.
+5. **Release** (gate 11): D6 licence and public repository, owner only (`rev-nzqr`); a
+   rerun from a fresh checkout with `make setup && make atlas LAW='AI Act'` (`rev-p61s`).
+6. **Demo** without the live frontend (decided): the five-minute script against command
+   outputs.
+
+Cut for today unless time remains: the batch over all 2019+ laws (`rev-0who`), the
+forecast (`rev-104q`) and gate 10's full explanation. Public-source coverage, the uncached
+any-law runtime and forecast quality remain unverified.
 
 The initial extraction foundation had no parsers; PR #26 subsequently added the
 source connectors listed in the Agent 1 handoff below. The original playbook sequence was: probe every catalog URL and record the real response shapes, resolve one procedure
@@ -517,6 +604,49 @@ Diagnostic wrappers recorded phase times and fetch counts without changing algor
 the source fingerprint and assessor/pipeline/matcher hashes were captured before the run.
 Artifacts remain under ignored `data/laws/2021-0106-COD/`; earlier view/audit artifacts
 are preserved separately under `gate3-runs/rules-2-0741e0e3d9fb/`.
+
+## Part 4 Inputs: Ask Direction and Proposal Masking (`rules-4`) — 3 October 2026
+
+Two inputs part 4's rules were written for never reached them on the live atlas path
+(`rev-jesy`, `rev-805l`). Asks carried no direction, so the same-direction tier and the
+opposite-direction contradiction never ran. `services/masking.py` existed, but only
+`services/calculation.py` called it (it is off the live path), so prose could match an
+amendment on wording that both took from the proposal. The assessor is now `rules-4`.
+
+- **Direction.** `asks_from_passages` records `assessment.requested_direction`: a quoted
+  instruction's change, read by `amendment_direction`, the cue rule the calibration applied
+  to LobbyPlag's submissions. Prose keeps `unknown`, and every prose link says its direction
+  checks did not run. On LobbyPlag's 272 labelled pairs, the rule finds no opposed pair at
+  the copied tier. Across all pairs it marks 2 positives and 5 weak negatives opposed, and
+  the same direction in 72 positives and 10 weak negatives. On the AI Act it changes no
+  verdict: 29,055 of 29,061 asks are prose, and the 6 quoted instructions hold no
+  obligation cue (for example "AI" to "electricity"). A measured prose reader is `rev-0vi1`.
+- **Masking.** `QuotedLaw` indexes the proposal's provisions once per law (385 provisions,
+  236,809 characters, 12 ms on an Apple M5). Part 4 masks 8-word quotations out of prose
+  before shared phrases are found, with a break word at each gap so no run bridges it.
+  Evidence offsets stay on the original text. A law without proposal text says so in its
+  view.
+
+Same collected run (`20261003T144014Z`), same 28,229 candidates (byte-identical), before
+on `main` `8c50f35` and after on this branch:
+
+| Verdict | `rules-3` | `rules-4` |
+| --- | ---: | ---: |
+| Published | 0 | 0 |
+| Unconfirmed, copied tier | 188 | 42 |
+| Unconfirmed, reworded tier | 671 | 252 |
+| Contradicted | 82 | 36 |
+| Shown in the view | 941 | 330 |
+
+Masking removed proposal wording from 13,667 verdicts (48%). Five removed copied-tier
+matches (seed 0 of 138) were all proposal wording that the amendment reuses or moves. 83
+of the 138 come from amendments whose original wording is unknown, so their whole text
+counted as inserted. That is an agent reading, not an audit. All 36 remaining
+contradictions come from the sentence-level negation check. Assessment took 29.2 s on
+cached candidates against 31.3 s before (single runs; masking all asks costs 0.62 s).
+**Gate 3 is still open**: no link is published. The audit view now holds 330 instead of
+941 candidates, with the proposal-quotation matches removed. Masking before BM25 is
+`rev-yfc0`. Ligatures extracted as U+0000 in 144 passages are `rev-obw8`.
 
 ## Frontend Coverage Notice — 3 October 2026
 

@@ -116,6 +116,11 @@ export interface AtlasView {
   coverage: readonly AtlasLayerCoverage[];
   /** Links whose status is published, unconfirmed or contradicted, and the records they cite. */
   bundle: AtlasBundle;
+  /**
+   * Labels for what this run could not show, e.g. "Negotiation in progress". Files written
+   * before the field existed lack it; read it through `atlasModes`.
+   */
+  modes?: readonly string[];
   snapshot: AtlasSnapshotRecord;
   rankings: readonly AtlasRanking[];
   limitations: readonly string[];
@@ -132,6 +137,11 @@ export class AtlasApiError extends Error {
     this.status = status;
     this.detail = detail;
   }
+}
+
+/** The view's mode labels; an older file without the field has none. */
+export function atlasModes(view: AtlasView): readonly string[] {
+  return view.modes ?? [];
 }
 
 export const atlasLawsUrl = "/api/v1/atlas";
@@ -166,8 +176,8 @@ async function errorDetail(response: Response): Promise<string> {
   return response.statusText || "no detail was supplied";
 }
 
-/** Reads one JSON answer of the backend's read API; a non-2xx answer is an `AtlasApiError`. */
-export async function readApiJson<T>(url: string, signal: AbortSignal): Promise<T> {
+/** Reads one answer of the backend read API (Atlas or lineage); the caller owns the check of `T`. */
+export async function readAtlasJson<T>(url: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, { signal, cache: "no-store" });
@@ -186,10 +196,10 @@ export async function readApiJson<T>(url: string, signal: AbortSignal): Promise<
 
 /** Reads `GET /api/v1/atlas`; with `useResource`, the URL keys and cancels the request. */
 export function readAtlasLaws(url: string, signal: AbortSignal): Promise<AtlasLawList> {
-  return readApiJson(url, signal);
+  return readAtlasJson(url, signal);
 }
 
 /** Reads `GET /api/v1/atlas/{slug}`; a law without a run answers 404 as an `AtlasApiError`. */
 export function readAtlasView(url: string, signal: AbortSignal): Promise<AtlasView> {
-  return readApiJson(url, signal);
+  return readAtlasJson(url, signal);
 }

@@ -18,6 +18,7 @@ from influence.services.judge import (
     amendment_query,
     best_sentence,
     change_query,
+    clipped_fields,
     judge_pairs,
     judge_prompt,
     probability,
@@ -99,6 +100,24 @@ def test_probability_is_the_logistic_of_the_log_odds_and_never_overflows() -> No
 def test_probability_is_in_range_and_increases_with_the_log_odds(low: float, high: float) -> None:
     low, high = sorted((low, high))
     assert 0.0 <= probability(low) <= probability(high) <= 1.0
+
+
+def test_every_cut_field_is_counted_for_both_prompt_forms() -> None:
+    long = "x" * (MAX_FIELD_CHARS + 1)
+    fits = "y" * MAX_FIELD_CHARS
+    assert clipped_fields(None, fits, fits) == 0
+    assert clipped_fields(None, long, "passage") == 1
+    assert clipped_fields(long, long, long) == 3
+    # The change form shows only the added and removed words, so a long unchanged
+    # paragraph is not cut there, but a long added run is.
+    paragraph = "word " * 400
+    assert clipped_fields(paragraph, paragraph + "new", "p") == 2
+    assert clipped_fields(paragraph, paragraph + "new", "p", changes_only=True) == 0
+    assert clipped_fields("a", "a " + long, "p", changes_only=True) == 1
+    # Where the change form falls back to old -> new, so does the count.
+    assert clipped_fields(None, long, "p", changes_only=True) == 1
+    too_many = "w " * 900
+    assert clipped_fields(too_many, too_many + "z", "p", changes_only=True) == 2
 
 
 def test_pairs_come_back_in_order_each_distinct_prompt_scored_once_in_batches() -> None:

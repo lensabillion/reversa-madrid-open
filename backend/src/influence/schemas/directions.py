@@ -24,8 +24,11 @@ from influence.schemas.scoring import FrozenModel
 
 type DirectionMethod = Literal["direction-rules-1"]
 # `from_published_links`: actor directions come from the law's atlas view. The other two
-# say why there are none: no view was built, or the view publishes no link.
-type ActorsStatus = Literal["from_published_links", "no_atlas_view", "no_published_links"]
+# say why there are none: no view was built, the view publishes no link, or the view was
+# built from an older collect run than the amendments counted here.
+type ActorsStatus = Literal[
+    "from_published_links", "no_atlas_view", "no_published_links", "stale_atlas_view"
+]
 
 
 class DirectionCounts(FrozenModel):

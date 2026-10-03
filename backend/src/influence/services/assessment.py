@@ -28,6 +28,7 @@ from influence.schemas.atlas import (
 )
 from influence.schemas.retrieval import PassageChange
 from influence.schemas.scoring import (
+    TOKEN_PATTERN,
     ChangeSpan,
     Operation,
     ScoreRequest,
@@ -35,7 +36,8 @@ from influence.schemas.scoring import (
     TextChange,
     TextSpan,
 )
-from influence.services.passage_change import read_changes
+from influence.services.masking import QuotedLaw
+from influence.services.passage_change import opposed_sentence, read_changes
 from influence.services.prose_match import (
     ProseMatch,
     Word,
@@ -43,16 +45,21 @@ from influence.services.prose_match import (
     negation_conflict,
     words_of,
 )
-from influence.services.scoring import score_pair
+from influence.services.scoring import changed_spans, score_pair
 
 METHOD = "lexical-rules"
-METHOD_REVISION = "rules-3"
+METHOD_REVISION = "rules-4"
 # Proposed by the LobbyPlag calibration (PR #40, evaluation/link-calibration.json): the least
-# lexical score whose held-out precision, with a Wilson 95% lower bound, clears each tier's
-# floor on practice data. Proposals, not frozen values: the practice loop owner freezes them
-# before the blind audit. On that data the copied tier held (35 of 36 correct); the reworded
-# tier did not reach its floor (36 of 50, 0.72 against 0.80), so it is labelled but not
-# published until an audit shows otherwise. Weak negatives, one law, mostly verbatim copies.
+# lexical score on a 0.01 grid whose precision on the development folds has a Wilson 95%
+# lower bound at or above each tier's floor; the held-out folds only check it. Copied (floor
+# 0.90): 97 of 101 correct on development (lower bound 0.9026), and 35 of 36 held out
+# (0.9722) but with a held-out lower bound of 0.8583, below the floor: too few held-out pairs
+# confirm it, so 0.75 is provisional. Reworded (floor 0.80): the artifact's 104 of 119 and
+# 36 of 50 count every pair scoring 0.32 or more, copies included; on the tier's own band
+# [0.32, 0.75) the same file gives 7 of 18 on development and 1 of 14 held out, so 0.32 is
+# stale and the tier is labelled but never published until the artifact is regenerated and
+# an audit shows otherwise. Proposals, not frozen values: the practice loop
+# owner freezes them before the blind audit. Weak negatives, one law, mostly verbatim copies.
 COPIED_THRESHOLD = 0.75
 REWORDED_THRESHOLD = 0.32
 SHORT_EDIT_TOKENS = 3
@@ -64,16 +71,25 @@ PROSE_COPIED_RUN_WORDS = 6
 PROSE_COPIED_COVERAGE = 0.8
 PROSE_REWORDED_RUN_WORDS = 4
 PROSE_REWORDED_COVERAGE = 0.5
-# The shared phrases must also carry this much rarity in absolute terms (the sum of their
-# words' inverse document frequencies), so a short insertion made only of the law's own
-# vocabulary ("before being placed on the market") cannot score as a full copy.
+# A placeholder floor on the shared phrases' rarity in absolute terms (the sum of their words'
+# inverse document frequencies). At 0.0 it filters nothing: it is where a floor would stop a
+# short insertion made only of the law's own vocabulary ("before being placed on the market")
+# scoring as a full copy, but no prose labels exist to set one. Until they do, prose matches
+# are held back by `publish_prose`, not by this value.
 PROSE_MIN_WEIGHT = 0.0
+# Break words stop a shared run crossing a gap: between an amendment's separate insertions,
+# and where a proposal quotation was masked out of a passage. They differ so that a break on
+# one side can never match a break on the other.
 _BREAK = "\x00"
+_PASSAGE_BREAK = "\x01"
 DEFAULT_PUBLISHABLE: frozenset[LinkTier] = frozenset({"copied"})
 
 _STRICTER_WORDS = frozenset({"shall", "must", "required", "least", "minimum"})
 _WEAKER_WORDS = frozenset({"may", "can", "optional"})
 _OPPOSITE: dict[Direction, Direction] = {"stricter": "weaker", "weaker": "stricter"}
+# Words whose difference changes the legal effect even when every other word matches: a modal
+# ("shall" against "may"), a negation, or a number (30 days against 90).
+_CUE_WORDS = frozenset({"shall", "must", "may", "can", "should", "not", "no", "never", "cannot"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +117,55 @@ def amendment_direction(spans: Iterable[ChangeSpan]) -> Direction:
     if stricter == weaker:
         return "unknown"
     return "stricter" if stricter > weaker else "weaker"
+
+
+def cue_mismatch(amendment: Iterable[ChangeSpan], ask: Iterable[ChangeSpan]) -> tuple[str, ...]:
+    """Modal, negation and number words changed on one side with no counterpart on the other.
+
+    Dice over many shared words hides one differing word, yet "shall keep" against "may keep"
+    or "30 days" against "90 days" is a different law. Compared per operation, and only for
+    an operation both sides perform: an ask that only inserts says nothing about deletions.
+    Sorted for stable output; linear in the changed words.
+    """
+
+    def cues(spans: Iterable[ChangeSpan]) -> dict[Operation, set[str]]:
+        found: dict[Operation, set[str]] = {}
+        for span in spans:
+            words = found.setdefault(span.operation, set())
+            for token in TOKEN_PATTERN.findall(span.text.casefold()):
+                if token in _CUE_WORDS or any(char.isdigit() for char in token):
+                    words.add(token)
+        return found
+
+    mine, theirs = cues(amendment), cues(ask)
+    return tuple(
+        sorted(
+            {
+                word
+                for operation in mine.keys() & theirs.keys()
+                for word in mine[operation] ^ theirs[operation]
+            }
+        )
+    )
+
+
+def requested_direction(text: str) -> Direction:
+    """The direction an ask's quoted instructions request, read like an amendment's change.
+
+    A quoted instruction ("replace 'may' with 'shall'") states its change, so its changed
+    words go through `amendment_direction`, the rule the calibration applied to LobbyPlag's
+    submissions (`practice/calibrate.py`, its direction features). Prose states no change:
+    counting cues over an argued passage reads "should not be required" as stricter, so
+    prose stays unknown until a reader is measured on labelled prose. An instruction past
+    the scorer's bounds is unknown too; `ask_limit_reason` reports it and it is never
+    assessed. Several instructions are read together, as an amendment's several spans are.
+    """
+    instructions = [change for change in read_changes(text) if change.kind != "statement"]
+    try:
+        changes = [TextChange(old=change.old or "", new=change.new) for change in instructions]
+    except ValidationError:
+        return "unknown"
+    return amendment_direction(span for change in changes for span in changed_spans(change))
 
 
 def _time_eligibility(amendment: Amendment, ask: Ask) -> TimeEligibility:
@@ -202,6 +267,8 @@ class _Prose:
     amendment_spans: tuple[SourceSpan, ...]
     ask_spans: tuple[SourceSpan, ...]
     negation: bool
+    # Characters of proposal quotation masked out of the passage; None when not masked.
+    masked_chars: int | None
 
 
 def _amendment_words(amendment: Amendment, spans: Iterable[ChangeSpan]) -> list[Word]:
@@ -219,15 +286,38 @@ def _amendment_words(amendment: Amendment, spans: Iterable[ChangeSpan]) -> list[
     return flat
 
 
+def _passage_words(text: str, quoted_law: QuotedLaw) -> tuple[list[Word], int]:
+    """Words outside proposal quotations, offsets in `text`, a break word at each masked gap.
+
+    Masking blanks the quotation in place, so the remaining words keep their offsets and
+    every quotation is still read from the original text. Also returns the masked length.
+    """
+    masked = quoted_law.mask(text)
+    gaps = iter(masked.spans)
+    gap = next(gaps, None)
+    flat: list[Word] = []
+    for word in words_of(masked.text):
+        while gap is not None and gap[1] <= word.start:
+            if flat:
+                flat.append(Word(_PASSAGE_BREAK, flat[-1].end, flat[-1].end))
+            gap = next(gaps, None)
+        flat.append(word)
+    return flat, sum(end - start for start, end in masked.spans)
+
+
 def _prose(
     amendment: Amendment,
     ask: Ask,
     change: PassageChange,
     spans: Iterable[ChangeSpan],
     rarity: Mapping[str, float] | None,
+    quoted_law: QuotedLaw | None,
 ) -> _Prose:
     mine = _amendment_words(amendment, spans)
-    theirs = words_of(change.new)
+    if quoted_law is None:
+        theirs, masked_chars = list(words_of(change.new)), None
+    else:
+        theirs, masked_chars = _passage_words(change.new, quoted_law)
     match = match_prose([w.text for w in mine], [w.text for w in theirs], rarity)
     shift = ask.span.start + change.start
     amendment_spans = tuple(
@@ -263,7 +353,7 @@ def _prose(
         )
         for run in match.runs
     )
-    return _Prose(match, amendment_spans, ask_spans, negation)
+    return _Prose(match, amendment_spans, ask_spans, negation, masked_chars)
 
 
 def _prose_tier(
@@ -277,8 +367,10 @@ def _prose_tier(
     return "same_direction" if same_direction and match.runs else None
 
 
-def _tier(score: float, *, short_edit: bool, same_direction: bool) -> LinkTier | None:
-    if score >= COPIED_THRESHOLD and not short_edit:
+def _tier(
+    score: float, *, short_edit: bool, same_direction: bool, cues_agree: bool = True
+) -> LinkTier | None:
+    if score >= COPIED_THRESHOLD and not short_edit and cues_agree:
         return "copied"
     if score >= REWORDED_THRESHOLD and not short_edit:
         return "reworded"
@@ -294,6 +386,7 @@ def assess_link(
     publishable: frozenset[LinkTier] = DEFAULT_PUBLISHABLE,
     rarity: Mapping[str, float] | None = None,
     publish_prose: bool = False,
+    quoted_law: QuotedLaw | None = None,
 ) -> LinkAssessment:
     """Judge whether `ask` supports `amendment`, with signals, quotations and limitations.
 
@@ -304,7 +397,10 @@ def assess_link(
     A passage that gives a quoted instruction ("replace 'shall' with 'may'") is compared as an
     edit. Any other passage is prose and is compared as shared phrases (`prose_match`), with
     `rarity` (inverse document frequency over the law's passages, `rarity_weights`) so
-    boilerplate counts for little; with no table every word weighs the same.
+    boilerplate counts for little; with no table every word weighs the same. With
+    `quoted_law`, wording the passage quotes from the proposal (8 words or more) is masked
+    out first: an amendment may reuse the proposal's own wording, and a passage quoting the
+    proposal has not asked for it. Without it nothing is masked, and the caller says why.
 
     A shared-phrase match on prose is never published unless `publish_prose` is set: on the
     AI Act the 7 links it published were all the law's own boilerplate, and no threshold
@@ -330,25 +426,68 @@ def assess_link(
     result = reading.result
     spans = (*result.amendment_changes,)
     direction = amendment_direction(spans)
-    same_direction = ask.direction == direction and direction != "unknown"
     evidence = (
-        _prose(amendment, ask, reading.change, spans, rarity)
+        _prose(amendment, ask, reading.change, spans, rarity, quoted_law)
         if reading.change.kind == "statement"
         else None
     )
+    # Asks read from passages carry no direction, so a quoted instruction's own changed words
+    # give it one: without this, "insert 'may keep'" against "shall keep" was never opposed.
+    # It only vetoes; agreement still needs a declared direction to earn the same_direction
+    # tier, since a cue count alone is too thin to support a link.
+    ask_direction = (
+        amendment_direction(result.submission_changes)
+        if ask.direction == "unknown" and evidence is None
+        else ask.direction
+    )
+    same_direction = ask.direction == direction and direction != "unknown"
     negation = result.negation_conflict if evidence is None else evidence.negation
     score = result.score if evidence is None else evidence.match.coverage
-    opposed = _OPPOSITE.get(direction) == ask.direction
+    opposed = _OPPOSITE.get(direction) == ask_direction
     short_edit = sum(len(span.text.split()) for span in spans) < SHORT_EDIT_TOKENS
     eligibility = _time_eligibility(amendment, ask)
     amendment_spans = (
         _amendment_spans(amendment, result) if evidence is None else evidence.amendment_spans
     )
     ask_spans = _ask_spans(ask, reading) if evidence is None else evidence.ask_spans
+    # "We oppose any proposal to insert 'X'" quotes X but asks against it: never published,
+    # and the quotation covers the whole sentence so the reader sees the opposition.
+    against = opposed_sentence(ask.span.text, reading.change)
+    if against is not None:
+        ask_spans = (
+            SourceSpan(
+                record_id=ask.span.record_id,
+                field=ask.span.field,
+                start=ask.span.start + against[0],
+                end=ask.span.start + against[1],
+                text=ask.span.text[against[0] : against[1]],
+            ),
+        )
 
     limitations: list[str] = [*result.limitations]
+    differing: tuple[str, ...] = ()
+    reversed_wording = False
     if evidence is None:
-        clean_tier = _tier(score, short_edit=short_edit, same_direction=same_direction)
+        differing = cue_mismatch(spans, result.submission_changes)
+        clean_tier = _tier(
+            score, short_edit=short_edit, same_direction=same_direction, cues_agree=not differing
+        )
+        if result.negation_conflict:
+            # The scorer zeroes a pair whose negation cues differ. Scored as if they agreed,
+            # wording close enough for a tier is the same text with its sense reversed.
+            unguarded = score_pair(
+                ScoreRequest(
+                    amendment=amendment_change,
+                    submission=TextChange(old=reading.change.old or "", new=reading.change.new),
+                ),
+                guard_negation=False,
+            )
+            reversed_wording = (
+                _tier(unguarded.score, short_edit=short_edit, same_direction=False) is not None
+            )
+            if reversed_wording:
+                # Quote the shared wording, so the reader sees what was reversed.
+                amendment_spans = _amendment_spans(amendment, unguarded)
     else:
         clean_tier = _prose_tier(
             evidence.match,
@@ -358,12 +497,27 @@ def assess_link(
         )
     # A negation cue is only a hint: it contradicts a link when the wording otherwise matches
     # well enough to earn a tier. A weak match with a "not" nearby is just a weak match.
-    conflict = opposed or (negation and clean_tier is not None)
+    conflict = opposed or (negation and (clean_tier is not None or reversed_wording))
     tier = None if conflict else clean_tier
     if short_edit:
         limitations.append("A short edit cannot pass the copied or reworded tier on words alone.")
+    if differing:
+        limitations.append(
+            "A modal, negation or number in the changed words has no counterpart on the other "
+            f"side ({', '.join(differing)}), so the wording cannot count as a copy."
+        )
+    if against is not None:
+        limitations.append(
+            "The instruction is preceded in its sentence by an opposition cue (such as 'do not' "
+            "or 'oppose'), so the ask may be against this change; it is not published."
+        )
     if conflict:
         limitations.append("The ask and the amendment pull in opposite directions.")
+    if evidence is not None and ask.direction == "unknown":
+        limitations.append(
+            "The ask is prose with no recorded direction, so the same-direction and "
+            "opposite-direction checks did not run."
+        )
     if eligibility != "ask_first":
         limitations.append("The ask is not dated before the amendment, so it cannot be an origin.")
     if amendment.old_text is None:
@@ -393,6 +547,7 @@ def assess_link(
         and amendment.old_text is not None
         and quotes_valid
         and (evidence is None or publish_prose)
+        and against is None
     ):
         status = "published"
     else:
@@ -417,6 +572,11 @@ def assess_link(
                 else {
                     "longest_shared_run": float(evidence.match.longest),
                     "shared_rarity": evidence.match.shared_weight,
+                    **(
+                        {}
+                        if evidence.masked_chars is None
+                        else {"quoted_law_masked_chars": float(evidence.masked_chars)}
+                    ),
                 }
             ),
         },

@@ -30,6 +30,7 @@ const laws: LineageLawList = {
       procedure_id: view.procedure_id,
       title: view.title,
       run_id: view.run_id,
+      status: view.status,
       adopted_phrases: view.counts.adopted_phrases,
       amendments_adopting: view.counts.amendments_adopting,
       documents_with_origin: view.counts.documents_with_origin,
@@ -101,7 +102,14 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(within(card).getAllByRole("blockquote")).toHaveLength(2);
   expect(screen.getByRole("heading", { name: "Who tabled the adopted wording" })).toBeDefined();
   expect(screen.getByText("Political groups (verbatim)")).toBeDefined();
-  expect(screen.getByText(/Verbatim matching only/)).toBeDefined();
+  expect(within(card).getByText(/joint: credited to several holders/)).toBeDefined();
+  expect(within(card).getByText(/18 of 18 words in the final act/)).toBeDefined();
+  const auken = screen.getByRole("row", { name: /Margrete AUKEN/ });
+  expect(within(auken).getByText("1 of 2")).toBeDefined();
+  expect(within(auken).getByText("50%")).toBeDefined();
+  expect(within(auken).getByText("1 (1)")).toBeDefined();
+  expect(screen.getByText("18 of 103")).toBeDefined();
+  expect(screen.getByText(/Verbatim wording only/)).toBeDefined();
   expect(screen.getByText(/Meetings: not collected in this run/)).toBeDefined();
   expect(fetchMock.mock.calls.map(([input]) => String(input)).sort()).toEqual([
     "/api/v1/lineage",
@@ -146,14 +154,26 @@ test("a long list is paged, and an undated or citing submission is labelled as s
       amendment_ids: ["am:1"],
     })),
     origins: [
-      { ...origin, phrase_id: ids[0] ?? "", amendment_ids: ["am:1"], precedes: null },
+      {
+        ...origin,
+        phrase_id: ids[0] ?? "",
+        amendment_ids: ["am:1"],
+        precedes: null,
+        eligibility: "unknown_date",
+      },
       { ...origin, phrase_id: ids[1] ?? "", amendment_ids: ["am:1"], is_citation: true },
-      { ...origin, phrase_id: ids[2] ?? "", amendment_ids: ["am:1"], precedes: false },
+      {
+        ...origin,
+        phrase_id: ids[2] ?? "",
+        amendment_ids: ["am:1"],
+        precedes: false,
+        eligibility: "amendment_first",
+      },
     ],
   });
   render(<LineagePage />);
 
-  await screen.findByText("No adopted wording, so no credit to share.");
+  await screen.findByText("No adopted wording, so no credit.");
   fireEvent.click(screen.getByRole("button", { name: `Tabled, not adopted (${total})` }));
   expect(screen.getAllByRole("article")).toHaveLength(PHRASES_PER_PAGE);
   expect(screen.getByText("Order unknown")).toBeDefined();
@@ -174,7 +194,8 @@ test("many credit holders are cut to the first rows until all are asked for", as
     holder_id: `actor:mep:${index}`,
     holder_kind: "mep" as const,
     name: `Member ${index}`,
-    phrases: 1 / (index + 1),
+    amendments: 20 - index,
+    amendments_tabled: 20,
   }));
   serve({ ...view, credits });
   render(<LineagePage />);
@@ -217,6 +238,50 @@ test("a view whose records do not join is refused whole, and Reload asks again",
   expect(screen.queryByRole("article")).toBeNull();
   fireEvent.click(within(alert).getByRole("button", { name: "Reload law" }));
   await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(2));
+});
+
+test("an unknown adoption shows its reason and unknown counts, never zeros", async () => {
+  const reason = "The final act was not collected";
+  const unknown: LineageView = {
+    ...view,
+    status: "unknown",
+    reason,
+    counts: {
+      ...view.counts,
+      amendments_adopting: null,
+      adopted_phrases: null,
+      phrases_without_group: null,
+      documents_read: null,
+      documents_with_origin: null,
+      changed_units: null,
+      linked_units: null,
+    },
+    adopted_phrases: [],
+    adoptions: [],
+    origins: [],
+    credits: [],
+  };
+  installFetch((path) => {
+    if (path === "/api/v1/lineage") {
+      return reply({
+        laws: laws.laws.map((law) => ({
+          ...law,
+          status: "unknown",
+          adopted_phrases: null,
+          amendments_adopting: null,
+          documents_with_origin: null,
+        })),
+      } satisfies LineageLawList);
+    }
+    return path === `/api/v1/lineage/${slug}` ? reply(unknown) : unexpected(path);
+  });
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  render(<LineagePage />);
+
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain(`Adoption could not be computed for this law. ${reason}.`);
+  expect(screen.getAllByText("unknown")).toHaveLength(4);
+  expect(await screen.findByText(/adoption unknown/)).toBeDefined();
 });
 
 test("an empty list says how to build the first lineage view and requests no law", async () => {

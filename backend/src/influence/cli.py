@@ -4,11 +4,11 @@
 Parltrack dumps, the register export and the Have Your Say index.
 `influence collect <law>` is Atlas part 1: it writes one law's public record under
 `data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
-writes the Atlas view (`atlas.json`). `influence lineage <law>` collects, then traces the
-final act's new wording to the amendments that carry it and the submissions that say it,
-and writes the view the explorer serves (`lineage.json`). `influence coordinated <law>` collects,
-then lists the near-identical amendments tabled by different political groups
-(`coordinated.json`). `influence channels <law>` collects, then counts the channels the law
+writes the view the explorer serves (`atlas.json`) and the law's coordinated amendments
+(`coordinated.json`). `influence coordinated <law>` collects, then lists those near-identical
+amendments tabled by different political groups. `influence lineage <law>` collects, then
+traces the final act's new wording to the amendments and consultation documents that carry
+it (`lineage.json`). `influence channels <law>` collects, then counts the channels the law
 was lobbied through: consultation stages, timing, tabling Members and coalitions
 (`channels.json`). `influence directions <law>` collects, then counts which way the
 amendments move the law and, through the atlas view's published links, each actor's asks
@@ -35,6 +35,7 @@ from influence.extraction.fetching import CachedFetcher, UrllibFetcher
 from influence.extraction.records import RecordError
 from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
+from influence.schemas.coordinated import CoordinatedCluster, CoordinatedView
 from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
@@ -48,12 +49,14 @@ from influence.services.collect import (
 )
 from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.direction import build_directions, write_directions
-from influence.services.lineage_pipeline import build_lineage_view, write_lineage_view
+from influence.services.lineage_assembly import build_lineage, write_lineage
 from influence.services.pipeline import (
+    Collected,
     PipelineError,
     build_view,
     load_collected,
     read_view,
+    remove_stale_view,
     write_view,
 )
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
@@ -172,60 +175,18 @@ def _print_collected(result: CollectResult, elapsed: float) -> None:
     print(f"manifest: {result.manifest_path.absolute()}")
 
 
-def _build_view(result: CollectResult) -> int:
-    try:
-        view = build_view(load_collected(result.bundle), generated_at=datetime.now(UTC))
-        path = write_view(view, result.bundle)
-    except (PipelineError, RecordError, OSError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        print("The collected bundle is kept; no view was written.", file=sys.stderr)
-        return 1
-    statuses = Counter(link.status for link in view.bundle.links)
-    print(
-        f"Atlas: {statuses['published']} published, {statuses['unconfirmed']} unconfirmed, "
-        f"{statuses['contradicted']} contradicted links; graph of "
-        f"{len(view.snapshot.nodes)} nodes and {len(view.snapshot.edges)} edges"
+def _coordination(collected: Collected, generated_at: datetime) -> CoordinatedView:
+    return build_coordination(
+        collected.law,
+        collected.manifest.run_id,
+        collected.amendments,
+        collected.actors,
+        generated_at=generated_at,
     )
-    print(f"view:     {path.absolute()}")
-    print(f"explorer: http://localhost:3000/atlas?law={view.slug}")
-    return 0
 
 
-def _build_lineage(result: CollectResult) -> int:
-    try:
-        view = build_lineage_view(load_collected(result.bundle), generated_at=datetime.now(UTC))
-        path = write_lineage_view(view, result.bundle)
-    except (PipelineError, RecordError, OSError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        print("The collected bundle is kept; no lineage view was written.", file=sys.stderr)
-        return 1
-    counts = view.counts
-    print(
-        f"Lineage: {counts.adopted_phrases} adopted phrases in {counts.amendments_adopting} of "
-        f"{counts.amendments} amendments; {len(view.tabled_phrases)} tabled phrases; "
-        f"{len(view.origins)} origin quotations in {counts.documents_with_origin} of "
-        f"{counts.documents_read} submissions"
-    )
-    print(f"view:     {path.absolute()}")
-    print(f"explorer: http://localhost:3000/lineage?law={view.slug}")
-    return 0
-
-
-def _list_coordinated(result: CollectResult) -> int:
-    try:
-        collected = load_collected(result.bundle)
-        view = build_coordination(
-            collected.law,
-            collected.manifest.run_id,
-            collected.amendments,
-            collected.actors,
-            generated_at=datetime.now(UTC),
-        )
-        path = write_coordination(view, result.bundle)
-    except (PipelineError, RecordError, OSError) as error:
-        print(f"error: {error}", file=sys.stderr)
-        print("The collected bundle is kept; no cluster file was written.", file=sys.stderr)
-        return 1
+def _print_coordination(view: CoordinatedView) -> list[CoordinatedCluster]:
+    """The one summary line both commands print; returns the clusters that span groups."""
     counts = view.counts
     crossing = [cluster for cluster in view.clusters if cluster.cross_group]
     print(
@@ -233,6 +194,48 @@ def _list_coordinated(result: CollectResult) -> int:
         f"political groups ({counts.amendments} amendments: {counts.compared} compared, "
         f"{counts.too_short} too short, {counts.not_comparable} not comparable)"
     )
+    return crossing
+
+
+def _build_view(result: CollectResult) -> int:
+    try:
+        collected = load_collected(result.bundle)
+        now = datetime.now(UTC)
+        view = build_view(collected, generated_at=now)
+        coordination = _coordination(collected, now)
+        # Both are built before either is written, and the view last: the API lists a law
+        # by its view, so a listed law always has the clusters of the same run beside it.
+        clusters = write_coordination(coordination, result.bundle)
+        path = write_view(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no view was written.", file=sys.stderr)
+        # A view of an earlier collect run would otherwise be served beside this run's records.
+        if remove_stale_view(result.bundle, result.manifest.run_id):
+            print("The view of an earlier collect run was removed.", file=sys.stderr)
+        return 1
+    statuses = Counter(link.status for link in view.bundle.links)
+    print(
+        f"Atlas: {statuses['published']} published, {statuses['unconfirmed']} unconfirmed, "
+        f"{statuses['contradicted']} contradicted links; graph of "
+        f"{len(view.snapshot.nodes)} nodes and {len(view.snapshot.edges)} edges"
+    )
+    _print_coordination(coordination)
+    print(f"view:     {path.absolute()}")
+    print(f"clusters: {clusters.absolute()}")
+    print(f"explorer: http://localhost:3000/atlas?law={view.slug}")
+    return 0
+
+
+def _list_coordinated(result: CollectResult) -> int:
+    try:
+        view = _coordination(load_collected(result.bundle), datetime.now(UTC))
+        path = write_coordination(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no cluster file was written.", file=sys.stderr)
+        return 1
+    crossing = _print_coordination(view)
     for position, cluster in enumerate(crossing[:CLUSTERS_SHOWN], start=1):
         print(
             f"  {position}. {len(cluster.members)} amendments, "
@@ -248,6 +251,40 @@ def _list_coordinated(result: CollectResult) -> int:
         quote = " ... ".join(span.text for span in cluster.members[0].inserted)
         print(f'     "{" ".join(quote.split())[:QUOTE_CHARACTERS]}"')
     print(f"clusters: {path.absolute()}")
+    return 0
+
+
+def _list_lineage(result: CollectResult) -> int:
+    try:
+        view = build_lineage(load_collected(result.bundle), generated_at=datetime.now(UTC))
+        path = write_lineage(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no lineage file was written.", file=sys.stderr)
+        return 1
+    counts = view.counts
+    if view.status == "unknown":
+        print(f"Lineage: unknown ({view.reason})")
+    else:
+        print(
+            f"Lineage: {counts.adopted_phrases} adopted phrases from {counts.amendments_adopting} "
+            f"of {counts.amendments} amendments; {counts.linked_units} of {counts.changed_units} "
+            "new words of the final act traced to an amendment"
+        )
+        documents = (
+            "origins unknown (no consultation text)"
+            if counts.documents_read is None
+            else f"{counts.documents_with_origin} of {counts.documents_read} consultation "
+            "documents say adopted or tabled wording first"
+        )
+        print(f"  {documents}")
+        for credit in [c for c in view.credits if c.holder_kind == "mep"][:CLUSTERS_SHOWN]:
+            print(
+                f"  {credit.name}: {credit.amendments} of {credit.amendments_tabled} amendments "
+                f"adopted, {credit.phrases} phrase(s) ({credit.joint_phrases} joint)"
+            )
+    print(f"lineage: {path.absolute()}")
+    print(f"explorer: http://localhost:3000/lineage?law={view.slug}")
     return 0
 
 
@@ -421,16 +458,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     for name, summary in (
         ("collect", "collect one law's public record into data/laws/<procedure>/"),
-        ("atlas", "collect one law, then build its Atlas view (parts 1 to 7)"),
-        (
-            "lineage",
-            "collect one law, then trace its final act's new wording to amendments and "
-            "submissions (the explorer's view)",
-        ),
+        ("atlas", "collect one law, then build the explorer's view of it (parts 1 to 7)"),
         (
             "coordinated",
             "collect one law, then list near-identical amendments tabled by different "
             "political groups",
+        ),
+        (
+            "lineage",
+            "collect one law, then trace the final act's new wording to the amendments and "
+            "consultation documents that carry it",
         ),
         ("channels", "collect one law, then count the channels it was lobbied through"),
         (
@@ -491,8 +528,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     after: dict[str, Callable[[CollectResult], int] | None] = {
         "collect": None,
         "atlas": _build_view,
-        "lineage": _build_lineage,
         "coordinated": _list_coordinated,
+        "lineage": _list_lineage,
         "channels": lambda result: _list_channels(
             result,
             CollectInputs.under(

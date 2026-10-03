@@ -13,11 +13,12 @@ export interface LineageAmendmentRow {
   amendmentId: string;
   stage: "committee" | "plenary" | null;
   committee: string | null;
+  /** Each author's name, with the political group in brackets when it is known. */
   authors: readonly string[];
   tabledOn: string | null;
-  /** Words of this amendment that stand in the final act; `null` for tabled wording. */
+  /** Words of the amendment's new text inside adopted wording, of all its words; `null` for tabled wording. */
   adoptedWords: number | null;
-  insertedWords: number | null;
+  newWords: number | null;
 }
 
 /** A submission that says the phrase, with the exact quotation and its date order. */
@@ -30,6 +31,8 @@ export interface LineageOriginRow {
   words: number;
   precedes: boolean | null;
   isCitation: boolean;
+  /** Dated before every carrying amendment and not a citation: the backend's `counts_as_origin`. */
+  countsAsOrigin: boolean;
   kind: LineageMatchKind;
 }
 
@@ -44,23 +47,28 @@ export interface LineagePhraseRow {
   finalQuotes: readonly AtlasSourceSpan[];
   amendments: readonly LineageAmendmentRow[];
   origins: readonly LineageOriginRow[];
-  /** At least one submission said it before the amendments and is not a citation. */
+  /** At least one origin counts: a dated document that came first and is not a citation. */
   hasEarlierRequest: boolean;
+  /** Credited to more than one holder. */
+  joint: boolean;
 }
 
 export interface LineageCreditRow {
   holderId: string;
   kind: LineageHolderKind;
   name: string;
+  /** Whole phrases credited (no fractional credit), and how many are shared. */
   phrases: number;
-  distinctPhrases: number;
+  jointPhrases: number;
+  /** Amendments that reached the final act, of those tabled on this law. */
   amendments: number;
+  amendmentsTabled: number;
 }
 
 export interface LineageCreditTable {
   basis: LineageMatchKind;
   groups: readonly LineageCreditRow[];
-  /** MEPs and the committee's own text, which has no individual author. */
+  /** Members, unresolved author names and the committee's own text, in the backend's order. */
   holders: readonly LineageCreditRow[];
 }
 
@@ -79,6 +87,7 @@ function originRow(origin: OriginMatchRecord): LineageOriginRow {
     words: origin.words,
     precedes: origin.precedes,
     isCitation: origin.is_citation,
+    countsAsOrigin: origin.eligibility === "ask_first" && !origin.is_citation,
     kind: origin.kind,
   };
 }
@@ -88,11 +97,26 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     amendmentId: adoption.amendment_id,
     stage: adoption.stage,
     committee: adoption.committee,
-    authors: adoption.author_names.length > 0 ? adoption.author_names : adoption.author_ids,
+    authors: authorLabels(adoption),
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
-    insertedWords: adoption.inserted_words,
+    newWords: adoption.new_words,
   };
+}
+
+/**
+ * Names when the dump gave them, otherwise IDs. Groups pair with author IDs, so they are
+ * attached only when names and IDs line up one to one.
+ */
+function authorLabels(adoption: AmendmentAdoptionRecord): readonly string[] {
+  const names = adoption.author_names.length > 0 ? adoption.author_names : adoption.author_ids;
+  if (names.length !== adoption.author_ids.length) {
+    return names;
+  }
+  return names.map((name, index) => {
+    const group = adoption.author_groups[index];
+    return group === undefined || group === null ? name : `${name} (${group})`;
+  });
 }
 
 function tabledRow(amendmentId: string): LineageAmendmentRow {
@@ -103,7 +127,7 @@ function tabledRow(amendmentId: string): LineageAmendmentRow {
     authors: [],
     tabledOn: null,
     adoptedWords: null,
-    insertedWords: null,
+    newWords: null,
   };
 }
 
@@ -122,7 +146,7 @@ function byEvidence(left: LineagePhraseRow, right: LineagePhraseRow): number {
 }
 
 function hasEarlierRequest(origins: readonly LineageOriginRow[]): boolean {
-  return origins.some((origin) => origin.precedes === true && !origin.isCitation);
+  return origins.some((origin) => origin.countsAsOrigin);
 }
 
 function creditRow(credit: CreditRecord): LineageCreditRow {
@@ -131,8 +155,9 @@ function creditRow(credit: CreditRecord): LineageCreditRow {
     kind: credit.holder_kind,
     name: credit.name,
     phrases: credit.phrases,
-    distinctPhrases: credit.distinct_phrases,
+    jointPhrases: credit.joint_phrases,
     amendments: credit.amendments,
+    amendmentsTabled: credit.amendments_tabled,
   };
 }
 
@@ -199,6 +224,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       amendments: carriers.get(phrase.phrase_id) ?? [],
       origins: said,
       hasEarlierRequest: hasEarlierRequest(said),
+      joint: phrase.holders.length > 1,
     };
   });
   const tabled = view.tabled_phrases.map((phrase): LineagePhraseRow => {
@@ -213,10 +239,11 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       amendments: carriers.get(phrase.phrase_id) ?? [],
       origins: said,
       hasEarlierRequest: hasEarlierRequest(said),
+      joint: false,
     };
   });
 
-  // The backend orders credits within each basis; the explorer keeps that order.
+  // The backend orders credits (`credit_rank`); the explorer keeps that order.
   const bases: LineageMatchKind[] = ["verbatim", "semantic"];
   const credits = bases.flatMap((basis): LineageCreditTable[] => {
     const rows = view.credits.filter((credit) => credit.basis === basis).map(creditRow);

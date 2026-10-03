@@ -30,7 +30,7 @@ export const PHRASES_PER_PAGE = 20;
 const CREDITS_SHOWN = 15;
 
 const count = new Intl.NumberFormat("en-US");
-const share = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
 
 /** A law without a lineage view is an expected answer here, not a failure to load. */
 type LawViewResult = { found: true; view: LineageView } | { found: false; detail: string };
@@ -50,6 +50,17 @@ function plural(value: number, one: string, many: string): string {
   return `${count.format(value)} ${value === 1 ? one : many}`;
 }
 
+/** A count the view could not compute is `null`: it reads "unknown", never zero. */
+function known(value: number | null): string {
+  return value === null ? "unknown" : count.format(value);
+}
+
+function ofTotal(part: number | null, whole: number | null): string {
+  return part === null || whole === null
+    ? "unknown"
+    : `${count.format(part)} of ${count.format(whole)}`;
+}
+
 function day(value: string | null): string {
   return value === null ? "date unknown" : value.slice(0, 10);
 }
@@ -64,6 +75,13 @@ function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
 }
 
 function Timing({ origin }: { origin: LineageOriginRow }) {
+  if (origin.countsAsOrigin) {
+    return (
+      <span className="rounded-sm bg-[#e8efea] px-2 py-0.5 font-medium text-teal-900">
+        Said before the amendments
+      </span>
+    );
+  }
   if (origin.isCitation) {
     return (
       <span className="rounded-sm bg-stone-200 px-2 py-0.5 text-stone-700">
@@ -76,11 +94,7 @@ function Timing({ origin }: { origin: LineageOriginRow }) {
       <span className="rounded-sm bg-stone-100 px-2 py-0.5 text-stone-600">Order unknown</span>
     );
   }
-  return origin.precedes ? (
-    <span className="rounded-sm bg-[#e8efea] px-2 py-0.5 font-medium text-teal-900">
-      Said before the amendments
-    </span>
-  ) : (
+  return (
     <span className="rounded-sm bg-amber-50 px-2 py-0.5 text-amber-900">
       Said after the first amendment
     </span>
@@ -108,6 +122,7 @@ function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
           )}
           <p className="text-xs text-stone-500">
             {plural(phrase.words, "word", "words")} · {phrase.kind}
+            {phrase.joint ? " · joint: credited to several holders" : ""}
           </p>
         </section>
         <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
@@ -125,8 +140,8 @@ function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
                     {amendment.stage}
                     {amendment.committee === null ? "" : ` · ${amendment.committee}`} · tabled{" "}
                     {day(amendment.tabledOn)}
-                    {amendment.adoptedWords !== null && amendment.insertedWords !== null
-                      ? ` · ${count.format(amendment.adoptedWords)} of ${count.format(amendment.insertedWords)} inserted words adopted`
+                    {amendment.adoptedWords !== null && amendment.newWords !== null
+                      ? ` · ${count.format(amendment.adoptedWords)} of ${count.format(amendment.newWords)} words in the final act`
                       : ""}
                   </span>
                 )}
@@ -262,13 +277,13 @@ function CreditList({ title, rows }: { title: string; rows: readonly LineageCred
               Name
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Phrase credit
+              Amendments adopted
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Phrases
+              Rate
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Amendments
+              Phrases (joint)
             </th>
           </tr>
         </thead>
@@ -276,9 +291,15 @@ function CreditList({ title, rows }: { title: string; rows: readonly LineageCred
           {shown.map((row) => (
             <tr key={`${row.kind}:${row.holderId}`} className="border-t border-stone-100">
               <td className="py-1.5 pr-3 text-stone-900">{row.name}</td>
-              <td className="py-1.5 text-right">{share.format(row.phrases)}</td>
-              <td className="py-1.5 text-right">{count.format(row.distinctPhrases)}</td>
-              <td className="py-1.5 text-right">{count.format(row.amendments)}</td>
+              <td className="py-1.5 text-right">
+                {count.format(row.amendments)} of {count.format(row.amendmentsTabled)}
+              </td>
+              <td className="py-1.5 text-right">
+                {percent.format(row.amendments / row.amendmentsTabled)}
+              </td>
+              <td className="py-1.5 text-right">
+                {count.format(row.phrases)} ({count.format(row.jointPhrases)})
+              </td>
             </tr>
           ))}
         </tbody>
@@ -299,12 +320,12 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
         Who tabled the adopted wording
       </h3>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
-        Each adopted phrase is worth 1, split equally among the Members who tabled an amendment
-        carrying it, so co-signers of one compromise do not each count in full. A group's credit is
-        the sum of its Members' shares.
+        Every holder of an adopted phrase is credited with the whole phrase; a phrase with several
+        holders is joint. Holders are ranked by the share of their amendments on this law that
+        reached the final act ("N of M"), not by phrase counts.
       </p>
       {tables.length === 0 ? (
-        <p className="text-sm text-stone-600">No adopted wording, so no credit to share.</p>
+        <p className="text-sm text-stone-600">No adopted wording, so no credit.</p>
       ) : (
         tables.map((table) => (
           <div key={table.basis} className="grid gap-6 lg:grid-cols-2">
@@ -369,19 +390,26 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           generated {view.generated_at}
         </p>
       </header>
+      {view.status === "unknown" && (
+        <p role="alert" className="max-w-3xl text-sm leading-6 text-amber-900">
+          Adoption could not be computed for this law.{" "}
+          {sentence(view.reason ?? "No reason was recorded")} Nothing is adopted or credited, and
+          counts that could not be computed read "unknown".
+        </p>
+      )}
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Adopted phrases" value={count.format(counts.adopted_phrases)} />
+        <Stat label="Adopted phrases" value={known(counts.adopted_phrases)} />
         <Stat
           label="Amendments with adopted wording"
-          value={`${count.format(counts.amendments_adopting)} of ${count.format(counts.amendments)}`}
+          value={ofTotal(counts.amendments_adopting, counts.amendments)}
         />
         <Stat
-          label="Tabled phrases a submission says"
-          value={count.format(lineage.tabled.length)}
+          label="New final-act words traced to an amendment"
+          value={ofTotal(counts.linked_units, counts.changed_units)}
         />
         <Stat
-          label="Submissions that say tabled or adopted wording"
-          value={`${count.format(counts.documents_with_origin)} of ${count.format(counts.documents_read)}`}
+          label="Consultation documents that said it first"
+          value={ofTotal(counts.documents_with_origin, counts.documents_read)}
         />
       </dl>
       <Credits tables={lineage.credits} />
@@ -517,7 +545,9 @@ export function LineageLawBrowser() {
                     <span className="block text-sm font-medium text-stone-900">{law.title}</span>
                     <span className="mt-1 block text-xs tabular-nums text-stone-500">
                       {law.procedure_id} ·{" "}
-                      {plural(law.adopted_phrases, "adopted phrase", "adopted phrases")}
+                      {law.adopted_phrases === null
+                        ? "adoption unknown"
+                        : plural(law.adopted_phrases, "adopted phrase", "adopted phrases")}
                     </span>
                   </button>
                 </li>

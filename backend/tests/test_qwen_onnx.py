@@ -103,8 +103,12 @@ def test_no_texts_means_no_vectors_and_no_model_call() -> None:
 
 
 def test_a_long_text_is_cut_but_keeps_its_end_of_text_token() -> None:
-    model, session = build({"long": [*range(1, MAX_TOKENS + 100), 7]})
+    model, session = build({"long": [*range(1, MAX_TOKENS + 100), 7], "short": [1, 7]})
+    assert model.truncated == 0
+    model(["long", "short"])
+    assert model.truncated == 1
     model(["long"])
+    assert model.truncated == 2
     sent = cast("list[list[int]]", session.feeds[0]["input_ids"])
     assert len(sent[0]) == MAX_TOKENS
     assert sent[0][-1] == 7

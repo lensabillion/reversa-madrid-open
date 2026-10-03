@@ -17,6 +17,8 @@ from datetime import date, datetime
 from itertools import combinations
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from influence.extraction.files import write_bytes_atomic
 from influence.extraction.layout import procedure_slug
 from influence.schemas.atlas import Actor, Amendment, LawRecord, SourceSpan
@@ -55,6 +57,10 @@ LIMITATIONS = (
 )
 
 type Shingle = tuple[str, ...]
+
+
+class CoordinationError(RuntimeError):
+    """A law's `coordinated.json` is on disk and does not fit `CoordinatedView`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,3 +267,27 @@ def write_coordination(view: CoordinatedView, bundle: Path) -> Path:
     path = bundle / VIEW_FILE
     write_bytes_atomic(path, view.model_dump_json().encode("utf-8"))
     return path
+
+
+def read_coordination(data_root: Path, slug: str) -> CoordinatedView | None:
+    """The law's last written clusters, or None when that law has none.
+
+    A file that does not validate raises: serving it as "no clusters" would hide a broken
+    run behind an answer that reads as a finding.
+    """
+    path = data_root / "laws" / slug / VIEW_FILE
+    if not path.is_file():
+        return None
+    try:
+        return CoordinatedView.model_validate_json(path.read_bytes())
+    except ValidationError as error:
+        raise CoordinationError(f"The clusters at {path} are invalid: {error}") from error
+
+
+def cross_group_clusters(data_root: Path, slug: str) -> int | None:
+    """How many of the law's clusters span political groups; None when none were built.
+
+    None is "not computed", which the law list keeps apart from a computed zero.
+    """
+    view = read_coordination(data_root, slug)
+    return None if view is None else sum(cluster.cross_group for cluster in view.clusters)

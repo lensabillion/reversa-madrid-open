@@ -18,20 +18,65 @@ test("joins an adopted phrase with its final quotation, amendment and earlier su
   const prepared = prepareLineage(view);
 
   const phrase = only(prepared.adopted);
-  expect(phrase.text).toBe("for at least six months after the system is placed on the market");
-  expect(only(phrase.finalQuotes).text).toBe(phrase.text);
+  expect(phrase.text).toBe(
+    "providers shall keep the logs for at least six months after the system is placed on the market",
+  );
+  expect(only(phrase.finalQuotes).text).toBe(
+    "Providers shall keep the logs for at least six months after the system is placed on the market",
+  );
   const amendment = only(phrase.amendments);
   expect(amendment.amendmentId).toBe("am:2021-0106-COD:ENVI:PE7-7");
+  // The test world's amendment names three people but resolves two IDs, so no group is attached.
   expect(amendment.authors).toContain("César Luena");
-  expect([amendment.adoptedWords, amendment.insertedWords]).toEqual([13, 13]);
+  expect([amendment.adoptedWords, amendment.newWords]).toEqual([18, 18]);
   const origin = only(phrase.origins);
-  expect([origin.organisation, origin.precedes, origin.isCitation]).toEqual([
+  expect([origin.organisation, origin.precedes, origin.isCitation, origin.countsAsOrigin]).toEqual([
     "Acme Unknown Lobby",
     true,
     false,
+    true,
   ]);
-  expect(phrase.hasEarlierRequest).toBe(true);
+  expect([phrase.hasEarlierRequest, phrase.joint]).toEqual([true, true]);
   expect(prepared.tabled).toEqual([]);
+});
+
+test("authors carry their group only when names and IDs line up one to one", () => {
+  const view = fixtureView();
+  const adoption = only(view.adoptions);
+  const paired: LineageView = {
+    ...view,
+    adoptions: [
+      {
+        ...adoption,
+        author_names: ["Brando Benifei", "Margrete Auken"],
+        author_groups: ["S&D", null],
+      },
+    ],
+  };
+
+  const amendment = only(only(prepareLineage(paired).adopted).amendments);
+
+  expect(amendment.authors).toEqual(["Brando Benifei (S&D)", "Margrete Auken"]);
+  const unnamed: LineageView = {
+    ...view,
+    adoptions: [{ ...adoption, author_names: [], author_groups: [] }],
+  };
+  expect(only(only(prepareLineage(unnamed).adopted).amendments).authors).toEqual(
+    adoption.author_ids,
+  );
+});
+
+test("only a dated, earlier, non-citation document counts as an origin", () => {
+  const view = fixtureView();
+  const origin = only(view.origins);
+  const with_ = (changes: Partial<OriginMatchRecord>) =>
+    only(only(prepareLineage({ ...view, origins: [{ ...origin, ...changes }] }).adopted).origins)
+      .countsAsOrigin;
+
+  expect(with_({})).toBe(true);
+  expect(with_({ is_citation: true })).toBe(false);
+  expect(with_({ precedes: false, eligibility: "amendment_first" })).toBe(false);
+  expect(with_({ precedes: null, eligibility: "unknown_date" })).toBe(false);
 });
 
 test("splits credits into groups and holders and keeps the backend's order", () => {
@@ -48,6 +93,16 @@ test("splits credits into groups and holders and keeps the backend's order", () 
   expect(table.holders.map((row) => row.holderId)).toEqual(ids(false));
   expect(table.groups.length).toBeGreaterThan(0);
   expect(table.holders.length).toBeGreaterThan(0);
+  const [first] = view.credits;
+  expect(table.holders[0]).toEqual({
+    holderId: first?.holder_id,
+    kind: first?.holder_kind,
+    name: first?.name,
+    phrases: first?.phrases,
+    jointPhrases: first?.joint_phrases,
+    amendments: first?.amendments,
+    amendmentsTabled: first?.amendments_tabled,
+  });
 });
 
 test("tabled wording carries its amendments by id and its submissions", () => {
@@ -106,7 +161,7 @@ test("orders phrases by evidence: an earlier request first, then any submission,
     ],
     origins: [
       said("phrase:b", { precedes: true }),
-      said("phrase:c", { precedes: false }),
+      said("phrase:c", { precedes: false, eligibility: "amendment_first" }),
       said("phrase:e", { precedes: true, is_citation: true }),
     ],
   });

@@ -5,20 +5,31 @@ saw in training. Each labelled pair links its organization, its amendment text a
 submission text. The first choice is connected components over those links: whole
 components go to one fold, so nothing can cross. When there are fewer components than
 folds, or one holds more than a fold's share of the positives (on LobbyPlag one holds 170
-of 172), components cannot make k useful folds. Then each organization is a test group,
-and every training pair that shares
-an amendment or submission text with the test fold is withheld from that fold's training
-data ("purged"). Either way no organization or text appears on both sides of a split; the
-fallback pays for it with smaller training sets, which the report counts.
+of 172), components cannot make k useful folds. Then the test groups are organizations,
+joined wherever two organizations submitted an identical input (the same amendment text
+and the same submission text, after `text_key`), so a duplicated input is never tested in
+two folds; every training pair that shares an amendment or submission text with the test
+fold is withheld from that fold's training data ("purged"). Either way no organization or
+text appears on both sides of a train/test split, and no identical input sits in two test
+folds (so neither in both the development and held-out halves of `calibrate.py`); the
+fallback pays for it with smaller training sets, which the report counts. A single shared
+amendment or submission text may still appear in two test folds when its pairs differ in
+the other text: joining on single texts would rebuild the dominant component.
 """
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from dataclasses import dataclass
 from math import ceil
 from typing import Literal
 
-from influence.practice.labels import LabelledPair, PracticeDataError, PracticePair, text_key
+from influence.practice.labels import (
+    LabelledPair,
+    PracticeDataError,
+    PracticePair,
+    input_key,
+    text_key,
+)
 
 type Grouping = Literal["connected_components", "organizations_with_purge"]
 type Link = tuple[str, str, str]
@@ -56,8 +67,11 @@ def links(pair: PracticePair) -> tuple[Link, Link, Link]:
     )
 
 
-def connected_components(pairs: Sequence[PracticePair]) -> list[list[int]]:
-    """Union-find with path halving over three hashed links per pair: O(n log n) amortized."""
+def connected_components(
+    pairs: Sequence[PracticePair],
+    keys: Callable[[PracticePair], Iterable[Hashable]] = links,
+) -> list[list[int]]:
+    """Union-find with path halving over each pair's hashed `keys`: O(n log n) amortized."""
     parent = list(range(len(pairs)))
 
     def root(index: int) -> int:
@@ -66,14 +80,19 @@ def connected_components(pairs: Sequence[PracticePair]) -> list[list[int]]:
             index = parent[index]
         return index
 
-    first: dict[Link, int] = {}
+    first: dict[Hashable, int] = {}
     for index, pair in enumerate(pairs):
-        for link in links(pair):
+        for link in keys(pair):
             parent[root(index)] = root(first.setdefault(link, index))
     members: defaultdict[int, list[int]] = defaultdict(list)
     for index in range(len(pairs)):
         members[root(index)].append(index)
     return list(members.values())
+
+
+def organization_groups(pair: PracticePair) -> tuple[Hashable, Hashable]:
+    """An organization and its exact input: pairs sharing either belong to one test group."""
+    return ("organization", pair.organization_id), ("input", input_key(pair))
 
 
 def _assign(groups: list[list[int]], pairs: Sequence[LabelledPair], k: int) -> list[list[int]]:
@@ -116,6 +135,7 @@ def make_folds(pairs: Sequence[LabelledPair], k: int) -> FoldPlan:
     """Assign every pair to exactly one test fold; O(k n) for the purge.
 
     Raises `PracticeDataError` when there are fewer groups than folds, so no fold is empty.
+    The fallback's groups are organizations joined by identical inputs (module docstring).
     """
     if k < 2:
         raise ValueError(f"Need at least 2 folds, got {k}")
@@ -126,10 +146,8 @@ def make_folds(pairs: Sequence[LabelledPair], k: int) -> FoldPlan:
     if len(components) >= k and largest <= ceil(sum(item.influenced for item in pairs) / k):
         grouping, groups = "connected_components", components
     else:
-        by_organization: defaultdict[str, list[int]] = defaultdict(list)
-        for index, pair in enumerate(texts):
-            by_organization[pair.organization_id].append(index)
-        grouping, groups = "organizations_with_purge", list(by_organization.values())
+        grouping = "organizations_with_purge"
+        groups = connected_components(texts, organization_groups)
     if len(groups) < k:
         raise PracticeDataError(f"{len(groups)} independent groups cannot fill {k} folds")
     folds: list[Fold] = []

@@ -137,7 +137,7 @@ are also retained for the NLI experiment.
 - `judge-diagnostic-output.json` contains raw synthetic predictions, while
   `judge-diagnostic-report.json` joins the separately stored intended labels afterward.
 
-Actual artifacts in this session are under
-`/Users/lensa/Projects/reversa-madrid-open/data/semantic-evaluation/`. Corrected retrieval
+The evaluation run kept its artifacts under
+`data/semantic-evaluation/` (relative to the repository root; not committed). Corrected retrieval
 inputs and model artifacts are in its `deletions/` directory; the judge artifacts are in
 `judge/` and bind the initial root `inputs.json`. Neither raw data nor vectors are committed.

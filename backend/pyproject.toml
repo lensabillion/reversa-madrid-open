@@ -14,7 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-# The 19:00 batch command; `make submit` runs it. See README.md, "Submission Command".
+# The `influence` command line (`influence.cli`); the root Makefile's targets run its
+# subcommands (`make setup`, `make atlas`, ...). See README.md for each command.
 influence = "influence.cli:main"
 
 [dependency-groups]

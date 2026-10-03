@@ -199,7 +199,7 @@ Length: 1,800–2,500 words plus 3 tables and 2 charts. Format: a web page in th
 - **Privacy.** Exclude submissions by **individual citizens**; analyse organisations only. MEPs are public office holders. Avoid naming individual lobbyists beyond register data.
 - **README for a one-command rerun.**
   - `make atlas`: download, with dated and checksummed sources in `data/provenance.json`; build; serve.
-  - `make atlas-sample`: about 5 laws, under 5 minutes, on a clean machine.
+  - `make atlas-sample`: about 5 laws, under 5 minutes, on a clean machine. (Not built. The rerun path that exists is `make setup && make atlas LAW='AI Act'`, one law per run; note added 3 October.)
   - State hardware and timings measured today.
   - Provenance table columns: source, URL, retrieval date, licence, SHA-256, record count.
 

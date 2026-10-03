@@ -36,6 +36,7 @@ _SYSTEM = (
 PREFIX = f"<|im_start|>system\n{_SYSTEM}<|im_end|>\n<|im_start|>user\n"
 SUFFIX = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
 # A field is cut here so a long amendment cannot push the answer prompt out of the model's reach.
+# The cut is not silent: `clipped_fields` counts it, and the practice report publishes the count.
 MAX_FIELD_CHARS = 1500
 BATCH_SIZE = 1
 _LOGIT_LIMIT = 30.0
@@ -47,7 +48,11 @@ class JudgeError(Exception):
 
 def _clip(text: str) -> str:
     stripped = text.strip()
-    return stripped if len(stripped) <= MAX_FIELD_CHARS else stripped[:MAX_FIELD_CHARS] + " ..."
+    return stripped if not _too_long(text) else stripped[:MAX_FIELD_CHARS] + " ..."
+
+
+def _too_long(text: str) -> bool:
+    return len(text.strip()) > MAX_FIELD_CHARS
 
 
 def amendment_query(old: str | None, new: str) -> str:
@@ -64,17 +69,37 @@ def change_query(old: str | None, new: str) -> str:
     paragraph; naming the change keeps it in front of the model. Falls back to the old -> new
     form when the original is unknown or the text is past the edit scorer's bounds.
     """
-    if old is None:
-        return amendment_query(None, new)
-    try:
-        spans = changed_spans(TextChange(old=old, new=new))
-    except ValueError:
+    changes = _changes(old, new)
+    if changes is None:
         return amendment_query(old, new)
-    added = " ".join(span.text for span in spans if span.operation == "insert")
-    removed = " ".join(span.text for span in spans if span.operation == "delete")
+    added, removed = changes
     parts = [f"adds: {_clip(added)}"] if added else []
     parts += [f"removes: {_clip(removed)}"] if removed else []
     return "Amendment " + "; ".join(parts) if parts else "Amendment makes no change"
+
+
+def _changes(old: str | None, new: str) -> tuple[str, str] | None:
+    """The words an amendment adds and removes; None when `change_query` falls back."""
+    if old is None:
+        return None
+    try:
+        spans = changed_spans(TextChange(old=old, new=new))
+    except ValueError:
+        return None
+    added = " ".join(span.text for span in spans if span.operation == "insert")
+    removed = " ".join(span.text for span in spans if span.operation == "delete")
+    return added, removed
+
+
+def clipped_fields(old: str | None, new: str, passage: str, *, changes_only: bool = False) -> int:
+    """How many fields of `judge_prompt(old, new, passage)` are cut at `MAX_FIELD_CHARS`.
+
+    The model never reads what follows a cut, so a caller that publishes scores counts the
+    cut prompts instead of letting them pass unnoticed.
+    """
+    changes = _changes(old, new) if changes_only else None
+    fields = list(changes) if changes is not None else ([] if old is None else [old]) + [new]
+    return sum(_too_long(field) for field in (*fields, passage))
 
 
 def judge_prompt(old: str | None, new: str, passage: str, *, changes_only: bool = False) -> str:

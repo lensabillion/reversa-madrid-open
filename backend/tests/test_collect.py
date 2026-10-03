@@ -8,8 +8,9 @@ a scripted fetcher: no test reaches the network.
 import logging
 import urllib.parse
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from hypothesis import given
@@ -26,7 +27,14 @@ from test_cellar import (
     sparql,
 )
 from test_hys import as_json, feedback, feedback_page, initiative, make_pdf, search_page
-from test_parltrack import ai_act_dossier, committee_record, dossier, mep_record, write_dump
+from test_parltrack import (
+    ai_act_dossier,
+    committee_record,
+    dossier,
+    mep_record,
+    switcher,
+    write_dump,
+)
 from test_register import export, representative
 
 from influence import cli
@@ -63,6 +71,8 @@ AI_ACT = "2021/0106(COD)"
 ONGOING = "2024/0100(COD)"
 NEWER_THAN_DUMP = "2025/0059(COD)"
 NOW = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
+LATER = "2026/0001(COD)"
+RECENT = "2026-09-01T00:00:00"
 EQUINET = "718971811339-46"
 ATTACHMENT = "090166e5e1cd1796"
 
@@ -186,9 +196,14 @@ def make_world(
             committee_record(),
             committee_record(id="PE1-1", reference=ONGOING, meps=[]),
             committee_record(id="PE9-9", reference=NEWER_THAN_DUMP, meps=[]),
+            # Another law's recent amendment: the dump reaches past the AI Act's end.
+            committee_record(id="PE8-8", reference=LATER, meps=[], date=RECENT),
         ],
     )
-    write_dump(dumps / "ep_plenary_amendments.json.zst", [plenary_record(AI_ACT)])
+    write_dump(
+        dumps / "ep_plenary_amendments.json.zst",
+        [plenary_record(AI_ACT), {**plenary_record(LATER), "date": RECENT}],
+    )
     write_dump(
         dumps / "ep_meps.json.zst", [mep_record(197721), mep_record(125042, "Margrete AUKEN")]
     )
@@ -634,7 +649,7 @@ def test_consultation_gaps_are_counted_by_kind(tmp_path: Path) -> None:
         layer="asks",
         status="partial",
         count=3,
-        reason="1 publication(s) not served or not read; 1 attachment(s) not downloaded",
+        reason="1 publication(s) not read: the request failed; 1 attachment(s) not downloaded",
     )
 
 
@@ -650,7 +665,10 @@ def test_an_unreadable_attachment_is_counted_and_kept_as_a_document(tmp_path: Pa
     result = world.collect()
 
     asks = row(result.law, "asks")
-    assert (asks.status, asks.reason) == ("partial", "1 attachment(s) with no extractable text")
+    assert (asks.status, asks.reason) == (
+        "partial",
+        "1 attachment(s) with no extractable text (invalid_pdf 1)",
+    )
     receipt = result.manifest.stages[2]
     documents = world.store().read_output(receipt, "documents.jsonl", SourceDocument)
     (attached,) = (d for d in documents if d.source_kind == "hys_attachment")
@@ -680,13 +698,18 @@ def test_without_the_index_a_title_search_finds_the_initiative_and_says_so(
     assert asks.reason == "Initiative found by title search: the Have Your Say index is not built"
 
 
-def test_a_failed_title_search_is_a_labelled_missing_layer(tmp_path: Path) -> None:
+def test_a_failed_title_search_is_a_labelled_layer_not_collected(tmp_path: Path) -> None:
     world = make_world(tmp_path, index=None)
 
-    asks = row(world.collect().law, "asks")
+    result = world.collect()
 
-    assert asks.status == "missing"
+    # The search failed, so the run did not get the feedback: not evidence of none.
+    asks = row(result.law, "asks")
+    assert asks.status == "not_collected"
     assert (asks.reason or "").startswith("Have Your Say title search failed")
+    receipt = next(stage for stage in result.manifest.stages if stage.stage == "asks")
+    assert receipt.status == "partial"
+    assert receipt.errors == (asks.reason,)
 
 
 def test_a_law_with_nothing_to_analyse_stops_without_a_manifest(tmp_path: Path) -> None:
@@ -696,6 +719,233 @@ def test_a_law_with_nothing_to_analyse_stops_without_a_manifest(tmp_path: Path) 
         world.collect("2022/0047(COD)")
 
     assert world.store("2022/0047(COD)").current() is None
+
+
+# --- Reruns after a failure, and stale inputs -----------------------------------------------
+
+
+def stage_statuses(result: CollectResult) -> list[tuple[str, str]]:
+    return [(stage.stage, stage.status) for stage in result.manifest.stages]
+
+
+def test_a_stage_left_partial_by_an_outage_is_rebuilt_when_the_source_returns(
+    tmp_path: Path,
+) -> None:
+    feedback_page_url = hys.feedback_url(14488, 0)
+    script = [item for item in ai_act_script() if item[0] != feedback_page_url]
+    world = make_world(tmp_path, script)
+
+    down = world.collect()
+
+    # The feedback request failed: not evidence that nobody answered the consultation.
+    asks = row(down.law, "asks")
+    assert (asks.status, asks.count) == ("not_collected", 0)
+    assert asks.reason == "1 publication(s) not read: the request failed"
+    assert ("asks", "partial") in stage_statuses(down)
+
+    world.scripted.script[:] = ai_act_script()
+    back = world.collect()
+
+    assert stage_statuses(back) == [
+        ("texts", "reused"),
+        ("amendments", "reused"),
+        ("asks", "complete"),
+        ("law", "complete"),
+    ]
+    assert row(back.law, "asks").status == "complete"
+    law_receipt = back.manifest.stages[3]
+    (stored,) = world.store().read_output(law_receipt, "laws.jsonl", LawRecord)
+    assert stored == back.law
+    assert sum(feedback_page_url in call for call in world.scripted.calls) == 2
+
+
+def test_an_unanswered_cellar_with_several_com_numbers_is_not_collected_until_it_answers(
+    tmp_path: Path,
+) -> None:
+    script = [item for item in ai_act_script() if item[0] != "procedure/2021_106>"]
+    world = make_world(tmp_path, script)
+    dossier_record = ai_act_dossier()
+    amended = {
+        "date": "2023-01-10T00:00:00",
+        "type": "Amended legislative proposal for reconsultation published",
+        "docs": [{"title": "COM(2023)0010"}],
+    }
+    events = cast("list[object]", dossier_record["events"])
+    write_dump(world.inputs.dossiers, [{**dossier_record, "events": [*events, amended]}])
+
+    down = world.collect()
+
+    asks = row(down.law, "asks")
+    assert asks.status == "not_collected"
+    assert (asks.reason or "").startswith(
+        "No COM reference was resolved, so Have Your Say was not searched: CELLAR did not answer"
+    )
+    assert ("asks", "partial") in stage_statuses(down)
+
+    world.scripted.script[:] = ai_act_script()
+    back = world.collect()
+
+    # The amendments were complete, so they are reused; the gaps CELLAR caused are not.
+    assert [status for _, status in stage_statuses(back)] == [
+        "complete",
+        "reused",
+        "complete",
+        "complete",
+    ]
+    assert row(back.law, "proposal").status == "complete"
+    assert row(back.law, "asks").status == "complete"
+
+
+def test_a_refreshed_dossiers_dump_that_changed_the_law_rebuilds_its_record(
+    tmp_path: Path,
+) -> None:
+    world = make_world(tmp_path, [("procedure/2024_100>", sparql())])
+    first = world.collect(ONGOING)
+    assert first.law.status == "ongoing"
+    completed = dossier(ONGOING, title="Toy Safety", stage_reached="Procedure completed")
+    write_dump(world.inputs.dossiers, [ai_act_dossier(), completed])
+
+    second = world.collect(ONGOING)
+
+    # The stages whose records carry the catalog entry are rebuilt; asks never read it.
+    assert stage_statuses(second) == [
+        ("texts", "complete"),
+        ("amendments", "complete"),
+        ("asks", "reused"),
+        ("law", "complete"),
+    ]
+    (stored,) = world.store(ONGOING).read_output(second.manifest.stages[3], "laws.jsonl", LawRecord)
+    assert (stored.status, stored.stage_reached) == ("completed", "Procedure completed")
+
+
+def test_each_amendment_names_its_authors_groups_on_the_day_it_was_tabled(
+    tmp_path: Path,
+) -> None:
+    world = make_world(tmp_path)
+    # 197721 sat with Renew until July 2024, then the EPP; the amendment is from 2022.
+    write_dump(world.inputs.meps, [switcher(197721), mep_record(125042, "Margrete AUKEN")])
+
+    result = world.collect()
+
+    receipt = result.manifest.stages[1]
+    amendments = world.store().read_output(receipt, "amendments.jsonl", Amendment)
+    committee = next(item for item in amendments if item.stage == "committee")
+    assert committee.author_ids == ("actor:mep:197721", "actor:mep:125042")
+    # 125042's spells leave 2019 to 2024 uncovered: unknown, not the latest group.
+    assert committee.author_groups == ("Renew", None)
+    actors = world.store().read_output(receipt, "actors.jsonl", Actor)
+    assert {a.actor_id: a.political_group for a in actors}["actor:mep:197721"] == "EPP"
+
+
+def test_amendments_from_a_dump_that_ends_before_the_law_did_are_partial(
+    tmp_path: Path,
+) -> None:
+    world = make_world(tmp_path)
+    write_dump(world.inputs.committee_amendments, [committee_record()])
+    write_dump(world.inputs.plenary_amendments, [{**plenary_record(AI_ACT), "date": None}])
+
+    law = world.collect().law
+
+    committee = row(law, "committee_amendments")
+    assert (committee.status, committee.count) == ("partial", 1)
+    assert committee.reason == (
+        "The Parltrack committee amendments dump ends on 2022-01-25, before the procedure's "
+        "last activity on 2024-07-12: later amendments may be absent"
+    )
+    plenary = row(law, "plenary_amendments")
+    assert plenary.status == "partial"
+    assert (plenary.reason or "").startswith(
+        "The Parltrack plenary amendments dump ends on an unknown date"
+    )
+
+
+def test_a_dumps_reach_is_scanned_once_and_cached_by_its_hash(tmp_path: Path) -> None:
+    dated = write_dump(tmp_path / "dated.json.zst", [committee_record()])
+    undated = write_dump(tmp_path / "undated.json.zst", [{"id": 1}])
+    catalog = tmp_path / "catalog"
+
+    assert collect.dump_reach(dated, "a" * 64, catalog) == date(2022, 1, 25)
+    assert collect.dump_reach(undated, "b" * 64, catalog) is None
+    dated.unlink()
+    undated.unlink()
+    # Read back from the cache: the dumps are gone.
+    assert collect.dump_reach(dated, "a" * 64, catalog) == date(2022, 1, 25)
+    assert collect.dump_reach(undated, "b" * 64, catalog) is None
+    with pytest.raises(CollectError, match="unreadable"):
+        collect.dump_reach(dated, "c" * 64, catalog)
+
+
+def test_a_package_publication_of_another_law_is_skipped_and_counted(tmp_path: Path) -> None:
+    base = index_entry()
+    other = base.publications[0].model_copy(
+        update={"publication_id": 999, "reference": "COM(2021)207", "com_reference": None}
+    )
+    shared = base.publications[0].model_copy(update={"reference": "COM(2021)0206 and COM(2021)207"})
+    entry = base.model_copy(update={"publications": (shared, other)})
+    world = make_world(tmp_path, index=(entry,))
+
+    asks = row(world.collect().law, "asks")
+
+    assert (asks.status, asks.count) == ("complete", 3)
+    assert asks.reason == "1 publication(s) of another law of the package skipped"
+    assert not any("999" in call for call in world.scripted.calls)
+
+
+def test_refresh_asks_have_your_say_again(tmp_path: Path) -> None:
+    world = make_world(tmp_path)
+    world.collect()
+    page = hys.feedback_url(14488, 0)
+    download = hys.download_url(ATTACHMENT)
+    asked = [sum(url in call for call in world.scripted.calls) for url in (page, download)]
+
+    world.collect(refresh=True)
+
+    again = [sum(url in call for call in world.scripted.calls) for url in (page, download)]
+    assert again == [count + 1 for count in asked]
+
+
+def test_an_index_crawl_failure_is_named_and_an_empty_answer_is_not_collected(
+    tmp_path: Path,
+) -> None:
+    world = make_world(tmp_path)
+    failures = tuple(
+        hys.IndexFailure(initiative_id=number, error="HTTP 500") for number in range(1, 7)
+    )
+    hys.write_failures(hys.failures_path(world.inputs.hys_index), failures[:1])
+
+    found = row(world.collect().law, "asks")
+
+    assert (found.status, found.count) == ("complete", 3)
+    assert found.reason == (
+        "The Have Your Say index lacks 1 initiative(s) its crawl could not read (1); "
+        "run setup again to retry them"
+    )
+
+    other = make_world(tmp_path / "other", index=(index_entry(com="COM(2099)1"),))
+    hys.write_failures(hys.failures_path(other.inputs.hys_index), failures)
+
+    lacking = row(other.collect().law, "asks")
+
+    assert lacking.status == "not_collected"
+    assert lacking.reason == (
+        "The Have Your Say index lacks 6 initiative(s) its crawl could not read "
+        "(1, 2, 3, 4, 5, ...); run setup again to retry them"
+    )
+
+
+def test_a_publication_the_api_does_not_serve_is_a_source_gap(tmp_path: Path) -> None:
+    unserved = RawResponse(200, "text/plain", b"bad_request")
+    script = [
+        (fragment, unserved) if fragment == hys.feedback_url(14488, 0) else (fragment, response)
+        for fragment, response in ai_act_script()
+    ]
+    world = make_world(tmp_path, script)
+
+    result = world.collect()
+
+    asks = row(result.law, "asks")
+    assert (asks.status, asks.reason) == ("missing", "1 publication(s) not served by the API")
+    assert ("asks", "complete") in stage_statuses(result)
 
 
 # --- Inputs that stop the run ---------------------------------------------------------------

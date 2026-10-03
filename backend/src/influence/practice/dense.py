@@ -15,6 +15,7 @@ Three questions, answered on the same pairs so a difference is the method's:
    negatives well enough to publish on, by the rule of `practice/calibrate.py`: the least
    threshold whose Wilson 95% lower bound on precision clears a floor, chosen on the
    even-numbered folds and then read on the odd ones, which played no part in choosing it.
+   The reworded tier is judged on its own band, below the copied threshold.
    And a funnel: how much an embedding cut would spare the slow judge, and what it would cost.
 
 Run from the repository root, after `make fetch-lobbyplag`, `make fetch-qwen-embedding` and
@@ -46,14 +47,11 @@ from pydantic import BaseModel, ConfigDict
 
 from influence.practice.__main__ import DATA_FILES, PER_CLASS, TOP_K, lexical_scores
 from influence.practice.calibrate import (
-    COPIED_FLOOR,
-    MIN_PAIRS,
-    REWORDED_FLOOR,
     TABLE_THRESHOLDS,
-    Counts,
+    Proposal,
     ThresholdRow,
-    choose_threshold,
     counts,
+    tier_proposals,
 )
 from influence.practice.folds import FoldPlan, make_folds
 from influence.practice.harness import (
@@ -87,8 +85,15 @@ from influence.services.embedding import (
     embed_texts,
     with_instruction,
 )
-from influence.services.judge import ScoreFunction, judge_pairs
-from influence.services.qwen_onnx import BATCH_SIZE, MODEL_ID, QwenError, load_qwen
+from influence.services.judge import MAX_FIELD_CHARS, ScoreFunction, clipped_fields, judge_pairs
+from influence.services.qwen_onnx import (
+    BATCH_SIZE,
+    MAX_TOKENS,
+    MODEL_ID,
+    QwenEmbedder,
+    QwenError,
+    load_qwen,
+)
 from influence.services.qwen_reranker import MODEL_ID as RERANKER_ID
 from influence.services.qwen_reranker import load_reranker
 from influence.services.retrieval import PassageIndex
@@ -121,6 +126,9 @@ CAVEATS = (
     "the batch (see services/qwen_onnx.py).",
     "A query that cannot run (empty or over-long text) counts as a miss and is listed in "
     "`query_errors`.",
+    f"The judge reads each field up to {MAX_FIELD_CHARS} characters; `clipped_prompts` counts "
+    f"the labelled pairs whose prompt was cut. The embedder reads {MAX_TOKENS} tokens; the run "
+    "prints how many texts it cut (vectors read from the cache are not recounted).",
 )
 
 
@@ -162,15 +170,6 @@ class Separation(Frozen):
     negatives_median: float
 
 
-class JudgeProposal(Frozen):
-    tier: Literal["copied", "reworded"]
-    floor: float
-    min_pairs: int
-    threshold: float | None
-    development: Counts | None
-    held_out: Counts | None
-
-
 class FunnelRow(Frozen):
     """What keeping only pairs whose embedding cosine is at least `cosine_at_least` leaves."""
 
@@ -186,13 +185,15 @@ class JudgeReport(Frozen):
     reranker_sha256: dict[str, str]
     separation: Separation
     table: tuple[ThresholdRow, ...]
-    proposals: tuple[JudgeProposal, ...]
+    proposals: tuple[Proposal, ...]
+    # Labelled pairs whose prompt had a field cut at `MAX_FIELD_CHARS` (see services/judge.py).
+    clipped_prompts: int
     development_folds: tuple[int, ...]
     held_out_folds: tuple[int, ...]
 
 
 class DenseReport(Frozen):
-    kind: Literal["dense-meaning-v1"]
+    kind: Literal["dense-meaning-v2"]
     model_id: str
     input_sha256: dict[str, str]
     model_sha256: dict[str, str]
@@ -585,8 +586,11 @@ def judge_report(
     practice: PracticeSet,
     plan: FoldPlan,
     reranker_sha256: dict[str, str],
+    *,
+    changes_only: bool,
 ) -> JudgeReport:
-    """Separation, threshold table and the development-then-held-out threshold proposals."""
+    """Separation, threshold table, the development-then-held-out threshold proposals, and
+    how many prompts the judge saw cut (`changes_only` as the scorer was run)."""
     labels = [item.influenced for item in practice.pairs]
     positives = [score for score, label in zip(scores, labels, strict=True) if label]
     negatives = [score for score, label in zip(scores, labels, strict=True) if not label]
@@ -599,29 +603,16 @@ def judge_report(
         )
         for threshold in TABLE_THRESHOLDS
     )
-
-    def proposal(tier: Literal["copied", "reworded"], floor: float) -> JudgeProposal:
-        def part(indices: Sequence[int]) -> tuple[list[float], list[bool]]:
-            return [scores[i] for i in indices], [labels[i] for i in indices]
-
-        threshold = choose_threshold(*part(development), floor)
-        if threshold is None:
-            return JudgeProposal(
-                tier=tier,
-                floor=floor,
-                min_pairs=MIN_PAIRS,
-                threshold=None,
-                development=None,
-                held_out=None,
-            )
-        return JudgeProposal(
-            tier=tier,
-            floor=floor,
-            min_pairs=MIN_PAIRS,
-            threshold=threshold,
-            development=counts(*part(development), threshold),
-            held_out=counts(*part(held_out), threshold),
-        )
+    documents = [
+        (item.pair, _proposal_text(item.pair.submission.old, item.pair.submission.new))
+        for item in practice.pairs
+    ]
+    clipped = sum(
+        clipped_fields(pair.amendment.old, pair.amendment.new, document, changes_only=changes_only)
+        > 0
+        for pair, document in documents
+        if document.strip()
+    )
 
     return JudgeReport(
         scorer=scorer,
@@ -636,7 +627,8 @@ def judge_report(
             negatives_median=_rounded(statistics.median(negatives)),
         ),
         table=table,
-        proposals=(proposal("copied", COPIED_FLOOR), proposal("reworded", REWORDED_FLOOR)),
+        proposals=tier_proposals(scores, labels, development, held_out),
+        clipped_prompts=clipped,
         development_folds=development_folds,
         held_out_folds=held_out_folds,
     )
@@ -700,7 +692,8 @@ def print_report(report: DenseReport, timings: str) -> None:
         print(
             f"{judge.scorer} P(yes): positives mean {sep.positives_mean:.3f} median "
             f"{sep.positives_median:.3f}; weak negatives mean {sep.negatives_mean:.3f} median "
-            f"{sep.negatives_median:.3f}"
+            f"{sep.negatives_median:.3f}; {judge.clipped_prompts} prompts cut at "
+            f"{MAX_FIELD_CHARS} characters"
         )
         for found in judge.proposals:
             held = found.held_out
@@ -708,7 +701,9 @@ def print_report(report: DenseReport, timings: str) -> None:
                 "no threshold reaches the floor"
                 if found.threshold is None or held is None
                 else (
-                    f"threshold {found.threshold:.2f}; held-out {held.positives}/{held.pairs} "
+                    f"threshold {found.threshold:.2f}"
+                    + ("" if found.below is None else f" to below {found.below:.2f}")
+                    + f"; held-out {held.positives}/{held.pairs} "
                     f"(Wilson {held.wilson_low:.3f}-{held.wilson_high:.3f})"
                 )
             )
@@ -755,12 +750,19 @@ def main(
     labels = [item.influenced for item in practice.pairs]
     reranker_digests = {} if reranker is None else _digests(reranker, RERANKER_FILES)
     judged = tuple(
-        judge_report(name, measured.scores[name], practice, plan, reranker_digests)
+        judge_report(
+            name,
+            measured.scores[name],
+            practice,
+            plan,
+            reranker_digests,
+            changes_only=name == "qwen-judge-changes",
+        )
         for name in ("qwen-judge", "qwen-judge-changes")
         if name in measured.scores
     )
     report = DenseReport(
-        kind="dense-meaning-v1",
+        kind="dense-meaning-v2",
         model_id=MODEL_ID,
         input_sha256=hashes,
         model_sha256=_digests(model, EMBEDDING_FILES),
@@ -775,6 +777,8 @@ def main(
     )
     write_atomically(out, render(report))
     finished = perf_counter()
+    if isinstance(embed, QwenEmbedder):
+        print(f"The embedder cut {embed.truncated} texts at {MAX_TOKENS} tokens in this run")
     print_report(
         report,
         f"Wrote {out}. Load data and models {loaded - started:.1f} s; retrieval "

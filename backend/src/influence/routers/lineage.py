@@ -8,7 +8,7 @@ from fastapi import Path as PathParameter
 from influence.routers.atlas import DataRoot
 from influence.schemas.atlas_view import SLUG_PATTERN
 from influence.schemas.lineage import LineageLawList, LineageView
-from influence.services.lineage_pipeline import list_lineage_views, read_lineage_view
+from influence.services.lineage_views import list_lineage_views, read_lineage_view
 from influence.services.pipeline import PipelineError
 
 router = APIRouter(prefix="/api/v1")
