@@ -1,0 +1,125 @@
+{
+  "provenance": "Synthetic diagnostic cases authored before running the model; not real law or a representative accuracy sample.",
+  "cases": [
+    {
+      "id": "same-obligation",
+      "premise": "Operators must retain records for six months.",
+      "hypothesis": "Operators are required to retain records for six months."
+    },
+    {
+      "id": "same-prohibition",
+      "premise": "Providers must not sell personal data.",
+      "hypothesis": "Providers are prohibited from selling personal data."
+    },
+    {
+      "id": "same-exemption",
+      "premise": "Small enterprises are exempt from the reporting obligation.",
+      "hypothesis": "Small enterprises do not have to report."
+    },
+    {
+      "id": "same-deadline",
+      "premise": "Reports must be submitted before 1 January 2030.",
+      "hypothesis": "Reports are due before 1 January 2030."
+    },
+    {
+      "id": "same-threshold",
+      "premise": "The duty applies to companies with more than 250 employees.",
+      "hypothesis": "Companies with 300 employees are subject to the duty."
+    },
+    {
+      "id": "same-permission",
+      "premise": "Operators may disclose a summary of their assessment.",
+      "hypothesis": "Operators are permitted to disclose an assessment summary."
+    },
+    {
+      "id": "same-deletion",
+      "premise": "The previous requirement to appoint an auditor has been removed.",
+      "hypothesis": "There is no longer a requirement to appoint an auditor."
+    },
+    {
+      "id": "same-scope",
+      "premise": "The prohibition applies to both public and private providers.",
+      "hypothesis": "The prohibition applies to private providers."
+    },
+    {
+      "id": "negation",
+      "premise": "Operators must retain records.",
+      "hypothesis": "Operators must not retain records."
+    },
+    {
+      "id": "sell-ban",
+      "premise": "Providers are prohibited from selling personal data.",
+      "hypothesis": "Providers are required to sell personal data."
+    },
+    {
+      "id": "exemption-reversed",
+      "premise": "Small enterprises are exempt from mandatory reporting.",
+      "hypothesis": "Small enterprises are subject to mandatory reporting."
+    },
+    {
+      "id": "deadline-reversed",
+      "premise": "Reports must be submitted before 1 January 2030.",
+      "hypothesis": "Reports must not be submitted before 1 January 2030."
+    },
+    {
+      "id": "threshold-reversed",
+      "premise": "The duty applies only to companies with more than 250 employees.",
+      "hypothesis": "The duty applies to companies with 100 employees."
+    },
+    {
+      "id": "deletion-reversed",
+      "premise": "The obligation to appoint an auditor has been removed.",
+      "hypothesis": "The obligation to appoint an auditor remains in force."
+    },
+    {
+      "id": "scope-reversed",
+      "premise": "Private providers are exempt from the prohibition.",
+      "hypothesis": "Private providers are subject to the prohibition."
+    },
+    {
+      "id": "permission-reversed",
+      "premise": "Operators are allowed to disclose their assessment.",
+      "hypothesis": "Operators are forbidden from disclosing their assessment."
+    },
+    {
+      "id": "may-to-must",
+      "premise": "Operators are allowed to disclose their assessment.",
+      "hypothesis": "Operators are required to disclose their assessment."
+    },
+    {
+      "id": "scope-expanded",
+      "premise": "Public providers must report annually.",
+      "hypothesis": "Private providers must report annually."
+    },
+    {
+      "id": "topic-only",
+      "premise": "Operators must retain records for six months.",
+      "hypothesis": "Operators must publish records for six months."
+    },
+    {
+      "id": "recipient-changed",
+      "premise": "Providers must send the report to the supervisory authority.",
+      "hypothesis": "Providers must send the report to every customer."
+    },
+    {
+      "id": "deadline-unspecified",
+      "premise": "Providers must submit a report.",
+      "hypothesis": "Providers must submit a report within ten days."
+    },
+    {
+      "id": "threshold-unspecified",
+      "premise": "Large providers must undergo an audit.",
+      "hypothesis": "Providers with ten employees must undergo an audit."
+    },
+    {
+      "id": "retention-versus-access",
+      "premise": "Operators must retain records for six months.",
+      "hypothesis": "Authorities may access every retained record."
+    },
+    {
+      "id": "exemption-other-sector",
+      "premise": "Agricultural enterprises are exempt from reporting.",
+      "hypothesis": "Technology enterprises are exempt from reporting."
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import given
@@ -64,6 +65,11 @@ def test_valid_quoted_instruction_uses_its_parsed_bounds() -> None:
     assert ask_limit_reason(ask) is None
 
 
+def _assess(*args: Any, **kwargs: Any) -> LinkAssessment:
+    """The assessor with prose publishing on, so these tests can check the whole ladder."""
+    return assess_link(*args, publish_prose=True, **kwargs)
+
+
 def _rows(name: str) -> list[dict[str, object]]:
     lines = (FIXTURES / name).read_text(encoding="utf-8").splitlines()
     return [json.loads(line) for line in lines]
@@ -112,18 +118,14 @@ def test_fixture_verdicts_match_the_committed_contract_examples() -> None:
     }
     asks = {row["ask_id"]: Ask.model_validate(row) for row in _rows("asks.jsonl")}
     texts = {str(row["document_id"]): str(row["text"]) for row in _rows("document_texts.jsonl")}
-    # Two fixture examples differ on purpose. The fixture publishes both, but their overlap
-    # (0.64 and 0.58) is under the calibrated copied threshold of 0.75, and the reworded tier
-    # is labelled and not published because it missed its precision floor on LobbyPlag.
-    differ = {
-        "link:a-am1-makers": ("unconfirmed", "reworded"),
-        "link:b-am3-labels": ("unconfirmed", "reworded"),
-    }
+    # One fixture example differs on purpose: its ask repeats ten words of the amendment
+    # verbatim, which is a copy, where the fixture labelled it reworded.
+    differ = {"link:b-am3-labels": ("published", "copied")}
     checked = 0
     for row in _rows("links.jsonl"):
         expected = LinkAssessment.model_validate(row)
         ask = asks[expected.ask_id]
-        got = assess_link(amendments[expected.amendment_id], ask, texts[ask.document_id])
+        got = _assess(amendments[expected.amendment_id], ask, texts[ask.document_id])
         assert got.time_eligibility == expected.time_eligibility
         if expected.link_id in differ:
             assert (got.status, got.tier) == differ[expected.link_id]
@@ -134,7 +136,7 @@ def test_fixture_verdicts_match_the_committed_contract_examples() -> None:
 
 
 def test_a_supported_copy_is_published_with_exact_quotations() -> None:
-    got = assess_link(_amendment(), _ask(), SOURCE)
+    got = _assess(_amendment(), _ask(), SOURCE)
     assert (got.status, got.tier) == ("published", "copied")
     assert got.ask_spans
     assert got.amendment_spans
@@ -145,8 +147,8 @@ def test_a_supported_copy_is_published_with_exact_quotations() -> None:
 def test_negation_and_opposite_direction_contradict() -> None:
     source = "Providers should not keep logs for at least six months after launch."
     negated = _ask(source, start=0)
-    assert assess_link(_amendment(), negated, source).status == "contradicted"
-    opposite = assess_link(_amendment(), _ask(direction="weaker"), SOURCE)
+    assert _assess(_amendment(), negated, source).status == "contradicted"
+    opposite = _assess(_amendment(), _ask(direction="weaker"), SOURCE)
     assert opposite.status == "contradicted"
     assert opposite.support_score == 0.0
     assert opposite.tier is None
@@ -165,7 +167,7 @@ def test_negation_and_opposite_direction_contradict() -> None:
 def test_only_an_ask_dated_strictly_before_the_amendment_can_be_an_origin(
     submitted_at: datetime | None, tabled_on: date | None, eligibility: str
 ) -> None:
-    got = assess_link(_amendment(tabled_on=tabled_on), _ask(submitted_at=submitted_at), SOURCE)
+    got = _assess(_amendment(tabled_on=tabled_on), _ask(submitted_at=submitted_at), SOURCE)
     assert got.time_eligibility == eligibility
     assert (got.status == "published") == (eligibility == "ask_first")
     if eligibility != "ask_first":
@@ -174,13 +176,13 @@ def test_only_an_ask_dated_strictly_before_the_amendment_can_be_an_origin(
 
 
 def test_unknown_original_wording_blocks_publication() -> None:
-    got = assess_link(_amendment(old=None), _ask(), SOURCE)
+    got = _assess(_amendment(old=None), _ask(), SOURCE)
     assert got.status == "unconfirmed"
     assert any("original wording is unknown" in note for note in got.limitations)
 
 
 def test_a_quotation_that_is_not_in_its_source_blocks_publication() -> None:
-    got = assess_link(_amendment(), _ask(), "A completely different document text here.")
+    got = _assess(_amendment(), _ask(), "A completely different document text here.")
     assert got.status == "unconfirmed"
     assert got.ask_spans == ()
     assert any("located exactly" in note for note in got.limitations)
@@ -188,7 +190,7 @@ def test_a_quotation_that_is_not_in_its_source_blocks_publication() -> None:
 
 def test_a_tier_the_caller_does_not_allow_stays_unconfirmed() -> None:
     only: frozenset[LinkTier] = frozenset({"reworded"})
-    got = assess_link(_amendment(), _ask(), SOURCE, publishable=only)
+    got = _assess(_amendment(), _ask(), SOURCE, publishable=only)
     assert (got.status, got.tier) == ("unconfirmed", "copied")
 
 
@@ -203,14 +205,14 @@ def test_a_one_word_edit_never_reaches_the_copied_tier() -> None:
             "span": SourceSpan(record_id="doc:hys_feedback:1", start=0, end=len(quote), text=quote)
         }
     )
-    got = assess_link(amendment, ask, quote)
+    got = _assess(amendment, ask, quote)
     assert (got.status, got.tier) == ("unconfirmed", "same_direction")
     assert got.signals["short_edit"] == 1.0
 
 
 def test_unrelated_text_is_insufficient_evidence() -> None:
     quote = "Pizza recipes need patience."
-    got = assess_link(_amendment(), _ask(quote=quote, start=0), quote)
+    got = _assess(_amendment(), _ask(quote=quote, start=0), quote)
     assert (got.status, got.tier) == ("insufficient_evidence", None)
 
 
@@ -246,9 +248,7 @@ def test_published_links_always_have_valid_spans_and_an_earlier_ask(
     old: str, new: str, quote: str
 ) -> None:
     source = f"Lead in. {quote} Trailing."
-    got = assess_link(
-        _amendment(old=old, new=new), _ask(quote=quote, start=len(" Lead in.")), source
-    )
+    got = _assess(_amendment(old=old, new=new), _ask(quote=quote, start=len(" Lead in.")), source)
     assert 0.0 <= got.support_score <= 1.0
     if got.status == "published":
         assert got.time_eligibility == "ask_first"
@@ -257,11 +257,107 @@ def test_published_links_always_have_valid_spans_and_an_earlier_ask(
 
 
 def test_a_reworded_link_is_labelled_but_not_published_unless_the_caller_allows_it() -> None:
-    sentence = "Providers shall keep logs for at least six months after launch."
-    ask = _ask(sentence)
-    default = assess_link(_amendment(), ask, SOURCE)
+    quote = "for at least six months in total"
+    source = "Intro. " + quote + " Outro."
+    ask = _ask(quote, start=source.index(quote))
+    default = _assess(_amendment(), ask, source)
     assert (default.status, default.tier) == ("unconfirmed", "reworded")
     allowed: frozenset[LinkTier] = frozenset({"copied", "reworded"})
-    opted_in = assess_link(_amendment(), ask, SOURCE, publishable=allowed)
+    opted_in = _assess(_amendment(), ask, source, publishable=allowed)
     assert (opted_in.status, opted_in.tier) == ("published", "reworded")
     assert opted_in.support_score == default.support_score
+
+
+PROSE_SOURCE = (
+    "We have many concerns about this proposal and its costs. Providers should not be "
+    "treated as users, and the rules are unclear. Still, providers shall keep technical logs "
+    "for at least six months after the system is placed on the market, as a minimum."
+)
+
+
+def _prose_ask(source: str = PROSE_SOURCE) -> Ask:
+    return _ask(source, direction="unknown", start=0)
+
+
+def test_a_far_away_negation_in_prose_does_not_contradict_a_shared_phrase() -> None:
+    """The first real AI Act run marked 99.8 percent of candidates contradicted this way."""
+    amendment = _amendment(
+        old="Providers shall keep technical logs.",
+        new=(
+            "Providers shall keep technical logs for at least six months after the system "
+            "is placed on the market."
+        ),
+    )
+    got = _assess(_amendment_to(amendment), _prose_ask(), PROSE_SOURCE)
+    assert got.status == "published"
+    assert got.signals["polarity_conflict"] == 0.0
+    assert got.signals["longest_shared_run"] >= 8
+    assert all(span_matches(span, PROSE_SOURCE) for span in got.ask_spans)
+
+
+def _amendment_to(amendment: Amendment) -> Amendment:
+    return amendment
+
+
+def test_a_negation_right_before_the_shared_phrase_does_contradict() -> None:
+    source = "Providers shall not keep technical logs for at least six months after launch."
+    amendment = _amendment(
+        old="Providers shall keep technical logs.",
+        new="Providers shall keep technical logs for at least six months after launch.",
+    )
+    got = _assess(amendment, _ask(source, start=0), source)
+    assert got.status == "contradicted"
+
+
+def test_scattered_common_words_in_prose_are_insufficient_evidence() -> None:
+    source = "The logs that providers keep are long and we shall see what months bring."
+    got = _assess(_amendment(), _ask(source, start=0), source)
+    assert (got.status, got.tier) == ("insufficient_evidence", None)
+    assert got.signals["longest_shared_run"] == 0.0
+
+
+def test_a_rarity_table_lowers_the_support_for_boilerplate() -> None:
+    quote = "for at least six months in total"
+    source = "Intro. " + quote + " Outro."
+    ask = _ask(quote, start=source.index(quote))
+    plain = _assess(_amendment(), ask, source)
+    boilerplate = {
+        "for": 0.01,
+        "at": 0.01,
+        "least": 0.01,
+        "six": 5.0,
+        "months": 5.0,
+        "after": 5.0,
+        "launch": 5.0,
+    }
+    weighted = _assess(_amendment(), ask, source, rarity=boilerplate)
+    assert weighted.support_score != plain.support_score
+
+
+def test_a_prose_match_is_never_published_by_default() -> None:
+    """The first prose run on the AI Act published 7 links, all of them the law's own wording."""
+    default = assess_link(_amendment(), _ask(), SOURCE)
+    assert (default.status, default.tier) == ("unconfirmed", "copied")
+    assert any("not published" in note for note in default.limitations)
+    assert _assess(_amendment(), _ask(), SOURCE).status == "published"
+
+
+def _instruction_ask(text: str) -> Ask:
+    return _ask(text, start=0)
+
+
+def test_a_quoted_instruction_that_repeats_the_inserted_words_is_a_published_copy() -> None:
+    text = "Please insert 'for at least six months after launch' into Article 5."
+    got = assess_link(_amendment(), _instruction_ask(text), text)
+    assert (got.status, got.tier) == ("published", "copied")
+    assert "longest_shared_run" not in got.signals
+    assert [span.text for span in got.ask_spans] == [
+        "insert 'for at least six months after launch'"
+    ]
+    assert got.amendment_spans
+
+
+def test_a_quoted_instruction_with_extra_words_is_only_a_rewording() -> None:
+    text = "Please insert 'for at least six whole calendar months' into Article 5."
+    got = assess_link(_amendment(), _instruction_ask(text), text)
+    assert (got.status, got.tier) == ("unconfirmed", "reworded")

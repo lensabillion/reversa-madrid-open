@@ -1,0 +1,29 @@
+{
+  "provenance": "Synthetic intended NLI relationships; require independent legal review before any accuracy claim.",
+  "labels": {
+    "same-obligation": "entailment",
+    "same-prohibition": "entailment",
+    "same-exemption": "entailment",
+    "same-deadline": "entailment",
+    "same-threshold": "entailment",
+    "same-permission": "entailment",
+    "same-deletion": "entailment",
+    "same-scope": "entailment",
+    "negation": "contradiction",
+    "sell-ban": "contradiction",
+    "exemption-reversed": "contradiction",
+    "deadline-reversed": "contradiction",
+    "threshold-reversed": "contradiction",
+    "deletion-reversed": "contradiction",
+    "scope-reversed": "contradiction",
+    "permission-reversed": "contradiction",
+    "may-to-must": "neutral",
+    "scope-expanded": "neutral",
+    "topic-only": "neutral",
+    "recipient-changed": "neutral",
+    "deadline-unspecified": "neutral",
+    "threshold-unspecified": "neutral",
+    "retention-versus-access": "neutral",
+    "exemption-other-sector": "neutral"
+  }
+}

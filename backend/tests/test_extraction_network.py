@@ -1,5 +1,6 @@
 """Fetching, probing and raw storage: cache-first reads, rate limiting, fail-soft probes."""
 
+import http.client
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
@@ -7,12 +8,13 @@ from datetime import UTC, datetime
 from email.message import Message
 from io import BytesIO
 from pathlib import Path
+from typing import override
 
 import pytest
 from extraction_fixtures import FETCHED_AT, FakeUrlResponse, RecordingFetcher
 from pydantic import ValidationError
 
-from influence.extraction import catalog, probe, pull
+from influence.extraction import catalog, fetching, probe, pull
 from influence.extraction.cache import HttpCache, request_key
 from influence.extraction.catalog import SourceSpec
 from influence.extraction.fetching import (
@@ -21,6 +23,7 @@ from influence.extraction.fetching import (
     FetchError,
     RateLimiter,
     RawResponse,
+    ResponseHead,
     UrllibFetcher,
 )
 from influence.extraction.layout import DataLayout, LayoutError
@@ -28,6 +31,7 @@ from influence.extraction.layout import DataLayout, LayoutError
 REGISTRY = catalog.source("A")
 AMENDMENTS = catalog.source("H")
 OEIL = catalog.source("E")
+DUMP_URL = "https://parltrack.org/dumps/ep_meps.json.zst"
 
 
 def fetcher_for(
@@ -147,6 +151,76 @@ def test_urllib_fetcher_keeps_the_status_of_a_refusal_and_reports_a_dead_host(
     monkeypatch.setattr(urllib.request, "urlopen", unreachable)
     with pytest.raises(FetchError) as failed:
         UrllibFetcher()("https://oeil.secure.europarl.europa.eu/")
+    assert failed.value.status is None
+
+
+def test_streaming_copies_the_body_in_fixed_chunks_and_sends_the_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[urllib.request.Request] = []
+    answer = FakeUrlResponse(200, b"0123456789", "application/zstd", length=10)
+
+    def fake_urlopen(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        seen.append(request)
+        return answer
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(fetching, "DOWNLOAD_CHUNK_BYTES", 4)
+    sink = BytesIO()
+
+    head = UrllibFetcher().stream(DUMP_URL, sink)
+
+    assert head == ResponseHead(200, "application/zstd")
+    assert sink.getvalue() == b"0123456789"
+    # Never one read of the whole body: memory stays at one chunk whatever the file size.
+    assert answer.reads == [4, 4, 4, 4]
+    assert seen[0].get_header("User-agent") == USER_AGENT
+
+
+def test_streaming_refuses_a_body_shorter_than_its_declared_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # http.client's read(n) returns b"" when the connection drops early instead of raising.
+    def cut_off(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        return FakeUrlResponse(200, b"half", length=10)
+
+    monkeypatch.setattr(urllib.request, "urlopen", cut_off)
+    with pytest.raises(FetchError, match="cut off after 4 of 10 bytes"):
+        UrllibFetcher().stream(DUMP_URL, BytesIO())
+
+
+def test_streaming_reports_a_dropped_connection_a_refusal_and_a_dead_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Dropped(FakeUrlResponse):
+        @override
+        def read(self, amt: int | None = None) -> bytes:
+            raise http.client.IncompleteRead(b"par", 10)
+
+    def drop(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        return Dropped(200, b"")
+
+    monkeypatch.setattr(urllib.request, "urlopen", drop)
+    with pytest.raises(FetchError, match="cut off after 0 bytes"):
+        UrllibFetcher().stream(DUMP_URL, BytesIO())
+
+    refusal = urllib.error.HTTPError(DUMP_URL, 404, "Not Found", Message(), BytesIO(b""))
+
+    def refuse(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        raise refusal
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    with pytest.raises(FetchError) as refused:
+        UrllibFetcher().stream(DUMP_URL, BytesIO())
+    assert refused.value.status == 404
+    assert refusal.closed
+
+    def unreachable(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        raise urllib.error.URLError("name resolution failed")
+
+    monkeypatch.setattr(urllib.request, "urlopen", unreachable)
+    with pytest.raises(FetchError, match="No response") as failed:
+        UrllibFetcher().stream(DUMP_URL, BytesIO())
     assert failed.value.status is None
 
 

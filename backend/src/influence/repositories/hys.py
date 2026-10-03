@@ -217,9 +217,9 @@ def normalise_com_reference(value: str | None) -> str | None:
     return f"COM({match.group(1)}){int(match.group(2))}"
 
 
-def _get_json(fetcher: CachedFetcher, url: str) -> dict[str, object]:
+def _get_json(fetcher: CachedFetcher, url: str, *, refresh: bool = False) -> dict[str, object]:
     try:
-        response = fetcher.get(url)
+        response = fetcher.get(url, refresh=refresh)
     except FetchError as error:
         raise HysError(f"Have Your Say request failed: {error}") from error
     return _decode(response.body, url)
@@ -250,9 +250,11 @@ def _publication(raw: dict[str, object]) -> Publication:
     )
 
 
-def fetch_initiative(fetcher: CachedFetcher, initiative_id: int) -> IndexEntry:
+def fetch_initiative(
+    fetcher: CachedFetcher, initiative_id: int, *, refresh: bool = False
+) -> IndexEntry:
     """One initiative with its publications, reduced to what the join needs."""
-    data = _get_json(fetcher, initiative_url(initiative_id))
+    data = _get_json(fetcher, initiative_url(initiative_id), refresh=refresh)
     publications = tuple(
         _publication(raw) for raw in _objects(data.get("publications"), "publications")
     )
@@ -268,8 +270,11 @@ def fetch_initiative(fetcher: CachedFetcher, initiative_id: int) -> IndexEntry:
     )
 
 
-def _search_page(fetcher: CachedFetcher, url: str) -> tuple[list[int], int | None, bool]:
-    page = _object(_get_json(fetcher, url).get("initiativeResultDtoPage"), "initiative page")
+def _search_page(
+    fetcher: CachedFetcher, url: str, *, refresh: bool = False
+) -> tuple[list[int], int | None, bool]:
+    answer = _get_json(fetcher, url, refresh=refresh)
+    page = _object(answer.get("initiativeResultDtoPage"), "initiative page")
     ids = [
         _required_integer(row.get("id"), "initiative id")
         for row in _objects(page.get("content"), "initiative list")
@@ -280,6 +285,7 @@ def _search_page(fetcher: CachedFetcher, url: str) -> tuple[list[int], int | Non
 def crawl_index(
     fetcher: CachedFetcher,
     *,
+    refresh: bool = False,
     progress: Progress | None = None,
     on_error: ErrorSink | None = None,
 ) -> Iterator[IndexEntry]:
@@ -288,18 +294,20 @@ def crawl_index(
     The list moves while it is being paged (new initiatives arrive at the top), so an
     initiative seen twice is fetched once. Without `on_error` the first failing
     initiative stops the crawl; with it, the failure is reported and the crawl goes on,
-    so one broken record does not cost the other four thousand.
+    so one broken record does not cost the other four thousand. `refresh` asks every
+    page again instead of reading the cache, which is the only way to see initiatives
+    and publications added since the cached crawl.
     """
     seen: set[int] = set()
     page = 0
     while True:
-        ids, total, last = _search_page(fetcher, search_url(page=page))
+        ids, total, last = _search_page(fetcher, search_url(page=page), refresh=refresh)
         for initiative_id in ids:
             if initiative_id in seen:
                 continue
             seen.add(initiative_id)
             try:
-                entry = fetch_initiative(fetcher, initiative_id)
+                entry = fetch_initiative(fetcher, initiative_id, refresh=refresh)
             except HysError as error:
                 if on_error is None:
                     raise

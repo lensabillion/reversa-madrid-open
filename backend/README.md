@@ -59,6 +59,68 @@ INFLUENCE_DATA_DIR=/absolute/path/to/lobbyplag make dev-backend
 The local frontend origins `http://localhost:3000` and `http://127.0.0.1:3000` are allowed
 by CORS. This is a local public-data demo without authentication or deployment hardening.
 
+## Setup Command (Atlas Part 1 Inputs)
+
+`influence setup` (`make setup`) fetches, once per machine, the global files every
+`influence collect` run reads, to the paths `CollectInputs.under` names under the data
+root (`INFLUENCE_DATA_ROOT`, default the repository's `data/`, or `--data-root`). Bead
+`rev-6c1o`. It needs network access to `parltrack.org` and `ec.europa.eu`.
+
+```sh
+make setup                                       # everything; the index crawl is the long part
+make setup ARGS='--only parltrack,register'      # the five required files only (about 310 MB)
+make setup ARGS='--only hys'                     # the index alone, for example in another terminal
+make setup ARGS=--refresh                        # fetch every chosen file again and replace it
+```
+
+| Group | Writes | From |
+| --- | --- | --- |
+| `parltrack` | `raw/parltrack/{ep_dossiers,ep_amendments,ep_plenary_amendments,ep_meps}.json.zst` | `https://parltrack.org/dumps/<name>.json.zst` |
+| `register` | `raw/registry/register.xml` | `https://ec.europa.eu/transparencyregister/public/files/ODP/download/XML/latest` |
+| `hys` | `catalog/hys-index.jsonl` | `hys.crawl_index`: about 42 list pages and one request per initiative (about 4,128) |
+
+Groups run in that order, so the required files are in place before the long crawl.
+
+**Downloads.** `CachedFetcher.download` streams each bulk file in 1 MiB chunks through
+the fetching layer's identity and rate limit, into a temporary file that is renamed over
+the target only when the whole body arrived with a 2xx status. A short body (fewer bytes
+than the declared Content-Length; Python's `http.client` returns such a body without
+raising), a refusal or a dead host leaves the previous file, or none. Bulk files bypass the
+HTTP cache: the file on disk is the stored copy. Beside each downloaded file,
+`<name>.source.json` holds its `SourceDocument`: URL, retrieval time (when the request
+left), SHA-256 and media type. For a dump it is the same record collect writes into a
+law's `documents.jsonl`.
+
+**The index.** The crawl reads and fills the HTTP cache under `data/cache/`. The index is
+written only when every initiative answered: a partial one would make collect report "no
+feedback" for a skipped law. The first failure stops the crawl; a rerun replays the cached
+answers and asks only for the rest. `--refresh` asks every page again, so an interrupted
+refresh starts over.
+
+**Reruns.** A file already present is not fetched and is reported `kept`; it is still
+hashed for the table. A file put there by hand has no `.source.json`, and setup does not
+invent one. Collect keys its `amendments` stage by the SHA-256 of the committee, plenary
+and MEP dumps and its `asks` stage by those of the export and the index, so after a
+refresh the next `make collect` redoes those stages. The dossiers dump is in no stage key:
+a refreshed one rebuilds the procedure catalog, but a law already collected keeps its
+saved stages, and with them the title and status the older dump gave, until
+`make collect ARGS=--refresh`.
+
+**Output.** One row per file, after the run: path, bytes, the first 12 hex digits of its
+SHA-256, and `fetched`, `built` or `kept`. Index progress goes to stderr every 250
+initiatives.
+
+**Stops.** Exit 1 at the first file that cannot be fetched or built, after listing the
+files finished before it; exit 2 for an unknown `--only` group.
+
+**Measured** (cloud container, 4-core Xeon 2.8 GHz, Python 3.14.7, a 120,000,000-byte file
+served from `127.0.0.1`): the streamed download, written and flushed to disk, took 0.97 to
+1.03 s with a peak RSS rise of 4 MB; the whole-body read the cache path uses took 0.25 s,
+writing nothing, and its peak RSS rose 167 MB. **Not verified:** a run against
+the real hosts, which this container's network policy blocks, so real download times, the
+real Content-Length and redirect behaviour, and the crawl's duration (about 35 minutes
+uncached, as reported in `docs/agents/agent-1-handoff.md`) are not measured here.
+
 ## Collect Command (Atlas Part 1)
 
 `influence collect <law>` turns what a person types into one law's public record, as the
@@ -92,8 +154,9 @@ missing ones:
 | `raw/registry/register.xml` | `https://ec.europa.eu/transparencyregister/public/files/ODP/download/XML/latest` |
 
 `catalog/hys-index.jsonl` (the Have Your Say initiatives by COM reference) is optional.
-Without it the consultation is found by a title search, and the coverage row says so. No
-command builds the index or downloads the dumps yet; that is a follow-up bead.
+Without it the consultation is found by a title search, and the coverage row says so.
+`make setup` downloads the five files and builds the index; see
+[Setup Command](#setup-command-atlas-part-1-inputs).
 
 **Outputs.** Under `data/laws/<procedure slug>/`: `stages/<stage>/<input hash>/` holds each
 stage's JSON Lines files and its receipt; `runs/<run id>.json` and `manifest.json` hold the
@@ -510,3 +573,34 @@ Measured on Apple M5, Python 3.14.7, 3 October 2026: 1,000 cached fixture projec
 aggregations took 0.1062 seconds (0.1062 ms per run). This tiny in-memory benchmark
 excludes ingestion, scoring, network and disk loading; it does not establish full-pipeline
 runtime or real-world accuracy. The script retains the inputs and measurement procedure.
+
+## Fitted Calculation and Local Model Evaluation
+
+`influence.services.calculation.calculate_links` composes the merged passage-change
+reader and assessment with fitted signals, law-local background/mutual ranks and explicit
+publication evidence. It returns the shared `LinkAssessment` contract consumed by the
+Atlas graph. It preserves all candidate alternatives and reports missing/experimental
+evidence. The default accepted-model set is empty: a fitted support score is neither a
+calibrated probability nor permission to publish.
+
+The [calculation design and plan-coverage handoff](../docs/design/calculation-handoff.md)
+explains formulas, evidence gates, known gaps and dependencies. The
+[isolated model runtime](models/README.md) gives reproducible local Qwen/E5 embeddings,
+DeBERTa NLI inference, measured retrieval comparisons and failed legal diagnostics.
+No paid API or new application dependency is required.
+
+Run the grouped development comparison from the repository root:
+
+```sh
+uv run --directory backend --locked python benchmarks/calculation_plan.py \
+  --data /absolute/path/to/data/lobbyplag \
+  --out /absolute/path/to/calculation-development.json
+```
+
+To include model features, first prepare and run the models as described in their
+README, then pass `--semantic <semantic-pairs.json>`, `--judge <judge-pairs.json>` and
+`--model-inputs <inputs.json>`. Both artifacts must bind the same exact prepared-input
+file and current source hashes. The evaluator rejects incomplete coverage or missing
+scores instead of inserting zeros. Its output retains all variants, five fitted models
+per variant, paired out-of-fold scores, settings, hashes and threshold diagnostics.
+Those pooled diagnostics cannot serve as the cutoff for a separately refitted model.

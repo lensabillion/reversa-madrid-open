@@ -99,13 +99,19 @@ with ten typed coverage rows. The manifest is published last. Details: the
 Verified offline (`measured`, cloud container, Python 3.14.7): 41 tests in
 `tests/test_collect.py` on a small world in the real source formats, covering every
 coverage status and stop; `make check-backend` passes with 636 tests and 100% branch
-coverage (3,947 statements, 994 branches). **Not verified:** a run on real sources. The
-cloud session that wrote it cannot reach the EU hosts, so the AI Act counts and the
-cached and uncached timings must be measured on a laptop: `make collect
-LAW='2021/0106(COD)'`. No command yet downloads the Parltrack dumps and the register or
-builds the Have Your Say index (follow-up bead); without the index, the consultation is
-found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
-`not_collected`.
+coverage (3,947 statements, 994 branches). First real run (`measured` by Agent 2 on
+Windows 11, PR #47, `--no-attachments`): the AI Act collected in 39.4 s uncached and
+18.5 s cached, with 4,852 committee and 808 plenary amendments, 376 proposal and 712
+final-act provisions, 437 asks and 583 actors. Not yet run: a second procedure, and a
+run with attachments. `parliament_position`, `meetings` and `votes` stay
+`not_collected`; without the Have Your Say index, the consultation is found by a
+labelled title search.
+
+Setup (bead `rev-6c1o`): `make setup` streams the four Parltrack dumps and the register
+export into `data/raw/` (atomic, with a `<name>.source.json` provenance record each) and
+builds `data/catalog/hys-index.jsonl`, so a fresh checkout needs no hand downloads.
+Tested offline (`tests/test_setup.py`) and on local files of the real sizes; not yet run
+against the real hosts ([backend README](../backend/README.md#setup-command-atlas-part-1-inputs)).
 
 ## End to End: Atlas Command, View API and Explorer Page — 3 October 2026
 
@@ -185,7 +191,7 @@ Open decisions are not settled until the project owner agrees.
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
-| D1: language-model judge (none, local open model, Claude or Jev) | **Open** | Now runs on thousands of candidates, not 60 pairs; bead `rev-jaig`; [Atlas explainer §10](explainer/influence-atlas-primer.md#10-models-from-hugging-face) |
+| D1: language-model judge | **Local evaluation authorized; no paid API** by the owner, 3 October 2026 | A pinned local DeBERTa NLI model scored 17/24 on a separate synthetic legal diagnostic. Evaluation is authorized; automatic publication is not validated. Raw outputs and labels stay separate. See [calculation handoff](design/calculation-handoff.md), `rev-jaig` and `rev-qs6i`. |
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
 | D5: organizer questions of the first brief | **Superseded**; one question remains: may we use code written before today? | Bead `rev-qvmx` |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
@@ -288,6 +294,59 @@ Completion needs a real bundle of source texts/provenance, resolved actors, all 
 asks, published assessments, outcomes including unmatched/unknown asks, and coverage.
 Then rehearse three random published links and the five-minute presentation. No real
 any-law, model-quality, large-graph or final mobile-integration claim is made here.
+
+## Consolidated Calculation Development — 3 October 2026
+
+Work under `rev-qs6i` extends the merged Agent 2 assessment/audit services with quoted-law
+masking, rarity, local alignment, legal cues, semantic evidence, law-background/mutual
+ranks, grouped fitted logistic support and provenance-bound publication gates. The
+[calculation handoff](design/calculation-handoff.md) maps each plan requirement to code,
+measurements and remaining dependencies. It does not mark all Agent 3 work complete.
+
+The user authorized local model evaluation only, with no paid API. The isolated
+[model runtime and generated report](../backend/models/README.md) record pinned Qwen/E5
+encoder runs and DeBERTa NLI. With deletion-only proposals retained, BM25 retrieves
+157/172 known LobbyPlag matches at 20; Qwen dense retrieves 142 and Qwen fusion 156;
+E5 dense retrieves 138 and E5 fusion 157. Retain BM25: no measured retrieval gain.
+The local NLI model matches 17/24 intended synthetic legal relations; seven failures
+prevent a claim that it can approve reworded links. These synthetic labels are not an
+independent legal audit, and LobbyPlag borrowing labels are not entailment labels.
+
+The existing lexical scorer remains the incumbent. Fitted models and cutoffs are
+explicit development artifacts until the paired evaluation and independent publication
+audit justify adoption. No real 2019+ blind audit or end-to-end collected-law snapshot
+has been established by this calculation work. Complete-law source coverage, part 7
+spend/trend/forecast calculations and the final public report remain separate tracked
+work; see the handoff rather than inferring completion from a working synthetic graph.
+
+Verification of the calculation branch on 3 October, 14:22 CEST: `make check` exited 0;
+854 backend tests passed with 100% coverage (4,666 statements, 1,248 branches); strict
+basedpyright reported zero errors/warnings; 83 frontend tests passed, production build
+passed, six catalogs validated, and backend/frontend vulnerability audits were clean.
+The isolated model gate additionally passed strict typing and four tests, with no known
+vulnerabilities in its 57-package audit. Generated grouped evaluation reports are in
+`backend/evaluation/calculation-qwen.json` and `calculation-e5.json`; their recorded
+implementation hashes match the tested source. Baseline mean precision@20 is 0.9801;
+fitted deterministic/background is 0.9765, Qwen full-signals/NLI 0.9671 and E5 0.9718.
+No fitted replacement is activated. CI status and PR identity remain on the beads.
+
+
+### Follow-Up Main Review at `2fbb229`
+
+The calculation branch integrates PRs #37–47, including the Atlas command/API (#45),
+frontend `/atlas` route (#46), status-quo outcomes, cautious forecast baseline,
+calibration/retrieval experiments and the real-data JSON Lines/long-amendment fixes (#47).
+The whole gate passed after this integration: 941 backend tests, 100% coverage
+(5,310 statements, 1,386 branches), 94 frontend tests, production `/atlas` build and both
+audits clean. New calculation audit digests also bind the reused assessor revision.
+
+An initial real AI Act command stopped on missing raw input files. These have now been
+prepared from official downloads and existing public dumps with hash/URL provenance.
+A real run is in progress; successful live-law output is not yet claimed. A synthetic
+check measured five generated asks but only two in the view/ranking input, confirming
+`rev-539s`. Runtime publication's independent audit gap is `rev-ffsz`. The initial
+frontend 404 (`rev-13x8`) was on `00033b1`; PR #46 adds the route and its browser check
+is being repeated against the current backend. Final test findings follow below.
 
 ## Gate 3 Real-Data Check — 3 October 2026
 
