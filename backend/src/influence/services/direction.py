@@ -56,6 +56,7 @@ from influence.schemas.directions import (
 from influence.schemas.scoring import ChangeSpan, TextChange
 from influence.services.pipeline import PipelineError
 from influence.services.scoring import changed_spans
+from influence.services.tabling_groups import group_limitations, latest_groups, tabling_groups
 
 METHOD: DirectionMethod = "direction-rules-1"
 VIEW_FILE = "directions.json"
@@ -84,8 +85,8 @@ LIMITATIONS = (
     "Counts are not causes: an actor's directions are those of the amendments its asks are "
     "published as linked to, one count per published link, and unconfirmed or contradicted "
     "links are never used.",
-    "A Member's political group is the one of their latest spell in Parltrack's dump; an "
-    "amendment co-signed across groups counts once in each group.",
+    "An amendment co-signed across groups counts once in each group, and a Member who "
+    "changed group counts under each group they tabled in.",
 )
 
 type SideField = Literal["old_text", "new_text"]
@@ -375,10 +376,12 @@ def build_directions(
     """Count one law's amendment directions overall, by stage, group and Member, and actor.
 
     Linear in the amendments apart from each one's bounded diff; the result does not
-    depend on their order.
+    depend on their order. Groups are each author's group on the tabling day; a top
+    Member shows every group they tabled under, joined by "/".
     """
     known = tuple(actors)
-    groups = {actor.actor_id: actor.political_group for actor in known if actor.political_group}
+    latest = latest_groups(known)
+    tabled_under: defaultdict[str, set[str]] = defaultdict(set)
     names = {actor.actor_id: actor.name for actor in known}
     ordered = sorted(amendments, key=lambda amendment: amendment.amendment_id)
     readings = [read_change(amendment.old_text, amendment.new_text) for amendment in ordered]
@@ -390,9 +393,13 @@ def build_directions(
     for amendment, reading in zip(ordered, readings, strict=True):
         direction = reading.direction
         by_stage[amendment.stage].append(direction)
-        tabling_groups = {groups[a] for a in amendment.author_ids if a in groups}
-        without_group += not tabling_groups
-        for group in tabling_groups:
+        on_day = tabling_groups(amendment, latest)
+        for author, group in on_day.items():
+            if group is not None:
+                tabled_under[author].add(group)
+        known_on_day = {group for group in on_day.values() if group is not None}
+        without_group += not known_on_day
+        for group in known_on_day:
             by_group[group].append(direction)
         for author in dict.fromkeys(amendment.author_ids):
             by_member[author].append(direction)
@@ -430,7 +437,7 @@ def build_directions(
             MemberDirections(
                 actor_id=author,
                 name=names.get(author, author),
-                political_group=groups.get(author),
+                political_group="/".join(sorted(tabled_under[author])) or None,
                 amendments=len(found),
                 counts=_counts(found),
             )
@@ -441,7 +448,7 @@ def build_directions(
         atlas_run_id=atlas.run_id if atlas is not None else None,
         actors=actor_rows,
         examples=tuple(examples[d] for d in PRECEDENCE if d in examples),
-        limitations=LIMITATIONS,
+        limitations=(*LIMITATIONS, *group_limitations(ordered)),
     )
 
 

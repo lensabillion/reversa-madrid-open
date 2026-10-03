@@ -26,6 +26,7 @@ from influence.schemas.atlas import (
 from influence.schemas.channels import ChannelsView, KeyCount, SubmitterGroup
 from influence.services import channels, collect
 from influence.services.pipeline import PipelineError
+from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 SHA = "0" * 64
 PROPOSED = date(2021, 4, 21)
@@ -355,7 +356,12 @@ def test_the_view_records_its_method_and_round_trips_through_its_file(tmp_path: 
         "run-1",
         channels.METHOD,
     )
-    assert view.limitations == channels.LIMITATIONS
+    assert view.limitations == (
+        *channels.LIMITATIONS[:3],
+        TABLING_DAY_GROUPS,
+        LATEST_SPELL_FALLBACK,
+        *channels.LIMITATIONS[3:],
+    )
     assert [row.layer for row in view.votes_and_meetings] == ["meetings", "votes"]
     assert (
         view.timing.feedback_vs_proposal.unplaced,
