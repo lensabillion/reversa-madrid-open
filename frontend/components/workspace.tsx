@@ -5,7 +5,6 @@ import type { AmendmentDetail, AmendmentPage, DatasetOverview } from "../lib/api
 import { useResource } from "../lib/use-resource";
 import { CompareTexts } from "./compare-texts";
 import { EvidenceColumns } from "./evidence-columns";
-import { InfluenceNetwork } from "./influence-network";
 
 const buttonStyle =
   "rounded-sm px-3 py-2 text-xs font-medium transition-colors hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:opacity-35";
@@ -115,7 +114,7 @@ function Evidence({ detail }: { detail: AmendmentDetail }) {
   );
 }
 
-/** One evidence workspace keeps selection and network context together. */
+/** One evidence workspace keeps amendment selection and its source evidence together. */
 export default function EvidenceWorkspace() {
   const [mode, setMode] = useState<"explore" | "compare">("explore");
   const [query, setQuery] = useState("");
@@ -123,7 +122,6 @@ export default function EvidenceWorkspace() {
   const [offset, setOffset] = useState(0);
   const [verifiedOnly, setVerifiedOnly] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [view, setView] = useState<"evidence" | "network">("evidence");
   const overview = useResource<DatasetOverview>(mode === "explore" ? "/api/v1/demo" : null);
   const list = useResource<AmendmentPage>(
     mode === "explore"
@@ -360,7 +358,7 @@ export default function EvidenceWorkspace() {
               )}
               {detail.data && (
                 <>
-                  <div className="mb-7">
+                  <div className="border-b border-stone-200 pb-7">
                     <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
                       Amendment ·{" "}
                       {detail.data.amendment.relations.join(" · ") || "Location unspecified"}
@@ -372,32 +370,7 @@ export default function EvidenceWorkspace() {
                       {[...new Set(detail.data.amendment.authors)].join(" · ") || "No named author"}
                     </p>
                   </div>
-                  <div className="flex gap-7 border-b border-stone-200">
-                    <button
-                      type="button"
-                      aria-pressed={view === "evidence"}
-                      onClick={() => setView("evidence")}
-                      className={`border-b-2 pb-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-teal-700 ${view === "evidence" ? "border-teal-800 text-teal-900" : "border-transparent text-stone-500"}`}
-                    >
-                      Evidence
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={view === "network"}
-                      onClick={() => setView("network")}
-                      className={`border-b-2 pb-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-teal-700 ${view === "network" ? "border-teal-800 text-teal-900" : "border-transparent text-stone-500"}`}
-                    >
-                      Network
-                    </button>
-                  </div>
-                  {view === "evidence" ? (
-                    <Evidence key={detail.data.amendment.id} detail={detail.data} />
-                  ) : (
-                    <InfluenceNetwork
-                      key={detail.data.amendment.id}
-                      amendmentId={detail.data.amendment.id}
-                    />
-                  )}
+                  <Evidence key={detail.data.amendment.id} detail={detail.data} />
                 </>
               )}
             </main>

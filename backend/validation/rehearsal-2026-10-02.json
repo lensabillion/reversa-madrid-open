@@ -3,7 +3,6 @@
     "amendments": 4867,
     "candidate_links": 1957,
     "details_browsed": 4867,
-    "graphs_browsed": 4867,
     "organizations_browsed": 44,
     "proposals": 1159,
     "score_requests": 60,
@@ -26,8 +25,8 @@
     "system": "Darwin"
   },
   "seconds": {
-    "browse_all": 0.865652,
-    "load": 0.030189,
-    "score_requests_60": 0.057417
+    "browse_all": 0.854275,
+    "load": 0.029454,
+    "score_requests_60": 0.071585
   }
 }

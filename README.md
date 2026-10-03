@@ -1,20 +1,30 @@
 # Reversa Challenges, Madrid Open 2026
 
 Our entry for Reversa's track at the Madrid Open (Saturday 3 October 2026, Mad Tech Campus).
-We picked **Challenge 03: Influence Graph**: given an EU amendment and a lobby
-submission, score how likely the amendment was written from the submission, then map who
-wins and predict which consultation proposals reach the final law.
+We compete in **Challenge 03: The Influence Atlas**: an open, public map of who shapes
+EU law since 2019. For any law, it shows which organizations' asks reached amendments and
+the final text, with the evidence side by side; it ranks who actually wins, explains how,
+and forecasts who will win next.
+
+The organizers replaced the first Challenge 03 brief (Influence Graph: score 60 supplied
+pairs into CSVs) at kickoff on 3 October 2026. The
+[Atlas brief](docs/brief/influence-atlas-challenge-brief.pdf) is the one that counts; the
+[first brief](docs/brief/madrid-open-reversa-challenges.pdf) is kept for the record.
 
 ## What is scored
 
-| Output | File | Metric |
-| --- | --- | --- |
-| `pair_id, influence_score` for 60 pairs (30 real, 30 lookalike decoys) | CSV | Precision in our top 20; recall on the 30 real pairs |
-| `proposal_id, p_adopted` for 20 consultation proposals | CSV | AUC |
-| Influence graph of organizations, MEPs and amendments | Demo | Jury |
+There is no hidden test and no supplied data. The jury scores 100 points live at 19:30:
 
-Test inputs are published at 19:00 and the CSVs are due at 20:00, so the pipeline must
-turn raw inputs into both CSVs with one command.
+| Criterion | Points | What the jury does |
+| --- | ---: | --- |
+| Real links | 25 | Picks 3 links from our graph at random and reads both texts side by side |
+| Any law | 20 | Names an EU law on the spot; our system shows who shaped it, with no code changes |
+| Insight | 25 | Reads our answers to five questions: who, on what, towards what, how, what next |
+| Report | 15 | Reads our public report and opens this repository |
+| Ambition | 15 | How much of Europe since 2019 we cover, and our forecast |
+
+We hand in a graph the jury can explore live, a short public report, and this repository,
+open source so anyone can rerun it.
 
 ## Where to Start
 
@@ -24,9 +34,11 @@ turn raw inputs into both CSVs with one command.
 - [Backend guide](backend/README.md): run the evidence API, obtain the public snapshot,
   understand the layers and scoring limits, and verify the implementation.
 - [Frontend guide](frontend/README.md): run the evidence workspace and connect it to the API.
-- [The explainer](docs/explainer/influence-graph-primer.md): the challenge explained from
-  first principles. A styled version is
-  [published separately](https://claude.ai/artifact/HL1KzDHpMWYerESyy3pLje) (private; the
-  owner shares it from its Share menu).
+- [The Atlas explainer](docs/explainer/influence-atlas-primer.md): the current challenge,
+  what changed, the architecture, the data, the models and the plan to win, from first
+  principles.
+- [The first explainer](docs/explainer/influence-graph-primer.md): written for the first
+  brief. Its background on EU law-making, amendments, lobbying and the boilerplate trap
+  still holds.
 
 The repository layout is described in AGENTS.md.

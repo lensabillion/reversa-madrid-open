@@ -9,7 +9,6 @@ from influence.schemas.demo import (
     AmendmentDetail,
     AmendmentPage,
     DatasetOverview,
-    InfluenceGraph,
     OrganizationPage,
 )
 from influence.services.demo import DemoService
@@ -37,11 +36,6 @@ def amendments(
 @router.get("/amendments/{amendment_id}")
 def amendment(amendment_id: str, service: Service) -> AmendmentDetail:
     return service.amendment(amendment_id)
-
-
-@router.get("/amendments/{amendment_id}/graph")
-def graph(amendment_id: str, service: Service) -> InfluenceGraph:
-    return service.graph(amendment_id)
 
 
 @router.get("/organizations")

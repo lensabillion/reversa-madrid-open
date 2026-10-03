@@ -7,8 +7,9 @@ proposed edit to a law; a submission records changes an organization requested.
 
 The [organizers' brief](../docs/brief/madrid-open-reversa-challenges.pdf), pages 12–15,
 also requires semantic influence scoring and adoption forecasting. This backend is the
-starting evidence demo and an executable lexical baseline. It does not yet deliver the
-two competition CSVs, a trained influence probability, or an adoption forecast.
+starting evidence demo and an executable lexical baseline. Its `influence submit` command
+writes the first competition CSV, `pairs.csv`, from the lexical comparison score; it does
+not yet deliver `proposals.csv`, a trained influence probability, or an adoption forecast.
 See the [primer](../docs/explainer/influence-graph-primer.md) for the broader design.
 See [implementation status](../docs/implementation-status.md) for verified capabilities,
 remaining competition work and handoff instructions.
@@ -58,6 +59,55 @@ INFLUENCE_DATA_DIR=/absolute/path/to/lobbyplag make dev-backend
 The local frontend origins `http://localhost:3000` and `http://127.0.0.1:3000` are allowed
 by CORS. This is a local public-data demo without authentication or deployment hardening.
 
+## Submission Command
+
+`influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
+web server. It reads the supplied pairs (part 1), compares each with the `/compare`
+service (parts 2–3), and passes that score through as `influence_score` (part 4) until a
+trained combiner exists. From the repository root:
+
+```sh
+make submit PAIRS=/absolute/or/relative/pairs.jsonl OUT=outputs/2026-10-03
+# equivalent: uv run --directory backend --locked influence submit \
+#   --pairs /absolute/pairs.jsonl --out /absolute/outputs --expected-pairs 60
+```
+
+The input is our own normalized contract, because the organizers' format is not yet known
+(decision D5): a UTF-8 [JSON Lines](https://jsonlines.org/) file, one object per line.
+
+```json
+{"pair_id": "P01", "amendment": {"old": "Keep data for 30 days.", "new": "Keep data for 90 days."}, "submission": {"old": null, "new": "Data should be kept for 90 days."}}
+```
+
+`old: null` means the original wording is unknown, exactly as in `/compare`; both originals
+known selects edit comparison, otherwise whole passages are compared. At 19:00 a small
+adapter converts whatever arrives into this shape. `pair_id` must be non-empty, without
+surrounding whitespace, control characters or line separators, and unique.
+
+The whole file is validated before anything is scored. Every problem is reported at once
+on stderr with its line number and `pair_id`: invalid JSON, schema errors, blank lines,
+duplicate identifiers, an empty file, a pair count other than `--expected-pairs` (default
+60, from the brief), and texts over the scorer's limits of 12,000 characters or 800 tokens.
+Texts are never truncated. Any problem exits with status 1 and writes nothing; usage
+errors exit with status 2.
+
+`OUT` receives two files. `pairs.csv` has the header `pair_id,influence_score` and one row
+per input pair in input order, with each score written as the shortest decimal that parses
+back to the identical float (so ranking ties are neither created nor lost), never in
+exponent form. `pairs.evidence.jsonl` holds one line per pair: `pair_id`,
+`influence_score` and the full comparison result (mode, method, score, evidence spans,
+negation conflict, limitations). Before writing, the command checks that the scored IDs
+equal the input IDs in order and that every score is a finite number in [0, 1]. Both files
+are staged in `OUT`, fsynced and renamed into place, evidence first and `pairs.csv` last:
+a failure leaves no partial file and any previous `pairs.csv` unchanged.
+
+Not handled yet: a whole lobby paper over the 800-token limit fails loudly until the
+passage finder (plan step 3, `rev-aapn`) selects the relevant passage; `proposals.csv` is
+plan step 4 (`rev-e5xh`). Rehearse the command on 60 public LobbyPlag pairs with
+`uv run --directory backend --locked python tests/rehearse_submission.py
+/absolute/path/to/lobbyplag`; the [recorded run](validation/submission-rehearsal-2026-10-02.json)
+took 0.16 seconds per complete command on an Apple M5, including interpreter start-up.
+
 ## HTTP Contract
 
 | Method and path | Result |
@@ -66,7 +116,6 @@ by CORS. This is a local public-data demo without authentication or deployment h
 | `GET /api/v1/demo` | Snapshot counts and coverage caveat |
 | `GET /api/v1/amendments` | Stable, paginated summaries |
 | `GET /api/v1/amendments/{id}` | Old/new amendment text and up to 20 candidate sources |
-| `GET /api/v1/amendments/{id}/graph` | Organization, amendment and author nodes with typed edges |
 | `GET /api/v1/organizations` | Recorded proposal, verified-link and distinct amendment counts |
 | `POST /api/v1/score` | Deterministic changed-text similarity and source-offset evidence |
 | `POST /api/v1/compare` | Explicit edit or whole-passage comparison when originals may be unknown |
@@ -76,9 +125,8 @@ List parameters are `q` (committee, amendment number or author; at most 200 char
 `offset` (nonnegative), `limit` (1–100, default 20), and `verified_only` (default false).
 Multiple search words must all match. Detail sources sort verified first, then by stable
 candidate identifier; `total_sources` exposes truncation. They are historical candidates,
-not newly retrieved recommendations. Graph edges use only historically verified source
-links; author edges record authorship. Counts are observed coverage, not organization
-win rates or proof of causation.
+not newly retrieved recommendations. Counts are observed coverage, not organization win
+rates or proof of causation.
 
 Unknown entities return 404. Missing/unreadable files and invalid snapshots return 503
 with a structured `detail.code`; filesystem paths are not exposed. A candidate outside
@@ -145,6 +193,8 @@ routes and validates HTTP parameters; it contains no matching or data-joining lo
 parses and validates the local source files, with no network calls or data writes.
 `services/demo.py` joins and aggregates those records. `services/scoring.py` is a pure
 function that can also be called by a future batch command without an HTTP server.
+`cli.py` is that batch command: a thin `argparse` layer over `services/submission.py`,
+which calls the same comparison service as `/compare`.
 
 There is one concrete repository and one scoring implementation. No database, vector
 store, model-provider abstraction, or background job system is necessary for this corpus.
@@ -204,9 +254,9 @@ uv run --directory backend --locked python tests/rehearse_demo.py /absolute/path
 ```
 
 The [recorded run](validation/rehearsal-2026-10-02.json) preserves input hashes, counts,
-timings and runtime details. On an Apple M5 (10 CPU cores), loading took 0.030 seconds,
-all 4,867 details and graphs took 0.866 seconds, and 60 repeated HTTP requests for one
-sample pair took 0.057 seconds. There were 1,933 computed scores, 24 non-English sources
+timings and runtime details. On an Apple M5 (10 CPU cores), loading took 0.029 seconds,
+all 4,867 details took 0.854 seconds, and 60 repeated HTTP requests for one sample pair
+took 0.072 seconds. There were 1,933 computed scores, 24 non-English sources
 with explicit unavailable scores, and no sources omitted by the detail limit. These are
 single-run smoke measurements, not an accuracy evaluation or the complete competition
 pipeline's timing. The five input files matched the pinned upstream snapshot byte for byte.

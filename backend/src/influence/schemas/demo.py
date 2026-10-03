@@ -1,7 +1,5 @@
 """Read-only demo contracts keep historical evidence distinct from computed scores."""
 
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict
 
 from influence.schemas.scoring import ScoreResult
@@ -65,25 +63,6 @@ class AmendmentDetail(DemoModel):
     text: SourceText
     sources: tuple[SourceMatch, ...]
     total_sources: int
-    coverage_note: str
-
-
-class GraphNode(DemoModel):
-    id: str
-    kind: Literal["amendment", "organization", "author"]
-    label: str
-
-
-class GraphEdge(DemoModel):
-    source: str
-    target: str
-    kind: Literal["historically_verified", "authored"]
-
-
-class InfluenceGraph(DemoModel):
-    amendment_id: str
-    nodes: tuple[GraphNode, ...]
-    edges: tuple[GraphEdge, ...]
     coverage_note: str
 
 
