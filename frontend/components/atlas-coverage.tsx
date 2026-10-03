@@ -217,3 +217,87 @@ export function AtlasModes({ modes }: { modes: readonly string[] }) {
     </ul>
   );
 }
+
+/** "Votes: not collected in this run. Connector not built." -> layer "Votes", state "not …". */
+const layerNotePattern = /^([^:.]{1,60}): ([^.]+)\.(?:\s|$)/;
+
+/**
+ * The one-line digest of the coverage notes: how many source layers have gaps and which ones.
+ * Notes that do not name a layer (e.g. "Every source layer … is complete.") are kept verbatim
+ * when no layer has a gap, and counted otherwise, so nothing is dropped from the line's account.
+ */
+export function coverageSummary(
+  notes: readonly string[],
+  seeAlso: string | null,
+): { line: string; digest: boolean } | null {
+  if (notes.length === 0) {
+    return null;
+  }
+  const gaps = notes.flatMap((note) => {
+    const match = layerNotePattern.exec(note);
+    return match === null ? [] : [{ layer: match[1] ?? "", state: match[2] ?? "" }];
+  });
+  if (gaps.length === 0) {
+    return { line: notes.join(" "), digest: false };
+  }
+  const states = new Set(gaps.map((gap) => gap.state));
+  const [onlyState] = states;
+  const head = `${plural(gaps.length, "source layer", "source layers")} ${
+    states.size === 1 && onlyState !== undefined ? onlyState : "with gaps"
+  }`;
+  const names = gaps
+    .map(({ layer }, index) =>
+      index === 0 ? layer : `${layer.charAt(0).toLocaleLowerCase("en")}${layer.slice(1)}`,
+    )
+    .join(", ");
+  const others = notes.length - gaps.length;
+  const extra = others > 0 ? `; and ${plural(others, "other note", "other notes")}` : "";
+  return {
+    line: `${head}: ${names}${extra}${seeAlso === null ? "" : ` — ${seeAlso}`}`,
+    digest: true,
+  };
+}
+
+/**
+ * Coverage notes as one compact line, with the full notes in a native disclosure. The line names
+ * every affected layer, so a screen reader hears the gist without expanding; the disclosure keeps
+ * each note's reason. Used where the Graph tab's source-layer badges already show the detail.
+ */
+export function CoverageSummary({
+  notes,
+  seeAlso,
+}: {
+  notes: readonly string[];
+  /** Where the same coverage is shown in full, e.g. "details on the Graph tab"; null for none. */
+  seeAlso: string | null;
+}) {
+  const summary = coverageSummary(notes, seeAlso);
+  if (summary === null) {
+    return null;
+  }
+  return (
+    <aside
+      aria-label="Source coverage"
+      className="mt-5 border-l-2 border-amber-400 pl-4 text-sm leading-6 text-stone-600"
+    >
+      {summary.digest ? (
+        <details>
+          <summary className="cursor-pointer [overflow-wrap:anywhere]">
+            <span className="font-medium text-stone-800">Source coverage: </span>
+            <span>{summary.line}</span>
+          </summary>
+          <ul className="mt-1 list-disc pl-5">
+            {notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </details>
+      ) : (
+        <p className="[overflow-wrap:anywhere]">
+          <span className="font-medium text-stone-800">Source coverage: </span>
+          <span>{summary.line}</span>
+        </p>
+      )}
+    </aside>
+  );
+}

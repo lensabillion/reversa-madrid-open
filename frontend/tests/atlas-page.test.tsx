@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AtlasPage from "../app/atlas/page";
 import type { AtlasBundle } from "../lib/atlas";
@@ -245,6 +245,26 @@ function requested(fetchMock: ReturnType<typeof installFetch>): string[] {
   return fetchMock.mock.calls.map(([input]) => String(input));
 }
 
+/** The findings endpoint's answer for a law none of whose analysis commands has run. */
+const notRunFindings = {
+  schema_version: "findings-1",
+  procedure_id: "2099/0001(COD)",
+  slug,
+  title: "Fixture Regulation on widget safety",
+  run_id: "20991201T090000Z",
+  findings: ["WHO", "WHAT", "TOWARDS", "HOW", "NEXT"].map((question) => ({
+    question,
+    title: question,
+    status: "not_run",
+    headline: null,
+    details: [],
+    evidence: [],
+    limitation: "A limitation.",
+    command: `make ${question.toLowerCase()} LAW='x'`,
+    notes: [],
+  })),
+};
+
 const unexpected = (path: string): never => {
   throw new Error(`Unexpected request: ${path}`);
 };
@@ -281,6 +301,9 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     if (path === coordinatedPath) {
       return noClusterFile();
     }
+    if (path === `/api/v1/atlas/${slug}/findings`) {
+      return reply(notRunFindings);
+    }
     return path === `/api/v1/atlas/${slug}` ? reply(view) : unexpected(path);
   });
   render(<AtlasPage />);
@@ -300,7 +323,14 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   fireEvent.click(law);
   expect(window.location.search).toBe(`?law=${slug}`);
   expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
-  expect(requested(fetchMock)).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`, coordinatedPath]);
+  // The coordinated panel asks from an effect, which can land after the heading under load.
+  await waitFor(() =>
+    expect(requested(fetchMock)).toEqual([
+      "/api/v1/atlas",
+      `/api/v1/atlas/${slug}`,
+      coordinatedPath,
+    ]),
+  );
   expect(law.getAttribute("aria-pressed")).toBe("true");
   // A law with a published link opens on its graph and names no mode it was not given.
   expect(
@@ -372,21 +402,38 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     "Widget Makers Europe",
     "City Network",
   ]);
-  expect(rows[1]?.textContent).toContain("2 / 2");
+  expect(rows[1]?.textContent).toContain("2 of 2 assessed");
   expect(
-    within(screen.getByRole("table")).getAllByText("Source evidence unavailable."),
+    within(screen.getByRole("table")).getAllByText("too few to rank (fewer than 3 assessed)"),
   ).toHaveLength(3);
-  for (const section of ["WHO", "WHAT", "TOWARDS", "HOW"]) {
-    expect(
-      within(screen.getByRole("region", { name: section })).getByText(
-        "Evidence gap: no source-backed finding supplied.",
-      ),
-    ).toBeDefined();
+  // The outcome cards read the report's findings for the open law, only once that tab opens.
+  for (const section of ["WHO", "WHAT", "TOWARDS", "HOW", "NEXT"]) {
+    const card = screen.getByRole("region", { name: section });
+    expect(await within(card).findByText(`make ${section.toLowerCase()} LAW='x'`)).toBeDefined();
+    expect(card.textContent).not.toContain("Evidence gap");
   }
+  expect(requested(fetchMock).at(-1)).toBe(`/api/v1/atlas/${slug}/findings`);
+  // Supplied outcome ids resolve to the final act's source; only the actor with a published
+  // card that shows that record offers it, and unpublished candidates are never offered.
   expect(
-    within(screen.getByRole("region", { name: "NEXT" })).getByText(
-      "Forecast unavailable: no source-backed forecast supplied.",
-    ),
+    within(screen.getByRole("table"))
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href")),
+  ).toEqual([
+    "https://example.invalid/fixture/celex/32099R0001",
+    "https://example.invalid/fixture/celex/32099R0001",
+    "https://example.invalid/fixture/celex/32099R0001",
+  ]);
+  expect(within(screen.getByRole("table")).getAllByRole("button")).toHaveLength(1);
+  const openCard = within(rows[1] ?? document.body).getByRole("button", {
+    name: "Open evidence card",
+  });
+  // A ranking row's evidence anchor opens the record it names in the Evidence view.
+  fireEvent.click(openCard);
+  expect(
+    within(screen.getByRole("article", { name: "Atlas link evidence" })).getByRole("heading", {
+      name: "Keep logs for at least six months",
+    }),
   ).toBeDefined();
 });
 
