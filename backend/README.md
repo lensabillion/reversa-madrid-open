@@ -362,6 +362,17 @@ for wording amendments inserted that was not adopted. The output is
 atomically, with `status`, `reason`, `counts`, `adopted_phrases`, `tabled_phrases`,
 `adoptions`, `origins`, `credits` and `limitations`.
 
+**Reworded origins with Jev** (`--jev`, `make lineage LAW='AI Act' ARGS='--jev'`). Verbatim
+search misses requests made in other words. With `--jev` (key in `TYPESAFE_API_KEY`;
+`--jev-max-usd`, default 1), `services/lineage_jev.py` takes each adopting amendment, lets
+part 3's BM25 shortlist the 5 consultation passages that share its rare changed words, and
+asks Jev PR #63's frozen four-question prompt for each pair (`services/jev_judge.py`).
+A pair whose four answers all clear 0.67 becomes an origin of kind `semantic`, quoting the
+whole passage, with `similarity` set to the weakest supporting answer and dated like a
+verbatim origin. Answers are cached under `data/cache/jev/` by request hash. BM25 bounds
+what Jev sees (recall@5 0.663 on LobbyPlag's verified pairs), and adoption itself stays
+word for word.
+
 Counting follows `docs/plan.md` section 7. Every holder of a phrase is credited with the
 whole phrase and a shared one is flagged joint (no fractional credit); each credit carries
 the amendments adopted and the amendments tabled, so Members are ranked by rate per

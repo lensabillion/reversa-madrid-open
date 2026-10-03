@@ -19,7 +19,9 @@ or output failure, 2 on a command-line usage error.
 
 import argparse
 import logging
+import os
 import platform
+import ssl
 import sys
 from collections import Counter
 from collections.abc import Callable, Sequence
@@ -27,6 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import cast
+
+from pydantic import SecretStr
 
 import influence
 from influence.extraction.cache import CacheError, HttpCache
@@ -49,6 +53,8 @@ from influence.services.collect import (
 )
 from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.direction import build_directions, write_directions
+from influence.services.jev import JevClient, JevError
+from influence.services.jev_judge import JevJudge
 from influence.services.lineage_assembly import build_lineage, write_lineage
 from influence.services.pipeline import (
     Collected,
@@ -61,6 +67,8 @@ from influence.services.pipeline import (
 )
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
 from influence.services.submission import SubmissionError, run_submission
+
+JEV_KEY_VARIABLE = "TYPESAFE_API_KEY"
 
 # The brief's hidden test supplies 60 amendment-submission pairs.
 EXPECTED_PAIRS = 60
@@ -254,9 +262,22 @@ def _list_coordinated(result: CollectResult) -> int:
     return 0
 
 
-def _list_lineage(result: CollectResult) -> int:
+def _jev_judge(data_root: Path, max_usd: float) -> JevJudge:
+    """Jev keyed from the environment; answers are cached under the data root."""
+    key = os.environ.get(JEV_KEY_VARIABLE, "")
+    if not key.strip():
+        raise JevError(f"--jev needs the TypeSafe key in {JEV_KEY_VARIABLE}")
+    if not 0 < max_usd < float("inf"):
+        raise JevError("--jev-max-usd must be a positive amount")
+    client = JevClient(SecretStr(key), ssl.create_default_context())
+    return JevJudge(client=client, cache=data_root / "cache" / "jev", max_usd=max_usd)
+
+
+def _list_lineage(result: CollectResult, judge: JevJudge | None = None) -> int:
     try:
-        view = build_lineage(load_collected(result.bundle), generated_at=datetime.now(UTC))
+        view = build_lineage(
+            load_collected(result.bundle), generated_at=datetime.now(UTC), judge=judge
+        )
         path = write_lineage(view, result.bundle)
     except (PipelineError, RecordError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -498,6 +519,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             action="store_true",
             help="skip submission attachments (faster; the asks layer is then partial)",
         )
+        if name == "lineage":
+            command.add_argument(
+                "--jev",
+                action="store_true",
+                help=f"add reworded origins judged by Jev; reads the key from {JEV_KEY_VARIABLE}",
+            )
+            command.add_argument(
+                "--jev-max-usd",
+                type=float,
+                default=1.0,
+                help="stop asking Jev before this much could be spent (default 1)",
+            )
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -525,11 +558,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("tuple[SetupGroup, ...]", args.only),
             refresh=cast("bool", args.refresh),
         )
+    judge: JevJudge | None = None
+    if args.command == "lineage" and cast("bool", args.jev):
+        try:
+            judge = _jev_judge(
+                cast("Path | None", args.data_root) or default_data_root(),
+                cast("float", args.jev_max_usd),
+            )
+        except JevError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
     after: dict[str, Callable[[CollectResult], int] | None] = {
         "collect": None,
         "atlas": _build_view,
         "coordinated": _list_coordinated,
-        "lineage": _list_lineage,
+        "lineage": lambda result: _list_lineage(result, judge),
         "channels": lambda result: _list_channels(
             result,
             CollectInputs.under(
