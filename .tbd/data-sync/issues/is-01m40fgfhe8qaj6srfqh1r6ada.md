@@ -5,7 +5,7 @@ title: "Part 6 · Atlas graph: actor -> ask -> amendment -> final article, plus 
 kind: feature
 status: in_progress
 priority: 0
-version: 12
+version: 13
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -22,11 +22,11 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-03T08:53:51.277Z
-updated_at: 2026-10-03T11:06:39.579Z
+updated_at: 2026-10-03T11:14:50.707Z
 started_at: 2026-10-03T10:00:59.971Z
 ---
 Atlas part 6. Built only from part 4's published links and part 5's outcomes, never from LobbyPlag labels. Store as plain files (JSONL/Parquet) per law plus one merged index; each edge carries its evidence record id. Serves the explorer, rankings and report. NetworkX for analysis; no graph database unless measured need.
 
 ## Notes
 
-Agent 3 graph consumer implemented against merged atlas-1 in isolated atlas-calculations worktree, branch feat/atlas-graph-analysis. PR https://github.com/lensabillion/reversa-madrid-open/pull/28 at cac0f29; all 9 CI checks passed. Pure services/atlas_graph.py preserves published actor/request/amendment paths and supported final outcomes, exact quotes, chronology, joint attribution, coverage and deterministic IDs. Rejects conflicting IDs/results and invalid published joins; audit candidates cannot become public paths. Synthetic fixture only: 11 nodes, 9 edges, 2 published origin links and 1 final realization. make check passed: 274 backend tests, 100% coverage (1563 statements/390 branches), 37 frontend tests/build, 6/6 catalogs, both audits clean. No shared schema/API/CLI/dependency changes. Real Agent1/2 pipeline and UI integration remain pending; do not close broader graph work from fixture success. Parent owns integration and frontend branch.
+Agent 3 graph consumer against atlas-1, worktree atlas-calculations, branch feat/atlas-graph-analysis. PR https://github.com/lensabillion/reversa-madrid-open/pull/28 now at 4072245 after main bdb0c61/PR26 merge; all9 CI checks green. No code conflicts, both docs sections retained and historical handoff claims clarified. Pure graph service validates published joins/quotes/chronology, preserves joint attribution, coverage and deterministic IDs; audit candidates excluded, conflicting IDs/results rejected. Fixture11nodes/9edges/2published links/1final realization, not real findings. make check passes538 backend tests,100%coverage3349 statements/844branches,37frontend tests/build,6catalogs,both audits. Agent1 handoff still requires collect/API/CLI orchestration and amendment document_id/source provenance fix; graph validation not weakened. Parent owns frontend integration. Keep open pending merge and real integration.
