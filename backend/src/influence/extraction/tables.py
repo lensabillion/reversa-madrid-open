@@ -135,7 +135,9 @@ def read_table[T: ExtractedRow](path: Path, model: type[T]) -> Iterator[T]:
         content = path.read_text(encoding="utf-8")
     except OSError as error:
         raise TableError(f"Cannot read {path.name}") from error
-    for number, line in enumerate(content.splitlines(), start=1):
+    # Split on the line feed alone, as the writer ends rows: splitlines() also breaks at U+2028
+    # and the like, which can sit inside a JSON string.
+    for number, line in enumerate(content.split("\N{LINE FEED}"), start=1):
         if not line.strip():
             continue
         try:

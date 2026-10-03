@@ -222,3 +222,12 @@ def test_manifest_read_reports_an_absent_or_invalid_file(tmp_path: Path) -> None
     path.write_text('{"title": "no procedure id"}', encoding="utf-8")
     with pytest.raises(ManifestError, match="is invalid"):
         read_manifest(path)
+
+
+def test_a_table_row_holding_a_unicode_line_separator_survives_a_round_trip(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "actors.jsonl"
+    actor = make_actor("1", "Example\N{LINE SEPARATOR}Association\N{NEXT LINE}")
+    assert write_table(path, [actor]) == 1
+    assert list(read_table(path, ActorRow)) == [actor]

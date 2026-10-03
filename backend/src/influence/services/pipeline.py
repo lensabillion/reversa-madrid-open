@@ -143,8 +143,16 @@ def asks_from_passages(passages: Iterable[Passage]) -> tuple[Ask, ...]:
     )
 
 
-def find_candidates(amendments: Iterable[Amendment], asks: Sequence[Ask]) -> tuple[Candidate, ...]:
+def find_candidates(
+    amendments: Iterable[Amendment],
+    asks: Sequence[Ask],
+    unsearchable: list[str] | None = None,
+) -> tuple[Candidate, ...]:
     """The top BM25 asks for each amendment's changed words.
+
+    An amendment the scorer's bounds refuse (over 800 tokens a side, as a long recital can
+    be, or no text) has no candidates; its ID is appended to `unsearchable` so the view can
+    say so, instead of one long amendment stopping a whole law.
 
     Building the index is linear in the asks' total length; each search costs the postings
     of the amendment's distinct changed words plus O(M log k) over M matching passages.
@@ -163,12 +171,17 @@ def find_candidates(amendments: Iterable[Amendment], asks: Sequence[Ask]) -> tup
     by_slice = {(ask.document_id, ask.span.start, ask.span.end): ask for ask in asks}
     found: list[Candidate] = []
     for amendment in amendments:
-        shortlist = index.search(
-            amendment.amendment_id,
-            amendment.old_text,
-            amendment.new_text,
-            k=CANDIDATES_PER_AMENDMENT,
-        )
+        try:
+            shortlist = index.search(
+                amendment.amendment_id,
+                amendment.old_text,
+                amendment.new_text,
+                k=CANDIDATES_PER_AMENDMENT,
+            )
+        except ValueError:
+            if unsearchable is not None:
+                unsearchable.append(amendment.amendment_id)
+            continue
         for candidate in shortlist.candidates:
             passage = candidate.passage
             ask = by_slice[(passage.document_id, passage.start, passage.end)]
@@ -267,8 +280,9 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
     amendments = {amendment.amendment_id: amendment for amendment in collected.amendments}
     asks_by_id = {ask.ask_id: ask for ask in asks}
     texts = {text.document_id: text.text for text in collected.document_texts}
+    unsearchable: list[str] = []
     links = assess_candidates(
-        find_candidates(collected.amendments, asks), amendments, asks_by_id, texts
+        find_candidates(collected.amendments, asks, unsearchable), amendments, asks_by_id, texts
     )
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)
@@ -331,7 +345,15 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
         bundle=bundle,
         snapshot=snapshot,
         rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
-        limitations=LIMITATIONS,
+        limitations=(
+            LIMITATIONS
+            if not unsearchable
+            else (
+                *LIMITATIONS,
+                f"{len(unsearchable)} amendment(s) were too long or empty to search and have no "
+                "candidates.",
+            )
+        ),
     )
 
 
