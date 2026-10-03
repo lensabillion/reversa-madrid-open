@@ -4,15 +4,15 @@
 Parltrack dumps, the register export and the Have Your Say index.
 `influence collect <law>` is Atlas part 1: it writes one law's public record under
 `data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
-writes the view the explorer serves (`atlas.json`). `influence coordinated <law>` collects,
-then lists the near-identical amendments tabled by different political groups
-(`coordinated.json`). `influence channels <law>` collects, then counts the channels the law
-was lobbied through: consultation stages, timing, tabling Members and coalitions
-(`channels.json`). `influence directions <law>` collects, then counts which way the
-amendments move the law and, through the atlas view's published links, each actor's asks
-(`directions.json`). `influence submit` is the first brief's pairs command, kept until
-part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
-or output failure, 2 on a command-line usage error.
+writes the view the explorer serves (`atlas.json`) and the law's coordinated amendments
+(`coordinated.json`). `influence coordinated <law>` collects, then lists those near-identical
+amendments tabled by different political groups. `influence channels <law>` collects,
+then counts the channels the law was lobbied through: consultation stages, timing, tabling
+Members and coalitions (`channels.json`). `influence directions <law>` collects, then
+counts which way the amendments move the law and, through the atlas view's published
+links, each actor's asks (`directions.json`). `influence submit` is the first brief's
+pairs command, kept until part 4 replaces it. Exit status: 0 when every output was
+written, 1 on any input, source or output failure, 2 on a command-line usage error.
 """
 
 import argparse
@@ -33,6 +33,7 @@ from influence.extraction.fetching import CachedFetcher, UrllibFetcher
 from influence.extraction.records import RecordError
 from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
+from influence.schemas.coordinated import CoordinatedCluster, CoordinatedView
 from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
@@ -47,6 +48,7 @@ from influence.services.collect import (
 from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.direction import build_directions, write_directions
 from influence.services.pipeline import (
+    Collected,
     PipelineError,
     build_view,
     load_collected,
@@ -169,9 +171,37 @@ def _print_collected(result: CollectResult, elapsed: float) -> None:
     print(f"manifest: {result.manifest_path.absolute()}")
 
 
+def _coordination(collected: Collected, generated_at: datetime) -> CoordinatedView:
+    return build_coordination(
+        collected.law,
+        collected.manifest.run_id,
+        collected.amendments,
+        collected.actors,
+        generated_at=generated_at,
+    )
+
+
+def _print_coordination(view: CoordinatedView) -> list[CoordinatedCluster]:
+    """The one summary line both commands print; returns the clusters that span groups."""
+    counts = view.counts
+    crossing = [cluster for cluster in view.clusters if cluster.cross_group]
+    print(
+        f"Coordinated amendments: {len(crossing)} of {len(view.clusters)} clusters span "
+        f"political groups ({counts.amendments} amendments: {counts.compared} compared, "
+        f"{counts.too_short} too short, {counts.not_comparable} not comparable)"
+    )
+    return crossing
+
+
 def _build_view(result: CollectResult) -> int:
     try:
-        view = build_view(load_collected(result.bundle), generated_at=datetime.now(UTC))
+        collected = load_collected(result.bundle)
+        now = datetime.now(UTC)
+        view = build_view(collected, generated_at=now)
+        coordination = _coordination(collected, now)
+        # Both are built before either is written, and the view last: the API lists a law
+        # by its view, so a listed law always has the clusters of the same run beside it.
+        clusters = write_coordination(coordination, result.bundle)
         path = write_view(view, result.bundle)
     except (PipelineError, RecordError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
@@ -183,33 +213,22 @@ def _build_view(result: CollectResult) -> int:
         f"{statuses['contradicted']} contradicted links; graph of "
         f"{len(view.snapshot.nodes)} nodes and {len(view.snapshot.edges)} edges"
     )
+    _print_coordination(coordination)
     print(f"view:     {path.absolute()}")
+    print(f"clusters: {clusters.absolute()}")
     print(f"explorer: http://localhost:3000/atlas?law={view.slug}")
     return 0
 
 
 def _list_coordinated(result: CollectResult) -> int:
     try:
-        collected = load_collected(result.bundle)
-        view = build_coordination(
-            collected.law,
-            collected.manifest.run_id,
-            collected.amendments,
-            collected.actors,
-            generated_at=datetime.now(UTC),
-        )
+        view = _coordination(load_collected(result.bundle), datetime.now(UTC))
         path = write_coordination(view, result.bundle)
     except (PipelineError, RecordError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         print("The collected bundle is kept; no cluster file was written.", file=sys.stderr)
         return 1
-    counts = view.counts
-    crossing = [cluster for cluster in view.clusters if cluster.cross_group]
-    print(
-        f"Coordinated amendments: {len(crossing)} of {len(view.clusters)} clusters span "
-        f"political groups ({counts.amendments} amendments: {counts.compared} compared, "
-        f"{counts.too_short} too short, {counts.not_comparable} not comparable)"
-    )
+    crossing = _print_coordination(view)
     for position, cluster in enumerate(crossing[:CLUSTERS_SHOWN], start=1):
         print(
             f"  {position}. {len(cluster.members)} amendments, "
