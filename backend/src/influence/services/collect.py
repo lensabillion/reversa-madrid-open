@@ -46,6 +46,7 @@ from influence.schemas.atlas import (
     SourceDocument,
     StageReceipt,
     StageStatus,
+    mep_actor_id,
 )
 from influence.services.actors import ActorResolver, merge_actors, resolution_summary
 from influence.services.law_query import parse_query, resolve_title
@@ -461,16 +462,35 @@ def _amendments(run: _Run, dumps: Sequence[SourceDocument]) -> _Built:
                 if author.startswith(_MEP_PREFIX)
             }
         )
-        meps = tuple(parltrack.mep_actors(run.inputs.meps, mep_ids, skipped))
+        found = tuple(parltrack.mep_actors(run.inputs.meps, mep_ids, skipped))
     except ParltrackError as error:
         raise CollectError(f"A Parltrack dump is unreadable: {error}") from error
+    named = {actor.mep_id for actor in found}
+    # An author the MEP dump lacks keeps an identity, so no amendment cites a missing actor.
+    unnamed = tuple(
+        Actor(
+            actor_id=mep_actor_id(mep_id),
+            kind="mep",
+            name=f"MEP {mep_id} (not in the Parltrack MEP dump)",
+            mep_id=mep_id,
+            resolution="mep_id",
+        )
+        for mep_id in mep_ids
+        if mep_id not in named
+    )
+    meps = (*found, *unnamed)
     law = run.law_record(
         [
             _amendment_coverage("committee_amendments", len(committee), run.ongoing),
             _amendment_coverage("plenary_amendments", len(plenary), run.ongoing),
         ]
     )
-    counts = {"committee": len(committee), "plenary": len(plenary), "meps": len(meps)}
+    counts = {
+        "committee": len(committee),
+        "plenary": len(plenary),
+        "meps": len(meps),
+        "meps_not_in_dump": len(unnamed),
+    }
     counts |= {f"skipped_{reason}": number for reason, number in skipped.items()}
     return _Built(
         {
