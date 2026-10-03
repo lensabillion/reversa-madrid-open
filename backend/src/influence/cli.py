@@ -19,9 +19,11 @@ writes to a law's view. `influence forecast <law> [<law> ...]` reads every writt
 validates the forecast on the completed laws and forecasts the named open laws' asks
 (`data/laws/forecast.json`). `influence batch` runs collect and those steps over many laws, named
 or every procedure amended since a date, resumably, into `data/laws/batch.json`.
-`influence submit` is the first brief's pairs command, kept until
-part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
-or output failure, 2 on a command-line usage error.
+`influence report <law> [<law> ...]` reads those files, without
+collecting, and writes the public report (`data/laws/report.md`). `influence submit` is
+the first brief's pairs command, kept until part 4 replaces it. Exit status: 0 when every
+output was written, 1 on any input, source or output failure, 2 on a command-line usage
+error.
 """
 
 import argparse
@@ -87,6 +89,16 @@ from influence.services.pipeline import (
     read_view,
     remove_stale_view,
     write_view,
+)
+from influence.services.report import (
+    DEFAULT_LINKS,
+    DEFAULT_SEED,
+    REPORT_FILE,
+    ReportError,
+    build_report,
+    load_law,
+    resolve_slug,
+    write_report,
 )
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
 from influence.services.submission import SubmissionError, run_submission
@@ -540,6 +552,30 @@ def _print_forecast(view: ForecastView) -> None:
             print(f"  {limitation}")
 
 
+def _report(
+    queries: Sequence[str], data_root: Path | None, out: Path | None, links: int, seed: int
+) -> int:
+    """Read what the other commands wrote and write the public report; collects nothing."""
+    root = data_root if data_root is not None else default_data_root()
+    # `make report LAW='AI Act, 2022/0140(COD)'` passes several laws as one argument.
+    names = [name.strip() for query in queries for name in query.split(",") if name.strip()]
+    try:
+        slugs = dict.fromkeys(resolve_slug(root, name) for name in names)
+        laws = [load_law(root, slug) for slug in slugs]
+        report = build_report(laws, generated_at=datetime.now(UTC), links=links, seed=seed)
+        path = write_report(report, out if out is not None else root / "laws" / REPORT_FILE)
+    except (ReportError, PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("No report was written.", file=sys.stderr)
+        return 1
+    print("\n".join(report.headlines))
+    print()
+    print("\n".join(report.links).rstrip())
+    print()
+    print(f"report: {path.absolute()}")
+    return 0
+
+
 def _collect(
     query: str,
     data_root: Path | None,
@@ -885,6 +921,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--refresh", action="store_true", help="collect every law again and redo every step"
     )
     batch.add_argument("--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT")
+    report = commands.add_parser(
+        "report",
+        help="write the public report from the files the other commands wrote",
+        description=(
+            "Write the Markdown report (WHO, WHAT, TOWARDS, HOW, NEXT, links side by side) "
+            "for one or more collected laws. It reads atlas.json, coordinated.json, "
+            "channels.json, directions.json, lineage.json and forecast.json, and says which "
+            "are missing; it collects and computes nothing."
+        ),
+    )
+    report.add_argument(
+        "laws", nargs="+", help="procedure numbers, CELEX, COM references or titles; commas split"
+    )
+    report.add_argument(
+        "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
+    )
+    report.add_argument(
+        "--out", type=Path, default=None, help=f"default: <data root>/laws/{REPORT_FILE}"
+    )
+    report.add_argument(
+        "--links",
+        type=_count,
+        default=DEFAULT_LINKS,
+        help=f"published links to draw at random and show side by side (default {DEFAULT_LINKS})",
+    )
+    report.add_argument(
+        "--seed", type=int, default=DEFAULT_SEED, help=f"sample seed (default {DEFAULT_SEED})"
+    )
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -955,6 +1019,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
         "directions": _list_directions,
     }
+    if args.command == "report":
+        return _report(
+            cast("list[str]", args.laws),
+            cast("Path | None", args.data_root),
+            cast("Path | None", args.out),
+            cast("int", args.links),
+            cast("int", args.seed),
+        )
     if args.command in after:
         return _collect(
             " ".join(cast("list[str]", args.query)),

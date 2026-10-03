@@ -545,6 +545,36 @@ every procedure since 2019 takes hours; it has not yet been timed on real data. 
 collected earlier is reused even when collected with other settings; use `--refresh`
 after a code or dump change. Tested offline (`tests/test_batch.py`).
 
+## Report Command (Part 8)
+
+`influence report <law> [<law> ...]` (`make report LAW='2021/0106(COD)'`; several laws are
+separated by commas, `LAW='AI Act, 2022/0140(COD)'`) writes the public report
+(`services/report.py`) to `data/laws/report.md`, atomically, and prints each section's
+headline, the link sample and the path. It collects and computes nothing: it reads the
+collected bundle (for actors' declared register spend and source URLs) and the files the
+other commands wrote, `atlas.json`, `coordinated.json`, `channels.json`, `directions.json`
+and `lineage.json` under `data/laws/<procedure>/`, plus `data/laws/forecast.json` when
+`influence forecast` has written it. A law is named by procedure number, slug, CELEX, COM
+reference, title or common name, matched only against laws already collected.
+
+The Markdown holds a coverage block (layers, gaps, run IDs, files not run, built from an
+older run or invalid), then WHO, WHAT, TOWARDS, HOW and NEXT, each with a headline in
+"N of M" form, a named actor or law, evidence (the file and field, record IDs) and one
+limitation; wins beside declared spend with ranks, for actors with at least 3 assessed asks
+and a declared cost (or the count saying none qualify); links side by side; and methods and
+limits (provisional thresholds, what is cut, the limitations the view recorded).
+
+**Links side by side.** `--links N --seed S` (defaults 3 and 20261003) draws a seeded uniform
+sample of published links, and prints for each the actor, the quoted ask span, the quoted
+amendment spans with the amendment ID, tabling Members and date, the final-act wording when
+traced through that same amendment, and every source URL. With no published link it says
+"0 published links" and shows instead a sample of lineage's verbatim adoptions (amendment to
+final article), labelled as not published links. The same seed draws the same links.
+
+A missing file is a line such as "Not run: `data/laws/2021-0106-COD/lineage.json` is missing;
+run `make lineage LAW='2021/0106(COD)'`", never a zero. `--out` is resolved from `backend/`
+when run through `make`. Tested offline (`tests/test_report.py`); not yet run on a real law.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the

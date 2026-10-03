@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -116,6 +116,12 @@ audit-score:  ## Score two filled sheets against the key: make audit-score DIR=d
 batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 'AI Act,DSA'" or ARGS='--since 2019 --with-amendments'
 	$(if $(ARGS),,$(error ARGS is required: make batch ARGS='--since 2019 --with-amendments'))
 	$(BACKEND) influence batch $(ARGS)
+
+# Part 8: the public report, read from the files the commands above wrote; collects nothing.
+# Several laws are separated by commas: make report LAW='AI Act, 2022/0140(COD)'.
+report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
+	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
+	$(BACKEND) influence report "$(LAW)" $(ARGS)
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
