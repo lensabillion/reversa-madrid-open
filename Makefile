@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -96,6 +96,16 @@ channels:  ## Count the channels one law was lobbied through: make channels LAW=
 directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
 	$(BACKEND) influence directions "$(LAW)" $(ARGS)
+
+# Gate 7, the blind audit: labels live under data/audit/ only, never in a law's view.
+audit-sample:  ## Draw two blind reader sheets from a view: make audit-sample LAW='2021/0106(COD)' SEED=<n> [SIZE=40] [ARGS='--status unconfirmed']
+	$(if $(LAW),,$(error LAW is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
+	$(if $(SEED),,$(error SEED is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
+	$(BACKEND) influence audit sample "$(LAW)" --seed $(SEED) $(if $(SIZE),--size $(SIZE)) $(ARGS)
+
+audit-score:  ## Score two filled sheets against the key: make audit-score DIR=data/audit/<slug>/<sample-id>
+	$(if $(DIR),,$(error DIR is required: make audit-score DIR=data/audit/<slug>/<sample-id>))
+	$(BACKEND) influence audit score "$(abspath $(DIR))"
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default

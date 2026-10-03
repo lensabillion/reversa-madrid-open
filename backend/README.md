@@ -419,6 +419,54 @@ whoever tabled or asked for it, and counts are not causes. Tested offline
 (`tests/test_direction.py`, including a table of edits per rule); not yet run on real data,
 timed, or audited against human labels.
 
+## Blind Audit Commands (Gate 7)
+
+The audit measures how often the links we publish are right. Two people read the same
+links apart, without seeing what the pipeline concluded, and the score is reported with
+its uncertainty. Labels are stored under `data/audit/` only: nothing here writes to a
+law's bundle or `atlas.json`, and no threshold or link is changed by an audit result.
+
+1. `influence audit sample <law> --seed N [--size 40] [--status published|unconfirmed]
+   [--tier copied|reworded]` (`make audit-sample LAW='2021/0106(COD)' SEED=N`) reads the
+   law's `atlas.json` (name it by procedure number or slug; run `make atlas` first) and
+   draws a seeded sample with `services/audit.py`'s `draw_sample`: spread over (law, tier)
+   in proportion to size by largest remainder, every stratum given at least one seat, a
+   pure function of the links and the seed. It writes, under
+   `data/audit/<slug>/<status>[-<tier>]-seed<N>-n<size>/`:
+   - `reader-a.csv` and `reader-b.csv`, identical blind sheets with an opaque item ID
+     (numbered in a seeded shuffle), the actor, the ask's quote, date and source URL, the
+     amendment's ID, provision, old and new wording, tabling date and source URL, and
+     empty `verdict` and `note` columns. No link ID, score, tier or status.
+   - `key.json`, kept from the readers: each item's link record, tier, score, status and
+     stratum, the seed, the size and the population it was drawn from.
+
+   An existing sample directory is refused, so a rerun cannot overwrite filled sheets.
+2. Each reader fills `verdict` with `yes` (the ask's wording or request reached this
+   amendment), `no`, or `unsure`, plus an optional note, without talking to the other.
+3. `influence audit score <dir>` (`make audit-score DIR=data/audit/<slug>/<sample-id>`)
+   checks that each sheet lists exactly the key's items and only yes, no, unsure or blank,
+   then writes `audit-result.json` and `audit-summary.md` beside the sheets: per stratum
+   and overall, the links both readers marked correct, both marked incorrect, the splits
+   and the blanks, and precision with its Wilson 95% interval (`audit.summarise`). A link
+   is correct only when both readers say yes: `unsure` counts as no, a split counts as
+   incorrect, and a blank leaves the link unlabelled (counted in neither, and reported).
+   The result says whether the overall lower bound reaches the copied-like floor of 0.90.
+
+**Unconfirmed sample: the proposed re-scope.** Plan gate 7 audits published links; the
+last real AI Act run published none, so the plan carries a **proposed, not adopted**
+re-scope: audit a sample of *unconfirmed* prose links to set the prose threshold.
+`--status unconfirmed` supports it and every output says so. Its score adds, for support-
+score cuts 0.05 to 0.95 in steps of 0.05, the sampled links at or above each cut, their
+precision and Wilson lower bound, and the lowest cut whose lower bound reaches 0.90. That
+cut is a proposal only: a person decides whether the threshold moves (recorded in the
+plan), and the pipeline then rebuilds the graph. With 40 links the bound is wide: even
+30 of 30 correct bounds precision at about 0.886, so reaching 0.90 needs about 35 links,
+all correct, at or above the cut.
+
+**Limits.** Tested offline on the invented fixture (`tests/test_audit_sheets.py`:
+blindness, determinism by seed, agreements and splits, the threshold grid, invalid
+sheets). No real sample has been drawn or read yet; no precision is measured.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
