@@ -186,6 +186,14 @@ Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with at
   explorer renders it unchanged (6 verbatim links on the AI Act, checked in a browser).
 - `services/jev.py` and its offline tests come from `feat/jev-gate-three` (PR #63) unchanged.
 
+- **Practice set** (`backend/benchmarks/lineage_practice.py`, LobbyPlag 272 pairs, same folds
+  and draws as the harness; `evaluation/lineage-practice.json`): the 12-word verbatim rule
+  selects 89 pairs, 85 right (precision 0.955, Wilson 95% 0.890–0.982), recall 0.494; as a
+  score its AUC is 0.688 and mean P@20 0.821 (lexical-delta-v1: AUC 0.862, P@20 0.980).
+  BM25 recall@5 on the proposals' new wording is 0.663, so the Jev stage can reach at most
+  that share of verified pairs. Jev on the same pairs: 222 distinct requests, about 0.008 USD;
+  not run yet (no key in the session). PR #63 measured `same_legal_change` alone at AUC 0.904.
+
 Next: run `lineage_jev.py --execute`, rebuild the view, read a sample of the reworded links,
 and fix the citation filter for the institutional formula.
 

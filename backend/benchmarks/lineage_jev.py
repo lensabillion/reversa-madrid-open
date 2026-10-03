@@ -158,7 +158,7 @@ def credential(env_file: Path | None) -> SecretStr:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("--law", type=Path, required=True, help="data/laws/<slug> bundle")
     parser.add_argument("--execute", action="store_true", help="call Jev (costs money)")
     parser.add_argument("--env-file", type=Path, help="file holding TYPESAFE_API_KEY")
