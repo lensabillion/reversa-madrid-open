@@ -6,8 +6,9 @@ Retrieval only narrows the search. A high score means shared rare words, not inf
 import re
 from collections import Counter, defaultdict
 from collections.abc import Sequence
-from heapq import nlargest
 from math import log
+
+import numpy as np
 
 from influence.schemas.retrieval import PassageCandidate, QueryKind, Shortlist, SourcePassage
 from influence.schemas.scoring import TOKEN_PATTERN, TextChange
@@ -70,20 +71,45 @@ def split_passages(document_id: str, text: str) -> tuple[SourcePassage, ...]:
 class PassageIndex:
     """Inverted index over the passages of one law's submissions.
 
-    Build is linear in total tokens. A query costs the postings of its distinct terms plus
-    O(M log k) to keep the top k of M matching passages.
+    A posting's BM25 weight depends only on the index (its term's rarity and its passage's
+    length), never on the query, so it is computed once here, and a query adds whole weight
+    arrays with numpy. Walking postings one at a time in Python took 212 s for the AI Act's
+    5,660 amendments over 29,056 passages, because common words such as "the" have postings
+    in most passages. Scores, ranks and tie-breaks are bit-identical to that walk: each
+    passage still sums its terms' weights in sorted term order with the same float operations.
+
+    Build is linear in total tokens. A query costs one vectorized add per distinct term over
+    its postings, O(N) to collect the M matching passages among N, and O(M) to keep the top
+    k (O(M log M) only when scores tie at the cut).
     """
 
     def __init__(self, passages: tuple[SourcePassage, ...]) -> None:
         self._passages = passages
-        self._lengths: list[int] = []
-        self._postings: dict[str, list[tuple[int, int]]] = defaultdict(list)
-        for index, passage in enumerate(passages):
-            counts = Counter(_words(passage.text))
-            self._lengths.append(sum(counts.values()))
-            for term, count in counts.items():
-                self._postings[term].append((index, count))
-        self._average_length = sum(self._lengths) / len(passages) if passages else 0.0
+        counts = [Counter(_words(passage.text)) for passage in passages]
+        self._terms = [frozenset(count) for count in counts]
+        lengths = [count.total() for count in counts]
+        postings: dict[str, list[tuple[int, int]]] = defaultdict(list)
+        for index, count in enumerate(counts):
+            for term, occurrences in count.items():
+                postings[term].append((index, occurrences))
+        total = len(passages)
+        average = sum(lengths) / total if total else 0.0
+        self._spans: dict[str, tuple[int, int]] = {}
+        indices: list[int] = []
+        frequencies: list[int] = []
+        idfs: list[float] = []
+        for term, entries in postings.items():
+            # math.log, not numpy's, so each weight matches the per-posting walk to the bit.
+            idf = log(1 + (total - len(entries) + 0.5) / (len(entries) + 0.5))
+            self._spans[term] = (len(indices), len(indices) + len(entries))
+            for index, occurrences in entries:
+                indices.append(index)
+                frequencies.append(occurrences)
+                idfs.append(idf)
+        self._indices = np.array(indices, dtype=np.intp)
+        count_array = np.array(frequencies, dtype=np.float64)
+        norm = 1 - _B + _B * np.array(lengths, dtype=np.float64)[self._indices] / average
+        self._weights = np.array(idfs) * count_array * (_K1 + 1) / (count_array + _K1 * norm)
 
     def __len__(self) -> int:
         return len(self._passages)
@@ -113,27 +139,30 @@ class PassageIndex:
             kind = "delta"
             query_text = " ".join(span.text for span in changed_spans(TextChange(old=old, new=new)))
         terms = tuple(sorted(set(_words(query_text))))
-        scores: dict[int, float] = defaultdict(float)
-        matched: dict[int, list[str]] = defaultdict(list)
-        total = len(self._passages)
+        scores = np.zeros(len(self._passages))
         for term in terms:
-            postings = self._postings.get(term, ())
-            idf = log(1 + (total - len(postings) + 0.5) / (len(postings) + 0.5))
-            for index, count in postings:
-                norm = 1 - _B + _B * self._lengths[index] / self._average_length
-                scores[index] += idf * count * (_K1 + 1) / (count + _K1 * norm)
-                matched[index].append(term)
-        best = nlargest(k, scores.items(), key=lambda item: (item[1], -item[0]))
+            if (span := self._spans.get(term)) is not None:
+                start, stop = span
+                # A term has one posting per passage, so the fancy-indexed add cannot collide.
+                scores[self._indices[start:stop]] += self._weights[start:stop]
+        # Every weight is positive, so exactly the passages sharing a term score above zero.
+        matched = np.flatnonzero(scores)
+        if 0 < k < matched.size:
+            # Only passages tying or beating the k-th best score can win; sort just those.
+            threshold = np.partition(scores[matched], -k)[-k]
+            matched = matched[scores[matched] >= threshold]
+        # Highest score first, then the earlier passage, as heapq.nlargest did.
+        best: list[int] = matched[np.lexsort((matched, -scores[matched]))][: max(k, 0)].tolist()
         candidates = tuple(
             PassageCandidate(
                 passage=self._passages[index],
                 context_start=self._context(index)[0],
                 context_end=self._context(index)[1],
                 rank=rank,
-                score=score,
-                matched_terms=tuple(matched[index]),
+                score=float(scores[index]),
+                matched_terms=tuple(term for term in terms if term in self._terms[index]),
             )
-            for rank, (index, score) in enumerate(best, start=1)
+            for rank, index in enumerate(best, start=1)
         )
         return Shortlist(
             amendment_id=amendment_id,
