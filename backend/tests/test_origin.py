@@ -53,15 +53,18 @@ def adoption(
     tabled_on: date | None = date(2099, 3, 1),
     phrase_id: str = PHRASE_ID,
     authors: tuple[str, ...] = (),
+    groups: tuple[str | None, ...] = (),
 ) -> AmendmentAdoption:
     return AmendmentAdoption(
         amendment_id=amendment_id,
         stage="committee",
         author_ids=authors,
+        author_groups=groups,
         tabled_on=tabled_on,
         phrase_ids=(phrase_id,),
         adopted_words=14,
         inserted_words=40,
+        new_words=40,
         longest_run=14,
     )
 
@@ -143,6 +146,25 @@ def test_the_earliest_of_several_amendments_is_the_date_to_beat() -> None:
     assert match.amendment_ids == ("am:2099-0001-COD:IMCO:1", "am:2099-0001-COD:IMCO:2")
 
 
+def test_one_undated_carrier_leaves_the_order_unknown_instead_of_dropping_out() -> None:
+    """Regression: the undated committee amendment used to be dropped before taking the min."""
+    committee_undated = adoption("am:2099-0001-COD:IMCO:1", tabled_on=None)
+    plenary_late = adoption("am:2099-0001-COD:PLENARY:2", tabled_on=date(2099, 9, 1))
+    text = "We ask that " + REQUEST + "."
+    published = datetime(2099, 6, 1, tzinfo=UTC)
+    (match,) = find_origins(
+        [phrase()], [committee_undated, plenary_late], [document(text=text, published=published)]
+    )
+    assert (match.earliest_amendment_on, match.precedes, match.eligibility) == (
+        None,
+        None,
+        "unknown_date",
+    )
+    assert not match.counts_as_origin
+    (dated,) = find_origins([phrase()], [plenary_late], [document(text=text, published=published)])
+    assert (dated.precedes, dated.eligibility, dated.counts_as_origin) == (True, "ask_first", True)
+
+
 def test_a_missing_tabling_date_falls_back_to_the_amendment_record() -> None:
     record = Amendment(
         amendment_id="am:2099-0001-COD:IMCO:1",
@@ -187,14 +209,21 @@ def test_a_citation_run_and_a_proposal_window_are_flagged() -> None:
         "the european parliament and of the council of 20 may 2021 setting up a union regime "
         "for the control of exports brokering technical assistance transit and transfer"
     )
-    (citation,) = find_origins(
-        [phrase(cited)], [adoption()], [document(text=cited)], proposal_texts=()
-    )
+    (citation,) = find_origins([phrase(cited)], [adoption()], [document(text=cited)])
     assert citation.is_citation
-    (from_proposal,) = find_origins(
-        [phrase()], [adoption()], [document(text=REQUEST)], proposal_texts=[f"Article 5 {REQUEST}"]
-    )
-    assert from_proposal.is_citation
+    assert not citation.counts_as_origin
+    (request,) = find_origins([phrase()], [adoption()], [document(text=REQUEST)])
+    assert not request.is_citation
+    assert request.counts_as_origin
+
+
+def test_only_consultation_documents_are_searched_so_the_law_never_matches_itself() -> None:
+    final_act = document("1", REQUEST, kind="cellar", title="Regulation")
+    feedback = document("2", REQUEST, kind="hys_feedback", title="Acme")
+    found = find_origins([phrase()], [adoption()], [final_act, feedback])
+    assert [match.document_id for match in found] == ["doc:hys_feedback:2"]
+    tabled = find_tabled_origins([amendment()], [final_act])
+    assert (tabled.phrases, tabled.origins) == ((), ())
 
 
 def test_the_organisation_comes_from_the_submitter_a_comment_title_or_nothing() -> None:
@@ -243,19 +272,24 @@ def test_the_organisation_comes_from_the_submitter_a_comment_title_or_nothing() 
     assert by_title == {"doc:hys_feedback:9": "Acme Lobby", "doc:hys_attachment:8": None}
 
 
-def test_coalition_phrases_are_those_carried_by_three_or_more_groups() -> None:
+def test_coalition_phrases_are_those_carried_by_two_or_more_known_groups() -> None:
+    other = "phrase:fedcba9876543210"
+    lone = "phrase:aaaaaaaaaaaaaaaa"
     adoptions = [
-        adoption("am:2099-0001-COD:IMCO:1", authors=("actor:mep:1", "actor:mep:2")),
-        adoption("am:2099-0001-COD:IMCO:2", authors=("actor:mep:3",)),
-        adoption("am:2099-0001-COD:IMCO:3", authors=("actor:mep:4", "actor:mep:99")),
+        adoption("am:2099-0001-COD:IMCO:1", authors=("actor:mep:1",), groups=("PPE",)),
+        adoption("am:2099-0001-COD:IMCO:2", authors=("actor:mep:3",), groups=("S&D",)),
+        # Two Members of one group, and one of unknown group: not a coalition.
         adoption(
-            "am:2099-0001-COD:IMCO:4", phrase_id="phrase:fedcba9876543210", authors=("actor:mep:1",)
+            "am:2099-0001-COD:IMCO:3",
+            phrase_id=other,
+            authors=("actor:mep:1", "actor:mep:2", "actor:mep:9"),
+            groups=("PPE", "PPE", None),
         ),
+        adoption("am:2099-0001-COD:IMCO:4", phrase_id=lone),
     ]
-    groups = {"actor:mep:1": "PPE", "actor:mep:2": "PPE", "actor:mep:3": "S&D", "actor:mep:4": "RE"}
-    assert coalition_phrase_ids(adoptions, groups) == {PHRASE_ID}
-    assert coalition_phrase_ids(adoptions, groups, minimum=4) == frozenset()
-    assert coalition_phrase_ids([], groups) == frozenset()
+    assert coalition_phrase_ids(adoptions) == {PHRASE_ID}
+    assert coalition_phrase_ids(adoptions, minimum=3) == frozenset()
+    assert coalition_phrase_ids([]) == frozenset()
 
 
 def test_contradictory_inputs_are_refused() -> None:
@@ -280,7 +314,7 @@ def test_semantic_phrases_and_adoptions_are_left_to_the_semantic_piece() -> None
         update={"kind": "semantic"}
     )
     assert find_origins([semantic], [other], [document(text="providers keep logs")]) == ()
-    assert coalition_phrase_ids([other], {}) == frozenset()
+    assert coalition_phrase_ids([other]) == frozenset()
 
 
 def test_a_repeated_quotation_is_reported_once_with_its_longest_run() -> None:
@@ -362,13 +396,13 @@ def test_a_document_is_tied_to_an_amendment_that_was_never_adopted() -> None:
     )
     (tabled,) = found.phrases
     (match,) = found.origins
-    # Only the words the amendment inserted count: "providers", "shall keep" and "logs" were
-    # already in its original, so the tabled wording is what follows them.
-    inserted = REQUEST.split(" logs ", 1)[1]
-    assert tabled.text == inserted
+    # The amendment kept "providers", "shall keep" and "logs" from its original but rewrote
+    # the sentence around them: the run is the whole rewritten sentence, not cut at the kept
+    # words, because every window of it holds an inserted word.
+    assert tabled.text == REQUEST
     assert tabled.amendment_ids == ("am:2099-0001-COD:IMCO:1",)
     assert match.phrase_id == tabled.phrase_id
-    assert match.span.text == inserted.upper()
+    assert match.span.text == REQUEST.upper()
     assert span_matches(match.span, text)
     assert (match.earliest_amendment_on, match.precedes, match.is_citation) == (
         date(2099, 3, 1),
@@ -381,17 +415,27 @@ def test_amendments_inserting_the_same_wording_share_one_phrase_and_the_earliest
     amendments = [
         amendment(2, tabled_on=date(2099, 6, 1)),
         amendment(1, tabled_on=date(2099, 1, 15)),
-        amendment(3, tabled_on=None),
     ]
     undated = document("2", REQUEST, published=None)
     found = find_tabled_origins(amendments, [document(text=REQUEST), undated])
     (tabled,) = found.phrases
-    ids = ("am:2099-0001-COD:IMCO:1", "am:2099-0001-COD:IMCO:2", "am:2099-0001-COD:IMCO:3")
+    ids = ("am:2099-0001-COD:IMCO:1", "am:2099-0001-COD:IMCO:2")
     assert tabled.amendment_ids == ids
     dated, unknown = sorted(found.origins, key=lambda m: m.document_id)
     assert (dated.amendment_ids, dated.earliest_amendment_on) == (ids, date(2099, 1, 15))
-    assert dated.precedes is False
-    assert unknown.precedes is None
+    assert (dated.precedes, dated.eligibility) == (False, "amendment_first")
+    assert (unknown.precedes, unknown.eligibility) == (None, "unknown_date")
+    # One undated carrier may have come first, so the order is unknown, not decided by the
+    # dated ones (the chronology hole the reviewer found).
+    with_undated = find_tabled_origins(
+        [*amendments, amendment(3, tabled_on=None)], [document(text=REQUEST)]
+    )
+    (match,) = with_undated.origins
+    assert (match.earliest_amendment_on, match.precedes, match.eligibility) == (
+        None,
+        None,
+        "unknown_date",
+    )
     only_undated = find_tabled_origins([amendment(tabled_on=None)], [document(text=REQUEST)])
     assert (only_undated.origins[0].earliest_amendment_on, only_undated.origins[0].precedes) == (
         None,

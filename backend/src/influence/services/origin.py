@@ -13,7 +13,10 @@ and adoption are two independent facts (`TabledPhrase`).
 A shared run is evidence of shared wording, not of authorship: the same text can come from a
 common draft, a coalition or a quotation of another act. So the result states what it can
 check (an exact span, the dates, whether the run is a citation, which amendments carry it)
-and nothing more. An undated document is never reported as coming before an amendment.
+and nothing more. Only consultation documents (`CONSULTATION_KINDS`) are searched, so the
+law's own texts never match themselves. A document counts as an origin only when it is dated
+before every carrying amendment, so an undated document, or one undated carrier, leaves the
+order unknown (`eligibility` "unknown_date", the same rule as part 4).
 
 Complexity: the index holds one entry per 8-word window of every phrase; each document is
 scanned once, and a window is built only where its first word starts some indexed window, so
@@ -28,7 +31,7 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from influence.schemas.atlas import (
     Actor,
@@ -37,8 +40,10 @@ from influence.schemas.atlas import (
     Passage,
     SourceDocument,
     SourceSpan,
+    TimeEligibility,
 )
 from influence.schemas.lineage import (
+    COALITION_GROUPS,
     MIN_ADOPTED_RUN_WORDS,
     NGRAM_WORDS,
     AdoptedPhrase,
@@ -46,7 +51,7 @@ from influence.schemas.lineage import (
     OriginMatch,
     TabledPhrase,
 )
-from influence.services.lineage import Rarity, inserted_blocks, phrase_id_of
+from influence.services.lineage import Rarity, inserted_words, phrase_id_of
 from influence.services.prose_match import Word, words_of
 
 # The first words of a run that quotes another act: "the European Parliament and of the
@@ -67,9 +72,9 @@ _CITATION_ANYWHERE = re.compile(
     r"|repealing (?:council |commission )?(?:directive|regulation|decision)s?)\b"
 )
 _CITATION_WINDOW_WORDS = 14
-# A phrase carried by amendments of this many different political groups is coalition
-# wording rather than one group's request.
-COALITION_GROUPS = 3
+# The documents an organisation or a citizen submitted: Have Your Say feedback and its
+# attachments. The law's own texts are never searched for origins.
+CONSULTATION_KINDS = frozenset({"hys_feedback", "hys_attachment"})
 
 
 class OriginError(ValueError):
@@ -112,21 +117,18 @@ def submitters_from(passages: Iterable[Passage], actors: Iterable[Actor]) -> dic
 
 
 def coalition_phrase_ids(
-    adoptions: Iterable[AmendmentAdoption],
-    group_of: Mapping[str, str],
-    *,
-    minimum: int = COALITION_GROUPS,
+    adoptions: Iterable[AmendmentAdoption], *, minimum: int = COALITION_GROUPS
 ) -> frozenset[str]:
     """Phrases carried by amendments of at least `minimum` different political groups.
 
-    An author with no known group counts for none, and committee text has no author, so it
-    counts for no group either.
+    The groups are the adoptions' `author_groups`. An author with no known group counts for
+    none, and committee text has no author, so it counts for no group either.
     """
     groups: defaultdict[str, set[str]] = defaultdict(set)
     for adoption in adoptions:
         if adoption.kind != "verbatim":
             continue
-        known = {group_of[author] for author in adoption.author_ids if author in group_of}
+        known = {group for group in adoption.author_groups if group is not None}
         for phrase_id in adoption.phrase_ids:
             groups[phrase_id] |= known
     return frozenset(phrase_id for phrase_id, found in groups.items() if len(found) >= minimum)
@@ -191,20 +193,21 @@ def find_origins(
     rarity: Rarity,
     amendments: Mapping[str, Amendment] | None = None,
     submitters: Mapping[str, Actor] | None = None,
-    proposal_texts: Iterable[str] = (),
 ) -> tuple[OriginMatch, ...]:
     """Every document that says an adopted phrase, with an exact quotation and the dates.
 
     For each (phrase, document) pair the longest shared run of at least
     `MIN_ADOPTED_RUN_WORDS` words that `rarity` finds significant (the law's own rarity, as in
-    adoption) is reported once. `precedes` is True when the document is
-    dated before the earliest amendment carrying the phrase, False when not, and None when
-    either date is unknown. `is_citation` marks a run that starts as a reference to another
-    act, or that holds a window of the Commission's proposal (`proposal_texts`).
-    `amendments` supplies a tabling date for an adoption that has none. `submitters` (see
-    `submitters_from`) names the organisation behind a document; without
-    it a comment is named by its title and an attachment is left unnamed. Output is ordered
-    longest first, then by document and phrase, so it is reproducible.
+    adoption) is reported once. Documents that are not consultation documents are skipped.
+    `precedes` is True when the document is dated before the earliest amendment carrying the
+    phrase, False when not, and None when the document or any carrying amendment is undated;
+    `eligibility` says the same in part 4's terms. `is_citation` marks a run that is a
+    reference to another act. An adopted phrase holds no window of the proposal by
+    construction, so there is no second test against the proposal here. `amendments`
+    supplies a tabling date for an adoption that has none. `submitters` (see
+    `submitters_from`) names the organisation behind a document; without it a comment is
+    named by its title and an attachment is left unnamed. Output is ordered longest first,
+    then by document and phrase, so it is reproducible.
     """
     verbatim = [phrase for phrase in phrases if phrase.kind == "verbatim"]
     carriers = _carriers(verbatim, adoptions)
@@ -213,40 +216,65 @@ def find_origins(
         for start, window in _windows(phrase.text.split()):
             index[window].append((phrase_index, start))
     first_words = frozenset(window[0] for window in index)
-    proposal = _proposal_windows(proposal_texts)
 
     found: list[OriginMatch] = []
-    for document, text in documents:
-        _checked(document, text)
+    for document, text in _consultation(documents):
         words = words_of(text.text)
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
         for phrase_index, (first, end) in _runs(folded, index, first_words, rarity).items():
             phrase = verbatim[phrase_index]
             carrying = carriers[phrase.phrase_id]
-            dates = [d for d in (_tabled(a, amendments) for a in carrying) if d is not None]
-            earliest = min(dates) if dates else None
-            published = document.published_at
-            run = folded[first:end]
+            earliest, precedes = _order(
+                [_tabled(a, amendments) for a in carrying], document.published_at
+            )
             found.append(
                 OriginMatch(
                     phrase_id=phrase.phrase_id,
                     document_id=document.document_id,
                     actor_id=None if submitter is None else submitter.actor_id,
                     organisation=_organisation(document, submitter),
-                    published_at=published,
+                    published_at=document.published_at,
                     span=_span(document, text.text, words, first, end),
                     words=end - first,
                     amendment_ids=tuple(sorted({a.amendment_id for a in carrying})),
                     earliest_amendment_on=earliest,
-                    precedes=None
-                    if published is None or earliest is None
-                    else published.date() < earliest,
-                    is_citation=is_citation(run)
-                    or any(window in proposal for _, window in _windows(run)),
+                    precedes=precedes,
+                    eligibility=_eligibility(precedes),
+                    is_citation=is_citation(folded[first:end]),
                 )
             )
     return tuple(sorted(found, key=lambda m: (-m.words, m.document_id, m.phrase_id)))
+
+
+def _consultation(
+    documents: Iterable[tuple[SourceDocument, DocumentText]],
+) -> Iterable[tuple[SourceDocument, DocumentText]]:
+    """The consultation documents, each checked against its text; the law's own are skipped."""
+    for document, text in documents:
+        _checked(document, text)
+        if document.source_kind in CONSULTATION_KINDS:
+            yield document, text
+
+
+def _order(
+    tabled: Sequence[date | None], published: datetime | None
+) -> tuple[date | None, bool | None]:
+    """The earliest tabling date, and whether the document came before it.
+
+    Both are None when any carrier is undated: the undated one may have come first, so the
+    order cannot be settled. `precedes` is also None for an undated document.
+    """
+    if not tabled or any(day is None for day in tabled):
+        return None, None
+    earliest = min(day for day in tabled if day is not None)
+    return earliest, None if published is None else published.date() < earliest
+
+
+def _eligibility(precedes: bool | None) -> TimeEligibility:
+    if precedes is None:
+        return "unknown_date"
+    return "ask_first" if precedes else "amendment_first"
 
 
 def _proposal_windows(proposal_texts: Iterable[str]) -> set[tuple[str, ...]]:
@@ -280,15 +308,17 @@ def find_tabled_origins(
 ) -> TabledOrigins:
     """Every document that says what an amendment inserted, whether or not it was adopted.
 
-    The words an amendment inserted (`lineage.inserted_blocks`) are indexed by 8-word window,
-    leaving out windows of the Commission's proposal, which are not the amendment's request.
-    For each (amendment block, document) pair the longest shared run of at least
+    The 8-word windows of each amendment's new text that hold a word it inserted
+    (`lineage.inserted_words`) are indexed, leaving out windows of the Commission's proposal,
+    which are not the amendment's request; windows slide over the whole new text, so an
+    insertion is not cut at the words it kept. Only consultation documents are searched.
+    For each (amendment, document) pair the longest shared run of at least
     `MIN_ADOPTED_RUN_WORDS` words that `rarity` finds significant is kept. A run that lies
     wholly inside adopted wording is left to `find_origins`, so a phrase is adopted or
     tabled, never both. Runs with the same
     folded words are one `TabledPhrase` carried by every amendment that yielded it; each
     `OriginMatch` names the amendments that share the run with that document, and is dated
-    against the earliest of them, as in `find_origins`.
+    against them as in `find_origins`.
     """
     proposal = _proposal_windows(proposal_texts)
     adopted_windows = {
@@ -300,20 +330,19 @@ def find_tabled_origins(
     owners: list[Amendment] = []
     index: defaultdict[tuple[str, ...], list[tuple[int, int]]] = defaultdict(list)
     for amendment in amendments:
-        for block in inserted_blocks(amendment)[0]:
-            target = len(owners)
-            owners.append(amendment)
-            for start, window in _windows(block):
-                if window not in proposal:
-                    index[window].append((target, start))
+        new, inserted, _ = inserted_words(amendment)
+        target = len(owners)
+        owners.append(amendment)
+        for start, window in _windows(new):
+            if window not in proposal and any(inserted[start : start + NGRAM_WORDS]):
+                index[window].append((target, start))
     first_words = frozenset(window[0] for window in index)
     by_id = {amendment.amendment_id: amendment for amendment in amendments}
 
     texts: dict[str, tuple[str, ...]] = {}
     carriers: defaultdict[str, set[str]] = defaultdict(set)
     found: list[OriginMatch] = []
-    for document, text in documents:
-        _checked(document, text)
+    for document, text in _consultation(documents):
         words = words_of(text.text)
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
@@ -328,9 +357,8 @@ def find_tabled_origins(
             ids, _, _ = shared.setdefault(phrase_id, (set(), first, end))
             ids.add(owners[target].amendment_id)
         for phrase_id, (ids, first, end) in shared.items():
-            dates = [d for d in (by_id[a].tabled_on for a in ids) if d is not None]
-            earliest = min(dates) if dates else None
             published = document.published_at
+            earliest, precedes = _order([by_id[a].tabled_on for a in ids], published)
             found.append(
                 OriginMatch(
                     phrase_id=phrase_id,
@@ -342,9 +370,8 @@ def find_tabled_origins(
                     words=end - first,
                     amendment_ids=tuple(sorted(ids)),
                     earliest_amendment_on=earliest,
-                    precedes=None
-                    if published is None or earliest is None
-                    else published.date() < earliest,
+                    precedes=precedes,
+                    eligibility=_eligibility(precedes),
                     is_citation=is_citation(texts[phrase_id]),
                 )
             )

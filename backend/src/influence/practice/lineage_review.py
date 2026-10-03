@@ -7,16 +7,29 @@ claims and call them real. This module is that step, and it only reads: it never
 `LineageView`, and labels live in their own file, apart from model output, so they can never
 feed back into what the explorer shows (AGENTS.md, "Data and Challenge Rules").
 
-* `review_rows` selects claims: the strongest first, then a seeded sample spread over the
-  amendment stage, the match kind and the tabling group, so the review is not curated. The
-  selection is a pure function of the view, the seed and the group map.
+A claim is one adopted phrase (one stretch of the final act) with every amendment that
+carries it: "this wording of the law came from these amendments". Claiming per phrase, not
+per (amendment, phrase) pair, keeps a phrase that twenty amendments share from filling the
+review twenty times.
+
+* `review_rows` draws `n` claims uniformly at random with a seed (a simple random sample
+  over distinct phrases), so the precision it estimates is the precision of every claim the
+  view makes. The `strongest` claims, by length and similarity, can be added for reading,
+  marked as such; they are never pooled into the precision. (`services/audit.draw_sample`
+  is the same seeded draw, stratified for part 4's links; it is typed on `LinkAssessment`,
+  so this module draws the same way over phrases.)
 * `export_rows` writes the selection as JSON Lines (for `summarise`), CSV and Markdown (for a
   person).
 * `summarise` counts a claim only when at least two readers agree it is real or not real,
-  and reports precision with a Wilson interval; splits and "unclear" are reported apart and
-  never decided for the readers.
+  and reports precision with a Wilson interval over the sampled claims alone; the strongest
+  claims are counted apart. Splits and "unclear" are reported and never decided for the
+  readers.
 * `meets_gate` refuses to pass on too few resolved labels: an empty or tiny review never
   looks like a pass.
+
+"Coalition wording" means a phrase carried by amendments of at least `COALITION_GROUPS` (2)
+different known political groups, the rule `origin.coalition_phrase_ids` applies; an author
+whose group is unknown counts for no group.
 
 Run from the repository root:
 
@@ -38,7 +51,6 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from math import ceil
 from pathlib import Path
 from typing import Literal, cast
 
@@ -54,23 +66,26 @@ from influence.schemas.lineage import (
 )
 from influence.schemas.scoring import FrozenModel
 from influence.services.audit import AuditError, wilson_interval
+from influence.services.origin import coalition_phrase_ids
 
 PHRASE_CHARACTERS = 200
-type Selection = Literal["strongest", "sample"]
+type Selection = Literal["sample", "strongest"]
 type Verdict = Literal["real", "not_real", "unclear"]
 
 LEGEND = (
-    "Leyenda: cada fila es una afirmacion del pipeline (una enmienda cuyo texto llego a la ley "
-    "final). Lea la frase, la cita en la ley y los documentos de origen, y etiquete como "
-    "real / not_real / unclear. 'precedes' indica si el documento es anterior a la enmienda."
+    "Leyenda: cada fila es una afirmacion del pipeline (un tramo de la ley final y las "
+    "enmiendas que lo contienen). Lea la frase, la cita en la ley y los documentos de origen, "
+    "y etiquete como real / not_real / unclear. 'eligibility' indica si el documento es "
+    "anterior a todas las enmiendas (ask_first). Solo las filas 'sample' cuentan para la "
+    "precision."
 )
 COLUMNS = (
     "claim_id",
     "selection",
     "kind",
-    "amendment_id",
-    "stage",
-    "tabled_on",
+    "amendment_ids",
+    "stages",
+    "earliest_tabled_on",
     "authors",
     "groups",
     "phrase_words",
@@ -91,7 +106,7 @@ class OriginRow(FrozenModel):
     organisation: str | None
     published_at: datetime | None
     quote: str
-    precedes: bool | None
+    eligibility: str
     is_citation: bool
     kind: MatchKind
     similarity: float | None
@@ -103,9 +118,9 @@ class ReviewRow(FrozenModel):
     claim_id: str = Field(min_length=1)
     selection: Selection
     kind: MatchKind
-    amendment_id: str
-    stage: str
-    tabled_on: date | None
+    amendment_ids: tuple[str, ...]
+    stages: tuple[str, ...]
+    earliest_tabled_on: date | None
     authors: tuple[str, ...]
     groups: tuple[str, ...]
     phrase_words: int
@@ -129,7 +144,7 @@ class LabelRecord(FrozenModel):
 
 @dataclass(frozen=True, slots=True)
 class ReviewSummary:
-    """Precision of the claims that readers agree on, with the uncertainty a small review has."""
+    """Precision of the sampled claims readers agree on; the strongest claims apart."""
 
     claims: int
     resolved: int
@@ -140,13 +155,15 @@ class ReviewSummary:
     low: float
     high: float
     by_kind: Mapping[str, tuple[int, int]]
+    strongest_real: int = 0
+    strongest_resolved: int = 0
 
 
 @dataclass(frozen=True, slots=True)
 class _Claim:
     claim_id: str
-    adoption: AmendmentAdoption
     phrase: AdoptedPhrase
+    carriers: tuple[AmendmentAdoption, ...]
 
     @property
     def strength(self) -> tuple[int, float, str]:
@@ -156,47 +173,24 @@ class _Claim:
         return (1, -(self.phrase.similarity or 0.0), self.claim_id)
 
 
-def claim_id(amendment_id: str, phrase_id: str) -> str:
-    return f"claim:{amendment_id}:{phrase_id}"
+def claim_id(phrase_id: str) -> str:
+    return f"claim:{phrase_id}"
 
 
 def _claims(view: LineageView) -> list[_Claim]:
-    phrases = {phrase.phrase_id: phrase for phrase in view.adopted_phrases}
-    return [
-        _Claim(claim_id(adoption.amendment_id, phrase_id), adoption, phrases[phrase_id])
-        for adoption in view.adoptions
-        for phrase_id in adoption.phrase_ids
-    ]
-
-
-def _group_of(claim: _Claim, groups: Mapping[str, str]) -> str:
-    if not claim.adoption.author_ids:
-        return "committee_text"
-    return groups.get(claim.adoption.author_ids[0], "unknown")
-
-
-def _stratum(claim: _Claim, groups: Mapping[str, str]) -> tuple[str, str, str]:
-    return (claim.adoption.stage, claim.phrase.kind, _group_of(claim, groups))
-
-
-def _pick(
-    claims: Sequence[_Claim], count: int, seed: int, groups: Mapping[str, str]
-) -> list[_Claim]:
-    """Round-robin over the strata (stage, kind, group), shuffled within each by the seed."""
-    # Deliberate: a seeded, reproducible draw is the requirement; nothing here is secret.
-    rng = random.Random(seed)  # noqa: S311
-    strata: dict[tuple[str, str, str], list[_Claim]] = defaultdict(list)
-    for claim in sorted(claims, key=lambda item: item.claim_id):
-        strata[_stratum(claim, groups)].append(claim)
-    for members in strata.values():
-        rng.shuffle(members)
-    keys = sorted(strata)
-    picked: list[_Claim] = []
-    while len(picked) < count:
-        for key in keys:
-            if strata[key] and len(picked) < count:
-                picked.append(strata[key].pop())
-    return picked
+    """One claim per adopted phrase that some amendment carries, ordered by identifier."""
+    carriers: dict[str, list[AmendmentAdoption]] = defaultdict(list)
+    for adoption in view.adoptions:
+        for phrase_id in adoption.phrase_ids:
+            carriers[phrase_id].append(adoption)
+    return sorted(
+        (
+            _Claim(claim_id(phrase.phrase_id), phrase, tuple(carriers[phrase.phrase_id]))
+            for phrase in view.adopted_phrases
+            if carriers[phrase.phrase_id]
+        ),
+        key=lambda claim: claim.claim_id,
+    )
 
 
 def _origin_row(origin: OriginMatch) -> OriginRow:
@@ -205,7 +199,7 @@ def _origin_row(origin: OriginMatch) -> OriginRow:
         organisation=origin.organisation,
         published_at=origin.published_at,
         quote=origin.span.text[:PHRASE_CHARACTERS],
-        precedes=origin.precedes,
+        eligibility=origin.eligibility,
         is_citation=origin.is_citation,
         kind=origin.kind,
         similarity=origin.similarity,
@@ -213,43 +207,35 @@ def _origin_row(origin: OriginMatch) -> OriginRow:
 
 
 def _row(
-    claim: _Claim,
-    selection: Selection,
-    view: LineageView,
-    shared: Mapping[str, int],
-    groups: Mapping[str, str],
+    claim: _Claim, selection: Selection, view: LineageView, coalitions: frozenset[str]
 ) -> ReviewRow:
     origins = sorted(
-        (
-            origin
-            for origin in view.origins
-            if origin.phrase_id == claim.phrase.phrase_id
-            and claim.adoption.amendment_id in origin.amendment_ids
-        ),
+        (origin for origin in view.origins if origin.phrase_id == claim.phrase.phrase_id),
         key=lambda origin: (
-            origin.precedes is not True,
+            not origin.counts_as_origin,
             str(origin.published_at),
             origin.document_id,
         ),
     )
     span = claim.phrase.final_spans[0]
-    members = shared[claim.phrase.phrase_id]
-    group_names = tuple(
-        dict.fromkeys(groups.get(author, "unknown") for author in claim.adoption.author_ids)
+    adoptions = sorted(claim.carriers, key=lambda adoption: adoption.amendment_id)
+    groups = tuple(
+        sorted({g for adoption in adoptions for g in adoption.author_groups if g is not None})
     )
+    dates = [adoption.tabled_on for adoption in adoptions]
     return ReviewRow(
         claim_id=claim.claim_id,
         selection=selection,
         kind=claim.phrase.kind,
-        amendment_id=claim.adoption.amendment_id,
-        stage=claim.adoption.stage,
-        tabled_on=claim.adoption.tabled_on,
-        authors=claim.adoption.author_names,
-        groups=group_names or ("committee_text",),
+        amendment_ids=tuple(adoption.amendment_id for adoption in adoptions),
+        stages=tuple(sorted({adoption.stage for adoption in adoptions})),
+        earliest_tabled_on=None if None in dates else min(d for d in dates if d is not None),
+        authors=tuple(dict.fromkeys(n for adoption in adoptions for n in adoption.author_names)),
+        groups=groups,
         phrase_words=claim.phrase.words,
         similarity=claim.phrase.similarity,
-        shared_by_amendments=members,
-        coalition=members > 1,
+        shared_by_amendments=len(adoptions),
+        coalition=claim.phrase.phrase_id in coalitions,
         phrase=claim.phrase.text[:PHRASE_CHARACTERS],
         final_provision=span.record_id,
         final_quote=span.text[:PHRASE_CHARACTERS],
@@ -258,31 +244,28 @@ def _row(
 
 
 def review_rows(
-    view: LineageView, n: int, seed: int = 0, groups: Mapping[str, str] | None = None
+    view: LineageView, n: int, seed: int = 0, strongest: int = 0
 ) -> tuple[ReviewRow, ...]:
-    """The `n` claims to read: the strongest half, then a seeded stratified sample.
+    """`n` claims drawn uniformly with `seed`, then up to `strongest` others marked apart.
 
-    Verbatim claims rank before semantic ones, by words and by similarity. The rest of the
-    selection is drawn evenly from every (stage, kind, group) stratum, so a large group or
-    kind cannot fill the review. `groups` maps an actor ID to a political group; a missing
-    entry reads as "unknown", and an amendment with no author as "committee_text". With
-    fewer than `n` claims, all of them are returned.
+    The draw is a simple random sample over distinct phrases, so every claim the view makes
+    has the same chance and the precision it estimates is unbiased. The strongest claims
+    (verbatim by words, then semantic by similarity) not already drawn are appended with
+    selection "strongest", for reading only. With fewer than `n` claims, all are sampled.
     """
     if n < 1:
         raise AuditError("A review needs at least one claim")
-    names = groups or {}
+    if strongest < 0:
+        raise AuditError("The strongest claims to add cannot be negative")
     claims = _claims(view)
-    shared: dict[str, int] = defaultdict(int)
-    for claim in claims:
-        shared[claim.phrase.phrase_id] += 1
-    ranked = sorted(claims, key=lambda claim: claim.strength)
-    top = ranked[: ceil(n / 2)]
-    taken = {claim.claim_id for claim in top}
-    rest = [claim for claim in claims if claim.claim_id not in taken]
-    sample = _pick(rest, min(n - len(top), len(rest)), seed, names)
+    # Deliberate: a seeded, reproducible draw is the requirement; nothing here is secret.
+    sample = random.Random(seed).sample(claims, min(n, len(claims)))  # noqa: S311
+    drawn = {claim.claim_id for claim in sample}
+    top = [c for c in sorted(claims, key=lambda c: c.strength) if c.claim_id not in drawn]
+    coalitions = coalition_phrase_ids(view.adoptions)
     return tuple(
-        [_row(claim, "strongest", view, shared, names) for claim in top]
-        + [_row(claim, "sample", view, shared, names) for claim in sample]
+        [_row(claim, "sample", view, coalitions) for claim in sample]
+        + [_row(claim, "strongest", view, coalitions) for claim in top[:strongest]]
     )
 
 
@@ -290,7 +273,7 @@ def _origins_text(row: ReviewRow) -> str:
     return " | ".join(
         f"{origin.organisation or origin.document_id} "
         f"({origin.published_at.date() if origin.published_at else 'undated'}, "
-        f"precedes={origin.precedes}, citation={origin.is_citation}): {origin.quote}"
+        f"eligibility={origin.eligibility}, citation={origin.is_citation}): {origin.quote}"
         for origin in row.origins
     )
 
@@ -307,9 +290,9 @@ def to_csv(rows: Sequence[ReviewRow]) -> str:
                 row.claim_id,
                 row.selection,
                 row.kind,
-                row.amendment_id,
-                row.stage,
-                row.tabled_on or "",
+                "; ".join(row.amendment_ids),
+                "; ".join(row.stages),
+                row.earliest_tabled_on or "",
                 "; ".join(row.authors),
                 "; ".join(row.groups),
                 row.phrase_words,
@@ -334,9 +317,10 @@ def to_markdown(rows: Sequence[ReviewRow], seed: int) -> str:
             "",
             f"- selection: {row.selection} | kind: {row.kind} | words: {row.phrase_words}"
             + ("" if row.similarity is None else f" | similarity: {row.similarity:.3f}"),
-            f"- amendment: {row.amendment_id} ({row.stage}, tabled {row.tabled_on or 'unknown'})",
+            f"- amendments: {', '.join(row.amendment_ids)} ({', '.join(row.stages)}, earliest "
+            f"tabled {row.earliest_tabled_on or 'unknown'})",
             f"- authors: {', '.join(row.authors) or 'committee text'}"
-            f" | groups: {', '.join(row.groups)}",
+            f" | groups: {', '.join(row.groups) or 'none known'}",
             f"- shared by {row.shared_by_amendments} amendment(s)"
             + (" (coalition wording)" if row.coalition else ""),
             f"- final law: {row.final_provision}",
@@ -349,7 +333,8 @@ def to_markdown(rows: Sequence[ReviewRow], seed: int) -> str:
             when = origin.published_at.date() if origin.published_at else "undated"
             lines += [
                 f"- origin: {origin.organisation or origin.document_id} ({when},"
-                f" precedes={origin.precedes}, citation={origin.is_citation}, {origin.kind})",
+                f" eligibility={origin.eligibility}, citation={origin.is_citation},"
+                f" {origin.kind})",
                 f"  > {origin.quote}",
             ]
         lines.append("")
@@ -391,11 +376,13 @@ def read_labels(path: Path) -> tuple[LabelRecord, ...]:
 
 
 def summarise(rows: Sequence[ReviewRow], labels: Sequence[LabelRecord]) -> ReviewSummary:
-    """Precision among claims at least two readers agree on, with its Wilson interval.
+    """Precision among sampled claims at least two readers agree on, with its Wilson interval.
 
     A claim counts as real or not real only when every reader gave that same verdict and
     there are at least two of them. Any split, or "unclear", is unresolved; fewer than two
-    readers is unlabelled. Neither counts toward precision, and both are reported. A label
+    readers is unlabelled. Neither counts toward precision, and both are reported. Claims
+    selected as "strongest" are not a random sample, so they are counted apart
+    (`strongest_real` of `strongest_resolved`) and never pooled into the precision. A label
     for a claim outside `rows`, or two labels from one reader on one claim, is an error.
     """
     known = {row.claim_id: row for row in rows}
@@ -407,16 +394,20 @@ def summarise(rows: Sequence[ReviewRow], labels: Sequence[LabelRecord]) -> Revie
         if label.reader in verdicts[label.claim_id]:
             raise AuditError(f"{label.reader} labelled {label.claim_id} more than once")
         verdicts[label.claim_id][label.reader] = label.verdict
-    real = resolved = unresolved = unlabelled = 0
+    real = resolved = unresolved = unlabelled = strongest_real = strongest_resolved = 0
     kinds: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     for claim, row in known.items():
         given = verdicts.get(claim, {})
         agreed = set(given.values())
-        if len(given) < 2:
+        decided = len(given) >= 2 and agreed in ({"real"}, {"not_real"})
+        is_real = agreed == {"real"}
+        if row.selection == "strongest":
+            strongest_resolved += decided
+            strongest_real += decided and is_real
+        elif len(given) < 2:
             unlabelled += 1
-        elif agreed == {"real"} or agreed == {"not_real"}:
+        elif decided:
             resolved += 1
-            is_real = agreed == {"real"}
             real += is_real
             kinds[row.kind][0] += is_real
             kinds[row.kind][1] += 1
@@ -424,7 +415,7 @@ def summarise(rows: Sequence[ReviewRow], labels: Sequence[LabelRecord]) -> Revie
             unresolved += 1
     low, high = wilson_interval(real, resolved)
     return ReviewSummary(
-        claims=len(known),
+        claims=sum(row.selection == "sample" for row in rows),
         resolved=resolved,
         real=real,
         unresolved=unresolved,
@@ -433,6 +424,8 @@ def summarise(rows: Sequence[ReviewRow], labels: Sequence[LabelRecord]) -> Revie
         low=low,
         high=high,
         by_kind={kind: (counts[0], counts[1]) for kind, counts in sorted(kinds.items())},
+        strongest_real=strongest_real,
+        strongest_resolved=strongest_resolved,
     )
 
 
@@ -459,9 +452,11 @@ def _parser() -> argparse.ArgumentParser:
     export = commands.add_parser("export", help="Select claims and write rows.jsonl/.csv/.md")
     export.add_argument("--view", type=Path, required=True, help="A lineage.json view")
     export.add_argument("--out", type=Path, required=True, help="Directory for the review files")
-    export.add_argument("--n", type=int, default=30, help="Claims to review")
+    export.add_argument("--n", type=int, default=30, help="Claims to sample")
     export.add_argument("--seed", type=int, default=0, help="Seed of the sample")
-    export.add_argument("--groups", type=Path, default=None, help="JSON {actor_id: group}")
+    export.add_argument(
+        "--strongest", type=int, default=0, help="Strongest claims to add, never pooled"
+    )
     summary = commands.add_parser("summarise", help="Precision of the claims readers agree on")
     summary.add_argument("--rows", type=Path, required=True, help="rows.jsonl from export")
     summary.add_argument("--labels", type=Path, required=True, help="Labels JSON Lines")
@@ -472,14 +467,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def _export(args: argparse.Namespace) -> int:
     view = LineageView.model_validate_json(cast("Path", args.view).read_text(encoding="utf-8"))
-    groups_path = cast("Path | None", args.groups)
-    groups = (
-        cast("dict[str, str]", json.loads(groups_path.read_text(encoding="utf-8")))
-        if groups_path
-        else {}
-    )
     n, seed = cast("int", args.n), cast("int", args.seed)
-    rows = review_rows(view, n, seed, groups)
+    rows = review_rows(view, n, seed, cast("int", args.strongest))
     paths = export_rows(rows, seed, cast("Path", args.out))
     print(f"{len(rows)} claims selected (n {n}, seed {seed}) from {view.procedure_id}")
     for path in paths:
@@ -491,12 +480,16 @@ def _summarise(args: argparse.Namespace) -> int:
     summary = summarise(read_rows(cast("Path", args.rows)), read_labels(cast("Path", args.labels)))
     precision = "n/a" if summary.precision is None else f"{summary.precision:.3f}"
     print(
-        f"{summary.claims} claims: {summary.resolved} resolved, {summary.unresolved} unresolved, "
-        f"{summary.unlabelled} unlabelled"
+        f"{summary.claims} sampled claims: {summary.resolved} resolved, "
+        f"{summary.unresolved} unresolved, {summary.unlabelled} unlabelled"
     )
     print(f"precision {precision} (Wilson 95% {summary.low:.3f} to {summary.high:.3f})")
     for kind, (real, total) in summary.by_kind.items():
         print(f"  {kind}: {real} of {total} real")
+    print(
+        f"strongest claims, not pooled: {summary.strongest_real} of "
+        f"{summary.strongest_resolved} resolved real"
+    )
     floor = cast("float | None", args.floor)
     if floor is None:
         return 0
