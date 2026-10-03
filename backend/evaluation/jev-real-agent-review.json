@@ -1,0 +1,396 @@
+{
+  "schema_version": "jev-real-agent-review-1",
+  "method": "Fixed raw same_legal_change cutoff0.58 and existing threeguards; uniform sample10 without replacement from sorted382nonpilotIDs, random.Random(0). No resampling or threshold tuning.",
+  "pool_sha256": "a399d9c275199139b5aa6a8fe9caaadf467d0756dc9d478873ec97df0b0ee49b",
+  "atlas_run_id": "20261003T130918Z",
+  "atlas_sha256": "ec377825c4c2110cfdb2a76efd82188bc80987419a7d927f17877542ac909fde",
+  "input_sha256": "8852c7f1d5cfcc59502e1a4c9cca40caf930cb4fc8eb19ee3b59816becb35afc",
+  "practice_report_sha256": "4b795a6a5373c4afa5eb57a11a4a360c87a0b1a58f7b13b0bf1a293f39286b95",
+  "counts": {
+    "assessed": 941,
+    "score_at_or_above_cutoff": 388,
+    "then_original_known": 388,
+    "then_ask_before_amendment": 388,
+    "then_exact_existing_quotes": 388,
+    "excluded_pilot_in_guarded_pool": 6,
+    "eligible_pool": 382,
+    "sampled": 10,
+    "existing_contradicted_in_guarded_pool": 30
+  },
+  "selected_case_ids": [
+    "link:ask-passage-doc-hys_attachment-090166e5e09f9f94-462:am-2021-0106-COD-JURI-PE730.041-694",
+    "link:ask-passage-doc-hys_attachment-090166e5e0a3baa9-21:am-2021-0106-COD-IMCO-LIBE-PE732.837-916",
+    "link:ask-passage-doc-hys_attachment-090166e5df44720d-23:am-2021-0106-COD-ENVI-PE704.585-201",
+    "link:ask-passage-doc-hys_attachment-090166e5e09a6421-62:am-2021-0106-COD-JURI-PE730.041-694",
+    "link:ask-passage-doc-hys_attachment-090166e5e0a6d2f2-57:am-2021-0106-COD-JURI-PE730.042-768",
+    "link:ask-passage-doc-hys_attachment-090166e5e0a676bb-113:am-2021-0106-COD-JURI-PE730.042-797",
+    "link:ask-passage-doc-hys_attachment-090166e5e0a358c8-74:am-2021-0106-COD-IMCO-LIBE-PE732.840-2088",
+    "link:ask-passage-doc-hys_attachment-090166e5e09dc8f3-189:am-2021-0106-COD-IMCO-LIBE-PE732.837-1070",
+    "link:ask-passage-doc-hys_attachment-090166e5e0a648c2-121:am-2021-0106-COD-IMCO-LIBE-PE732.839-1819",
+    "link:ask-passage-doc-hys_attachment-090166e5e09f9f94-355:am-2021-0106-COD-IMCO-LIBE-PE732.838-1555"
+  ],
+  "findings_counts": {
+    "supported_textual_association": 2,
+    "not_established": 7,
+    "unresolved_shared_source": 1
+  },
+  "interpretation": "Two clear requested-change associations, seven not established, one shared-third-party definition unresolved. These are agent diagnostic judgments, not an accuracy estimate, independent audit, published links or a Gate3 pass.",
+  "proposal_context_limitation": "The request builder retrieves only an exact whole Article N provision; paragraph-granularity records such as Article9(3),20(1),29(5),54(1) can exist while proposal_text is null. It also misses relevant common-base wording outside the target provision, such as Recital47.",
+  "published_links_added": 0,
+  "model_outputs_changed": false,
+  "reproduce_selection": "random.Random(0).sample(sorted(nonpilot_three_guard_passing_case_ids), min(10,pool_size))",
+  "full_review_sha256": "7ebbc267e2c8b8d6660a0198020d1bcdeec088bfccd95bf842d125786281607f",
+  "response_hash_manifest_sha256": "0ccdf8803b49a0a00cd6a85eeee701db34c999c9c6fa6daa144c57237e9b8636",
+  "reviews": [
+    {
+      "sample_number": 1,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e09f9f94-462:am-2021-0106-COD-JURI-PE730.041-694",
+      "actor": "Legal, Ethical & Accountable Digital Society (LEADS) Lab, University of Birmingham",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "background_and_different_effect",
+      "explanation": "The passage criticizes user discretion and quotes Article29 retention duties. The amendment concerns providers and adds at least ten years. Neither that period nor that specific provider change is requested in the quoted passage or surrounding context.",
+      "scores": {
+        "actual_request": 0.6,
+        "same_legal_change": 0.75,
+        "incompatible_legal_change": 0.23,
+        "shared_background": 0.4
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-05T21:35:43+02:00",
+      "amendment_tabled_on": "2022-03-24",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e09f9f94",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "Users are responsible for a similar self-assessment of risks under Article",
+        "start": 173318,
+        "end": 173392
+      },
+      "amendment_excerpt": {
+        "text": "for a period of at least ten",
+        "start": 99,
+        "end": 127
+      },
+      "common_base_provisions": [
+        {
+          "article_id": "art:52021PC0206:article-29-5",
+          "provision": "Article 29(5)",
+          "text_sha256": "f2cbf3eaeee98f43d2fda224430b0cffd5d97acfdae40cc22f7c2fdedc31d9b1"
+        }
+      ]
+    },
+    {
+      "sample_number": 2,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e0a3baa9-21:am-2021-0106-COD-IMCO-LIBE-PE732.837-916",
+      "actor": "Twilio Inc.",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "unresolved",
+      "reason": "explicit_shared_third_party_definition",
+      "explanation": "The passage explicitly quotes the OECD definition. The amendment adds varying levels of autonomy, present in that definition. Following context favors an adapted definition but stops before the full proposed wording. This supports a shared-definition association, not submission-specific origin; do not classify the OECD quotation as original Twilio wording.",
+      "scores": {
+        "actual_request": 0.72,
+        "same_legal_change": 0.75,
+        "incompatible_legal_change": 0.19,
+        "shared_background": 0.88
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-06T10:16:52+02:00",
+      "amendment_tabled_on": "2022-06-13",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e0a3baa9",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "Recommendation of the Council on Artificial Intelligence",
+        "start": 7028,
+        "end": 7084
+      },
+      "amendment_excerpt": {
+        "text": "with varying levels of autonomy",
+        "start": 207,
+        "end": 238
+      },
+      "common_base_provisions": []
+    },
+    {
+      "sample_number": 3,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5df44720d-23:am-2021-0106-COD-ENVI-PE704.585-201",
+      "actor": "Private citizens (aggregated)",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "existing_proposal_wording",
+      "explanation": "The source proposes broader transparency for all AI in Recital47, then repeats documentation language already in the Commission proposal. The amendment instead adds that documentation language to an operative requirement. The common phrase is not a distinctive requested change from this submission.",
+      "scores": {
+        "actual_request": 0.88,
+        "same_legal_change": 0.8,
+        "incompatible_legal_change": 0.17,
+        "shared_background": 0.43
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-07-02T13:24:05+02:00",
+      "amendment_tabled_on": "2022-01-25",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5df44720d",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "include concise and clear information",
+        "start": 7040,
+        "end": 7077
+      },
+      "amendment_excerpt": {
+        "text": "concise and clear",
+        "start": 88,
+        "end": 105
+      },
+      "common_base_provisions": [
+        {
+          "article_id": "art:52021PC0206:recital-47",
+          "provision": "Recital 47",
+          "text_sha256": "4186cd7a009a6da88ad057a9c22a4dffe4ba89ae6e63732ebbd91a5877b331dd"
+        }
+      ]
+    },
+    {
+      "sample_number": 4,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e09a6421-62:am-2021-0106-COD-JURI-PE730.041-694",
+      "actor": "BANCO BILBAO VIZCAYA ARGENTARIA",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "different_edit_and_common_base",
+      "explanation": "PDF extraction interleaves apparent edits replacing logs with records and cross-references Article12. The retention wording is already in proposal Article20(1). The amendment adds a ten-year period to Article16; the passage does not request that period. Exact phrase overlap does not resolve this mismatch.",
+      "scores": {
+        "actual_request": 0.68,
+        "same_legal_change": 0.69,
+        "incompatible_legal_change": 0.25,
+        "shared_background": 0.42
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-05T13:24:13+02:00",
+      "amendment_tabled_on": "2022-03-24",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e09a6421",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "Records maintenance",
+        "start": 24798,
+        "end": 24817
+      },
+      "amendment_excerpt": {
+        "text": "at least ten",
+        "start": 115,
+        "end": 127
+      },
+      "common_base_provisions": [
+        {
+          "article_id": "art:52021PC0206:article-20-1",
+          "provision": "Article 20(1)",
+          "text_sha256": "8647b2e82a39fccc5d466d7a9de4009697c3eeb0f1bef783605125bbae130260"
+        }
+      ]
+    },
+    {
+      "sample_number": 5,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e0a6d2f2-57:am-2021-0106-COD-JURI-PE730.042-768",
+      "actor": "Future of Life Institute",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "different_requested_power",
+      "explanation": "FLI requests that the AI Board amend Annexes on its own accord without restriction. The amendment requires sandbox authorities to cooperate particularly with EDPS. Mentioning EDPS and the Board is topical overlap, not the same allocation of legal power.",
+      "scores": {
+        "actual_request": 0.89,
+        "same_legal_change": 0.61,
+        "incompatible_legal_change": 0.18,
+        "shared_background": 0.56
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-06T14:00:00+02:00",
+      "amendment_tabled_on": "2022-03-24",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e0a6d2f2",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "implement changes to the Act’s Annexes",
+        "start": 19825,
+        "end": 19863
+      },
+      "amendment_excerpt": {
+        "text": "in particular with the",
+        "start": 202,
+        "end": 224
+      },
+      "common_base_provisions": []
+    },
+    {
+      "sample_number": 6,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e0a676bb-113:am-2021-0106-COD-JURI-PE730.042-797",
+      "actor": "Japan Business Council in Europe",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "supported_textual_association",
+      "reason": "specific_requested_membership_change",
+      "explanation": "The passage explicitly asks to add AI ethics experts and industry representatives as Board members. The amendment adds exactly those categories to the Board composition. The supplied context does not attribute this addition to a third-party definition. This is textual support, not proof of causation or unique authorship.",
+      "scores": {
+        "actual_request": 0.92,
+        "same_legal_change": 0.84,
+        "incompatible_legal_change": 0.17,
+        "shared_background": 0.59
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-06T13:26:27+02:00",
+      "amendment_tabled_on": "2022-03-24",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e0a676bb",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "AI ethics experts and industry representatives",
+        "start": 34999,
+        "end": 35045
+      },
+      "amendment_excerpt": {
+        "text": "ethics experts and industry",
+        "start": 206,
+        "end": 233
+      },
+      "common_base_provisions": []
+    },
+    {
+      "sample_number": 7,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e0a358c8-74:am-2021-0106-COD-IMCO-LIBE-PE732.840-2088",
+      "actor": "AI4Belgium",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "historical_background_not_specific_request",
+      "explanation": "The passage recounts slow GDPR guidance and national enforcement shortcomings. Surrounding context calls for a balance between national and EU governance. The amendment specifically designates the national DPA as notifying authority, which this passage does not request.",
+      "scores": {
+        "actual_request": 0.33,
+        "same_legal_change": 0.63,
+        "incompatible_legal_change": 0.22,
+        "shared_background": 0.44
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-06T09:54:36+02:00",
+      "amendment_tabled_on": "2022-06-13",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e0a358c8",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "the first code of",
+        "start": 25263,
+        "end": 25280
+      },
+      "amendment_excerpt": {
+        "text": "the national Data Protection Authority",
+        "start": 37,
+        "end": 75
+      },
+      "common_base_provisions": []
+    },
+    {
+      "sample_number": 8,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e09dc8f3-189:am-2021-0106-COD-IMCO-LIBE-PE732.837-1070",
+      "actor": "Access Now Europe",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "quoted_existing_law_different_provision",
+      "explanation": "The passage lists existing Article54 sandbox processing exceptions while criticizing them. The amendment expands the definition of law enforcement authority. The shared criminal-law wording already exists in the proposal and is not a request to make this definition change.",
+      "scores": {
+        "actual_request": 0.43,
+        "same_legal_change": 0.58,
+        "incompatible_legal_change": 0.26,
+        "shared_background": 0.2
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-05T17:26:15+02:00",
+      "amendment_tabled_on": "2022-06-13",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e09dc8f3",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "Article 54(1)(a) lists three areas",
+        "start": 73758,
+        "end": 73792
+      },
+      "amendment_excerpt": {
+        "text": "law enforcement authority",
+        "start": 6,
+        "end": 31
+      },
+      "common_base_provisions": [
+        {
+          "article_id": "art:52021PC0206:article-54-1",
+          "provision": "Article 54(1)",
+          "text_sha256": "02338f69db0a2070923c5a5c02343aab30f38cc940a683f4607b8ca07cc6f110"
+        }
+      ]
+    },
+    {
+      "sample_number": 9,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e0a648c2-121:am-2021-0106-COD-IMCO-LIBE-PE732.839-1819",
+      "actor": "ITI - The Information Technology Industry Council",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "supported_textual_association",
+      "reason": "specific_requested_oversight_change",
+      "explanation": "ITI explicitly requests oversight adapted to specific risks, automation level and context. The amendment inserts this same requirement before the listed oversight measures. This supports a matching requested legal change; it does not establish unique or causal origin.",
+      "scores": {
+        "actual_request": 0.84,
+        "same_legal_change": 0.75,
+        "incompatible_legal_change": 0.21,
+        "shared_background": 0.45
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-06T13:13:47+02:00",
+      "amendment_tabled_on": "2022-06-13",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e0a648c2",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "The degree",
+        "start": 42122,
+        "end": 42132
+      },
+      "amendment_excerpt": {
+        "text": "The degree of human oversight",
+        "start": 3,
+        "end": 32
+      },
+      "common_base_provisions": []
+    },
+    {
+      "sample_number": 10,
+      "case_id": "link:ask-passage-doc-hys_attachment-090166e5e09f9f94-355:am-2021-0106-COD-IMCO-LIBE-PE732.838-1555",
+      "actor": "Legal, Ethical & Accountable Digital Society (LEADS) Lab, University of Birmingham",
+      "reviewer_type": "AI agent; not an independent human reader",
+      "review_scope": "Supplied passage, neighboring context, old/new amendment, and identified Commission proposal provisions",
+      "finding": "not_established",
+      "reason": "quotation_of_existing_requirement",
+      "explanation": "The passage explains and quotes existing Article9(3), including the state-of-the-art language. The amendment adds that language to the general compliance requirement. The quoted paragraph is background description, not an identifiable request to make this change.",
+      "scores": {
+        "actual_request": 0.68,
+        "same_legal_change": 0.69,
+        "incompatible_legal_change": 0.2,
+        "shared_background": 0.39
+      },
+      "existing_status": "unconfirmed",
+      "ask_submitted_at": "2021-08-05T21:35:43+02:00",
+      "amendment_tabled_on": "2022-06-13",
+      "ask_source_url": "https://ec.europa.eu/info/law/better-regulation/api/download/090166e5e09f9f94",
+      "amendment_source_url": "https://parltrack.org/dumps/ep_amendments.json.zst",
+      "ask_excerpt": {
+        "text": "These measures, according to Article 9(3)",
+        "start": 134399,
+        "end": 134440
+      },
+      "amendment_excerpt": {
+        "text": "generally",
+        "start": 112,
+        "end": 121
+      },
+      "common_base_provisions": [
+        {
+          "article_id": "art:52021PC0206:article-9-3",
+          "provision": "Article 9(3)",
+          "text_sha256": "040755f9dea268ce0ce67abbd83a0d07ea93f7a2b04627595ca15f411e11faf8"
+        }
+      ]
+    }
+  ]
+}

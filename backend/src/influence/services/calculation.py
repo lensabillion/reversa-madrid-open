@@ -42,6 +42,8 @@ def model_digest(
     semantic_model: tuple[str, str] | None = None,
     entailment_model: tuple[str, str] | None = None,
     entailment_decision: str | None = None,
+    jev_model: tuple[str, str] | None = None,
+    jev_prompt_revision: str | None = None,
 ) -> str:
     """Bind audits/approval to fitted weights, corpus and every enabled model revision."""
     value = (
@@ -53,6 +55,18 @@ def model_digest(
         entailment_model,
         entailment_decision,
     )
+    if jev_model is not None or jev_prompt_revision is not None:
+        if (
+            jev_model is None
+            or not all(part.strip() for part in jev_model)
+            or jev_prompt_revision is None
+            or not jev_prompt_revision.strip()
+        ):
+            raise ValueError("Jev needs a complete nonblank model and prompt revision")
+        # Preserve existing approval digests when the optional Jev features are disabled.
+        return hashlib.sha256(
+            json.dumps((value, jev_model, jev_prompt_revision), sort_keys=True).encode()
+        ).hexdigest()
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
@@ -88,6 +102,25 @@ class EntailmentEvidence:
     amendment_spans: tuple[SourceSpan, ...]
     ask_spans: tuple[SourceSpan, ...]
     contradicted: bool = False
+
+
+@dataclass(frozen=True)
+class JevEvidence:
+    """Independent Noul values bound to the full source, not an NLI distribution/verdict.
+
+    source_sha256 hashes the exact UTF-8 text supplied via source_texts; it also binds
+    preceding/following context outside the ask. prompt_revision identifies the context policy.
+    """
+
+    actual_request: float
+    same_legal_change: float
+    incompatible_legal_change: float
+    shared_background: float
+    model_id: str
+    revision: str
+    pair_digest: str
+    prompt_revision: str
+    source_sha256: str
 
 
 @dataclass(frozen=True)
@@ -188,7 +221,7 @@ def _publication(
         )
 
 
-def _semantic(evidence: SemanticEvidence | EntailmentEvidence, digest: str) -> None:
+def _semantic(evidence: SemanticEvidence | EntailmentEvidence | JevEvidence, digest: str) -> None:
     if (
         not evidence.model_id.strip()
         or not evidence.revision.strip()
@@ -247,9 +280,12 @@ def calculate_links(
     publication: Mapping[LinkTier, PublicationEvidence],
     semantics: Mapping[str, SemanticEvidence] | None = None,
     entailment: Mapping[str, EntailmentEvidence] | None = None,
+    jev: Mapping[str, JevEvidence] | None = None,
     semantic_model: tuple[str, str] | None = None,
     entailment_model: tuple[str, str] | None = None,
     entailment_decision: str | None = None,
+    jev_model: tuple[str, str] | None = None,
+    jev_prompt_revision: str | None = None,
     approved_model_digests: frozenset[str] = frozenset(),
     proposal_texts: Mapping[str, str] | None = None,
 ) -> tuple[LinkAssessment, ...]:
@@ -268,6 +304,8 @@ def calculate_links(
         semantic_model=semantic_model,
         entailment_model=entailment_model,
         entailment_decision=entailment_decision,
+        jev_model=jev_model,
+        jev_prompt_revision=jev_prompt_revision,
     )
     approved = digest in approved_model_digests
     for tier, policy in publication.items():
@@ -275,8 +313,8 @@ def calculate_links(
     candidate_ids = {candidate.candidate_id for candidate in candidates}
     if len(candidate_ids) != len(candidates):
         raise ValueError("Candidate IDs must be unique")
-    semantic_rows, entailment_rows = semantics or {}, entailment or {}
-    if (set(semantic_rows) | set(entailment_rows)) - candidate_ids:
+    semantic_rows, entailment_rows, jev_rows = semantics or {}, entailment or {}, jev or {}
+    if (set(semantic_rows) | set(entailment_rows) | set(jev_rows)) - candidate_ids:
         raise ValueError("Semantic evidence refers to an absent candidate")
     bases: dict[str, LinkAssessment] = {}
     feature_rows: dict[str, dict[str, float]] = {}
@@ -387,6 +425,24 @@ def calculate_links(
                 neutral_score=entailed.neutral_score,
             )
             _entailment_quotes(entailed, amendment, ask, source)
+        if jev_evidence := jev_rows.get(candidate.candidate_id):
+            _semantic(jev_evidence, inputs_digest)
+            if jev_evidence.source_sha256 != hashlib.sha256(source.encode()).hexdigest():
+                raise ValueError("Jev source hash does not match the full original document")
+            if (
+                jev_evidence.model_id,
+                jev_evidence.revision,
+            ) != jev_model or jev_evidence.prompt_revision != jev_prompt_revision:
+                raise ValueError("Jev model/prompt does not match the frozen configuration")
+            jev_signals = {
+                "jev_actual_request": jev_evidence.actual_request,
+                "jev_same_legal_change": jev_evidence.same_legal_change,
+                "jev_incompatible_legal_change": jev_evidence.incompatible_legal_change,
+                "jev_shared_background": jev_evidence.shared_background,
+            }
+            if any(not isfinite(score) or not 0 <= score <= 1 for score in jev_signals.values()):
+                raise ValueError("Jev values must each be finite and within [0,1]")
+            signals.update(jev_signals)
         bases[candidate.candidate_id] = base
         feature_rows[candidate.candidate_id] = signals
         pools[candidate.procedure_id].append(
@@ -434,6 +490,11 @@ def calculate_links(
             )
         if semantic := semantic_rows.get(identifier):
             limits.append(f"Semantic cosine: {semantic.model_id}@{semantic.revision}.")
+        if jev_evidence := jev_rows.get(identifier):
+            limits.append(
+                f"Jev independent raw signals: {jev_evidence.model_id}@{jev_evidence.revision}; "
+                f"prompt {jev_evidence.prompt_revision}; not an entailment verdict."
+            )
         entailed = entailment_rows.get(identifier)
         conflict = (
             (entailed is not None and entailed.contradicted)

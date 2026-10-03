@@ -739,3 +739,89 @@ file and current source hashes. The evaluator rejects incomplete coverage or mis
 scores instead of inserting zeros. Its output retains all variants, five fitted models
 per variant, paired out-of-fold scores, settings, hashes and threshold diagnostics.
 Those pooled diagnostics cannot serve as the cutoff for a separately refitted model.
+
+
+## Jev legal-meaning evaluation (Gate 3)
+
+The optional `services/jev.py` client calls TypeSafe's pinned `jev-1.13.0` model.
+It returns typed signals: whether a passage is a request, whether it asks for the
+amendment's actual change, whether the legal effects conflict, and whether matching
+wording is explicitly attributed to background material. These signals are not
+probabilities of influence. No Jev score changes the production atlas yet.
+
+The client uses the Python standard library, verified TLS, bounded inputs/responses,
+no redirects or automatic retries, and sanitized errors. The benchmark loads
+`TYPESAFE_API_KEY` only from the explicitly supplied ignored environment file. Never
+commit that file. Public excerpts alone are sent; labels and reviewer notes are not.
+
+Run from the repository root, replacing the absolute paths below:
+
+```sh
+# Prepare public practice requests; labels are written separately.
+uv run --directory backend --locked python -m benchmarks.jev_practice prepare \
+  --data /absolute/data/lobbyplag --out /absolute/data/jev-evaluation
+# Dry run: no credentials read and no provider call.
+uv run --directory backend --locked python benchmarks/jev_gate3.py run \
+  --inputs /absolute/data/jev-evaluation/lobbyplag-inputs.json \
+  --out /absolute/data/jev-evaluation/usage --max-cost-usd 1 --max-requests 305
+# To execute an authorized experiment, append:
+# --execute --env-file /absolute/backend/.env
+# Reuse the SAME usage directory across every batch: it is the cumulative ledger.
+uv run --directory backend --locked python -m benchmarks.jev_practice evaluate \
+  --data /absolute/data/lobbyplag \
+  --inputs /absolute/data/jev-evaluation/lobbyplag-inputs.json \
+  --cache /absolute/data/jev-evaluation/usage \
+  --out /absolute/data/jev-evaluation/practice-report.json --combiner
+```
+
+Requests and results are content-addressed and saved atomically. Identical requests
+reuse results. Before each call, the ledger reserves the provider's full 65,536-token
+input allowance at the documented $0.042/million input-token rate; a successful
+response reconciles to returned usage. Failed or interrupted attempts retain their
+reservation and are not retried automatically. The cap is a client-side estimate at
+that recorded rate, not a guarantee about a provider's later pricing.
+
+The comparison reuses LobbyPlag's 272 pairs, five organization-grouped folds with
+training text overlaps purged, and 2,000 balanced draws with seed 0. Threshold fitting
+uses even folds only, including for the optional combiner; odd-fold labels do not
+enter those fits. The development selection criterion is a Wilson 95% lower bound
+of 0.90 with at least 30 selected examples. This is development evidence, not a
+real-prose publication audit. See `evaluation/jev-gate3-evaluation.json` for measured
+results and limitations. Gate 3's real-link count and random reads remain separate
+from Gate 7's two-reader audit.
+
+
+The complete comparison is separate from the small lexical/Jev ablation:
+
+```sh
+uv run --directory backend --locked python -m benchmarks.calculation_plan \
+  --data /absolute/data/lobbyplag \
+  --semantic /absolute/data/semantic-evaluation/qwen/semantic-pairs.json \
+  --model-inputs /absolute/data/semantic-evaluation/inputs.json \
+  --jev-inputs /absolute/data/jev-evaluation/lobbyplag-inputs.json \
+  --jev-cache /absolute/data/jev-evaluation/usage \
+  --out evaluation/calculation-qwen-jev.json
+```
+
+`all_signals_jev` uses 19 features: ten edit/rarity/alignment/legal-cue signals,
+four background/rank signals, semantic cosine, and four Jev signals. The same
+organization-grouped folds and training-only rarity are used for every comparison;
+coefficients are fitted separately for each variant and training fold. These features run together through `calculate_links`.
+`pipeline.build_view(..., verification=FittedVerification(...))` now passes that
+single verifier's results to the existing outcomes, graph, rankings and API view.
+The configuration supplies a frozen fit, corpus, and exact-input model evidence;
+missing required features raise errors. No weights are invented at runtime.
+
+The normal CLI still uses its existing rules until a deployable fit and publication
+policy are validated. This service integration is tested end to end on synthetic
+collected sources; it is not a claim that the live graph has passed Gate 3. In
+particular, raw Noul answers are not converted into a mutually exclusive NLI
+probability distribution or into permission to publish a link.
+
+
+For the saved AI Act diagnostic, `jev_gate3.py prepare-all --atlas PATH --out PATH`
+retains the first experiment's context by default. Add `--context-version proposal-v2`
+to include all stored paragraphs of the target article, or the target recital, from
+the same procedure and proposal stage. This keeps exact original text and record IDs;
+if the whole context exceeds the request bound, it is explicitly omitted. Inputs and
+responses from each version remain separate and content-addressed.

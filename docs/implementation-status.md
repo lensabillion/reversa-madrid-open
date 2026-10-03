@@ -34,6 +34,63 @@ report 15, ambition 15 (coverage since 2019 and a forecast).
 Influence (an amendment borrows from an ask) and outcome (the ask reached the final law)
 remain different targets. Similar wording alone proves neither.
 
+## Jev and the Combined Calculation — 3 October 2026
+
+The owner added a TypeSafe key and requested Jev for Gate 3, then clarified that all
+planned signals must work together. Part 4 now accepts four independent, provenance-bound
+Jev signals beside the existing edit, rarity, alignment, legal-cue, background/rank and
+semantic features. The optional `FittedVerification` configuration connects this single
+calculation to `pipeline.build_view`, outcomes, graph, rankings and the existing API.
+Missing required features fail rather than falling back to lexical scoring. The normal
+CLI remains on the existing rules: no validated production fit/policy has been activated.
+
+Measured on the same 272 public LobbyPlag pairs, five organization-grouped folds and
+2,000 balanced draws (seed 0):
+
+| Fitted feature set | Mean top-20 precision | Mean recall at legacy 0.5 | Mean AUC |
+| --- | ---: | ---: | ---: |
+| Existing 15 signals, including Qwen semantic cosine | 0.9727 | 0.8510 | 0.9230 |
+| The same signals plus four Jev signals | 0.9561 | 0.8567 | 0.9516 |
+
+The complete comparison is [calculation-qwen-jev.json](../backend/evaluation/calculation-qwen-jev.json).
+Jev raises AUC but reduces top-20 precision; these labels measure historical
+clean-edit copying, not the accuracy of prose requests or reworded influence. Timing,
+source quotation, known originals and polarity remain independent checks. The smaller
+[lexical/Jev ablation](../backend/evaluation/jev-gate3-evaluation.json) is retained and is
+not described as the full plan.
+
+The pinned `jev-1.13.0` passed all 24 unchanged synthetic meaning diagnostics (local
+DeBERTa: 17/24). A bounded live trial scored all 941 saved AI Act candidates. Its v1
+raw cutoff of 0.58 came from public practice; 388 passed that cutoff plus original/date/
+exact-span guards. A seed-0 agent review of ten, excluding pilot cases, found two
+supported textual associations, seven unestablished and one unresolved shared definition.
+This is a diagnostic sample, not human audit precision or published links. It exposed a
+proposal-context lookup bug: article paragraphs and recitals were not matched by the
+whole-article lookup. A versioned preparation fixes that lookup while retaining v1 inputs: supplied proposal context rises from 253 to 817 of 941 cases.
+The [review artifact](../backend/evaluation/jev-real-agent-review.json) records exact IDs,
+source references and findings.
+The repaired-context trial also completed all 941 cases. At the unchanged experimental
+cutoff, 388 candidates remain above it (26 entered, 26 left); all ten original diagnostic
+cases remain above it, so the observed failures persist. The
+[paired comparison](../backend/evaluation/jev-context-comparison.json) is development
+follow-up, not a fresh independent evaluation. Total accounted cost for both real runs,
+public practice and the pilot was $0.136191594, including a retained $0.002752512
+reservation for one failed local result-save attempt; no key is committed.
+
+`make check` passed on this combined change: 1,188 backend/benchmark tests, 100% branch
+coverage (6,434 application statements and 1,640 branches), strict types and Ruff;
+94 frontend tests, Biome, TypeScript and production build; six research catalogs;
+backend audit clean for 46 packages and frontend audit zero vulnerabilities. Synthetic
+integration tests prove semantic and Jev signals independently affect the same fitted
+score, then flow to the normal API view. They do not establish real-world accuracy.
+
+
+**Gate 3 remains open:** the live atlas still has zero published links, so the required
+20 published links and ten random published-link reads are not satisfied. This work does
+not lower thresholds or change scores by hand. A deployable fit and a real-prose policy
+with measured precision, plus CLI artifact loading, remain work under `rev-jaig`,
+`rev-qs6i`, `rev-nuk5` and `rev-zzur`. Gate 7's independent two-reader audit is separate.
+
 ## Implemented and Evaluated
 
 Everything below was built for the first brief. The third column says what it becomes.
@@ -229,7 +286,7 @@ Open decisions are not settled until the project owner agrees.
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
-| D1: language-model judge | **Local evaluation authorized; no paid API** by the owner, 3 October 2026 | A pinned local DeBERTa NLI model scored 17/24 on a separate synthetic legal diagnostic. Evaluation is authorized; automatic publication is not validated. Raw outputs and labels stay separate. See [calculation handoff](design/calculation-handoff.md), `rev-jaig` and `rev-qs6i`. |
+| D1: language-model judge | **Jev evaluation authorized** by the owner on 3 October after adding `TYPESAFE_API_KEY`; this experiment uses a cumulative $1 cap. Production adoption remains unvalidated. | Pinned `jev-1.13.0` scored 24/24 on the existing synthetic legal diagnostic (local DeBERTa: 17/24). On 272 public practice pairs, adding Jev improved AUC and recall but reduced top-20 precision. These clean-edit copy labels do not validate prose requests or reworded links. Raw outputs and labels remain separate. See [Jev evaluation](../backend/evaluation/jev-gate3-evaluation.json), `rev-jaig` and `rev-qs6i`. |
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
 | D5: organizer questions of the first brief | **Superseded**; one question remains: may we use code written before today? | Bead `rev-qvmx` |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |

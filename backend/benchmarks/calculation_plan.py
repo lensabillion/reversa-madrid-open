@@ -13,6 +13,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import cast
 
+from benchmarks.jev_gate3 import digest, key_for, load_trial
+from benchmarks.jev_practice import cached_features, prepared
 from influence.practice.__main__ import lexical_scores
 from influence.practice.folds import make_folds
 from influence.practice.harness import (
@@ -28,6 +30,7 @@ from influence.repositories.lobbyplag import DemoRepository
 from influence.schemas.scoring import TextChange
 from influence.services.calibration import fit_combiner, select_threshold
 from influence.services.evaluation_artifacts import ArtifactKind, load_model_features
+from influence.services.jev import MODEL
 from influence.services.ranking_signals import RankedPair, background_signals, feature_vector
 from influence.services.signals import SignalCorpus, pair_signals
 
@@ -50,6 +53,66 @@ CONTEXT = (
     "mutual_reciprocal_rank",
 )
 JUDGE = ("entailment_score", "contradiction_score")
+JEV = (
+    "jev_actual_request",
+    "jev_same_legal_change",
+    "jev_incompatible_legal_change",
+    "jev_shared_background",
+)
+
+
+def jev_features(
+    data: Path, inputs: Path, cache: Path, pairs: Sequence[PracticePair]
+) -> tuple[dict[str, dict[str, float]], dict[str, object]]:
+    """Join cached atomic legal questions to the exact public-source practice preparation."""
+    expected, practice, _ = prepared(data)
+    trial = load_trial(inputs)
+    if trial != expected or [item.pair for item in practice.pairs] != list(pairs):
+        raise ValueError("Jev inputs differ from the current public-source practice preparation")
+    features, response_hashes = cached_features(trial, cache)
+    rows: dict[str, dict[str, float]] = {
+        identifier: dict(zip(JEV, values, strict=True)) for identifier, values in features.items()
+    }
+    provenance: dict[str, object] = {
+        "model": MODEL,
+        "inputs_sha256": digest(inputs),
+        "ledger_sha256": digest(cache / "ledger.json"),
+        "source_hashes": trial.source_hashes,
+        "request_sha256_by_candidate": {case.case_id: key_for(case) for case in trial.cases},
+        "response_sha256_by_request": response_hashes,
+        "features": JEV,
+        "role": "Four cached legal-question Noul signals; not an NLI class distribution.",
+    }
+    return rows, provenance
+
+
+def feature_variants(*, semantic: bool, judge: bool, jev: bool) -> dict[str, tuple[str, ...]]:
+    """Keep the incumbent ablations while adding Jev to the existing full feature family."""
+    variants: dict[str, tuple[str, ...]] = {
+        "deterministic": DETERMINISTIC,
+        "deterministic_context": (*DETERMINISTIC, *CONTEXT),
+    }
+    if semantic:
+        variants["deterministic_semantic"] = (*DETERMINISTIC, "semantic_cosine")
+        variants["all_signals"] = (*DETERMINISTIC, *CONTEXT, "semantic_cosine")
+    if judge:
+        variants["deterministic_judge"] = (*DETERMINISTIC, *JUDGE)
+        variants["deterministic_context_judge"] = (*DETERMINISTIC, *CONTEXT, *JUDGE)
+        if semantic:
+            variants["all_signals_judge"] = (*DETERMINISTIC, *CONTEXT, "semantic_cosine", *JUDGE)
+    if jev:
+        variants["deterministic_context_jev"] = (*DETERMINISTIC, *CONTEXT, *JEV)
+        if judge:
+            variants["deterministic_context_judge_jev"] = (*DETERMINISTIC, *CONTEXT, *JUDGE, *JEV)
+        if semantic:
+            variants["all_signals_jev"] = (
+                *DETERMINISTIC,
+                *CONTEXT,
+                "semantic_cosine",
+                *(JUDGE if judge else ()),
+                *JEV,
+            )
+    return variants
 
 
 def signal_rows(
@@ -82,6 +145,8 @@ def main() -> None:
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--semantic", type=Path)
     parser.add_argument("--judge", type=Path)
+    parser.add_argument("--jev-inputs", type=Path, help="Frozen Jev public-source practice inputs")
+    parser.add_argument("--jev-cache", type=Path, help="Completed Jev request/response cache")
     parser.add_argument(
         "--model-inputs", type=Path, help="Frozen inputs.json used by all model artifacts"
     )
@@ -91,6 +156,10 @@ def main() -> None:
     semantic_path = cast("Path | None", args.semantic)
     judge_path = cast("Path | None", args.judge)
     inputs_path = cast("Path | None", args.model_inputs)
+    jev_inputs = cast("Path | None", args.jev_inputs)
+    jev_cache = cast("Path | None", args.jev_cache)
+    if (jev_inputs is None) != (jev_cache is None):
+        parser.error("--jev-inputs and --jev-cache must be supplied together")
     if (semantic_path or judge_path) and inputs_path is None:
         parser.error("--model-inputs is required with --semantic or --judge")
     started = perf_counter()
@@ -99,6 +168,11 @@ def main() -> None:
         name: hashlib.sha256((service_dir / name).read_bytes()).hexdigest()
         for name in ("scoring.py", "signals.py", "ranking_signals.py", "calibration.py")
     }
+    implementation_hashes["calculation_plan.py"] = digest(Path(__file__))
+    if jev_inputs is not None:
+        implementation_hashes["jev.py"] = digest(service_dir / "jev.py")
+        for name in ("jev_gate3.py", "jev_practice.py"):
+            implementation_hashes[name] = digest(Path(__file__).with_name(name))
     repository = DemoRepository.load(data)
     practice = build_practice_set(repository)
     source_hashes = {
@@ -123,6 +197,13 @@ def main() -> None:
             model_artifacts[kind] = dict(artifact.provenance)
             for identifier, values in artifact.features.items():
                 model_features.setdefault(identifier, {}).update(values)
+    if jev_inputs is not None and jev_cache is not None:
+        features, provenance = jev_features(
+            data, jev_inputs, jev_cache, [item.pair for item in practice.pairs]
+        )
+        model_artifacts["jev"] = provenance
+        for identifier, values in features.items():
+            model_features.setdefault(identifier, {}).update(values)
     plan = make_folds(practice.pairs, 5)
     draws = simulated_tests([pair.influenced for pair in practice.pairs], 2000, 30, 0)
     settings = SimulationSettings(
@@ -135,18 +216,9 @@ def main() -> None:
     )
     scores = {"lexical_baseline": out_of_fold_scores(lexical_scores, practice.pairs, plan)}
     fitted: dict[str, list[dict[str, object]]] = {}
-    variants: dict[str, tuple[str, ...]] = {
-        "deterministic": DETERMINISTIC,
-        "deterministic_context": (*DETERMINISTIC, *CONTEXT),
-    }
-    if semantic_path:
-        variants["deterministic_semantic"] = (*DETERMINISTIC, "semantic_cosine")
-        variants["all_signals"] = (*DETERMINISTIC, *CONTEXT, "semantic_cosine")
-    if judge_path:
-        variants["deterministic_judge"] = (*DETERMINISTIC, *JUDGE)
-        variants["deterministic_context_judge"] = (*DETERMINISTIC, *CONTEXT, *JUDGE)
-        if semantic_path:
-            variants["all_signals_judge"] = (*DETERMINISTIC, *CONTEXT, "semantic_cosine", *JUDGE)
+    variants = feature_variants(
+        semantic=semantic_path is not None, judge=judge_path is not None, jev=jev_inputs is not None
+    )
     for name, names in variants.items():
         fits: list[dict[str, object]] = []
 
@@ -243,6 +315,9 @@ def main() -> None:
             "English cues and semantic cosine do not establish legal equivalence.",
             "Judge features use full new text and generic English NLI; they are experimental "
             "signals, not verified entailment or legal verdicts.",
+            "Jev features, when enabled, are separate actual-request, same-change, incompatible-"
+            "change and shared-background Noul answers. Clean-edit practice labels do not "
+            "validate real consultation prose; these signals never activate publication.",
             "Balanced 30-positive/30-negative panel precision is not estimated live publication "
             "precision; recall at numeric 0.5 uses different score scales.",
             "OOF threshold selection is diagnostic and combines five fitted score distributions, "

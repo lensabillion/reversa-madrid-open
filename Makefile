@@ -49,9 +49,10 @@ check-backend-quality: backend-env  ## Ruff format and lint, then basedpyright s
 	$(BACKEND) ruff format --check
 	$(BACKEND) ruff check
 	$(BACKEND) basedpyright
+	$(BACKEND) basedpyright benchmarks/calculation_plan.py benchmarks/jev_gate3.py benchmarks/jev_practice.py benchmarks/tests
 
 check-backend-tests: backend-env  ## Tests, gate probes and branch coverage.
-	$(BACKEND) pytest --cov
+	$(BACKEND) python -m pytest --cov=influence tests benchmarks/tests
 
 # `uv audit` is a preview command in uv 0.12.8; the flag opts in and silences its warning.
 audit-backend:  ## Look up every package in backend/uv.lock in the OSV vulnerability database.
