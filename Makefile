@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report demo-prepare \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -122,6 +122,23 @@ batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 
 report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
 	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
 	$(BACKEND) influence report "$(LAW)" $(ARGS)
+
+# The live demo: warms every flagship law once, after make setup, so the jury's "any law"
+# check reads from cache and every view and the report already exist. Names are
+# comma-separated and must resolve (see LAW_ALIASES in services/law_query.py). GDPR is left
+# out: its procedure (2012/0011(COD)) predates the brief's 2019 scope. Forecast is allowed
+# to fail (make prints "ignored") so the report is still written; it then says which
+# layer is missing.
+comma := ,
+DEMO_DATA = $(or $(INFLUENCE_DATA_ROOT),$(CURDIR)/data)
+FLAGSHIP ?= AI Act,DSA,DMA,Data Act,CSDDD,EHDS,Cyber Resilience Act
+demo-prepare:  ## Warm the flagship laws for the live demo: make demo-prepare [FLAGSHIP='AI Act,DSA']
+	$(BACKEND) influence batch --laws "$(FLAGSHIP)" --steps atlas,coordinated,channels,lineage,directions
+	-$(BACKEND) influence forecast "$(subst $(comma),"  ",$(FLAGSHIP))"
+	$(BACKEND) influence report "$(FLAGSHIP)"
+	@echo "batch:    $(DEMO_DATA)/laws/batch.json"
+	@echo "forecast: $(DEMO_DATA)/laws/forecast.json"
+	@echo "report:   $(DEMO_DATA)/laws/report.md"
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
