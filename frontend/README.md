@@ -102,53 +102,42 @@ inside its own column. Model accuracy is unchanged by this display clarification
 
 ## Atlas Components and Agent 3 Handoff
 
-`AtlasExplorer` and `AtlasEvidence` prepare architecture part 8 to display the graph
-from part 6. They are reusable components; the application route still uses the
-existing evidence workspace until the shared snapshot adapter is implemented.
+`AtlasWorkspace` opens on an explanation and a graph: who requested a change, which
+amendment matched it, and what appeared in the final law. Separate views provide the
+source evidence and descriptive outcome counts. The production application route still
+uses the earlier evidence workspace; Agent 1's API/route integration remains pending.
+The local `/atlas-preview` route is an uncommitted, explicitly synthetic rehearsal.
 
-- `AtlasExplorer` accepts already assessed links and source coverage notes. It filters
-  loaded records by law/actor/request text, topic and year, and opens each link's
-  evidence. Published links and unconfirmed/contradicted audit candidates have separate
-  views.
-- `AtlasEvidence` shows the request, original wording, amendment and final wording,
-  with source URLs, pages, dates, supplied assessment methods and limitations. Missing
-  originals differ from known empty originals; unknown outcomes differ from failures.
-  Unicode code-point spans must exactly match their source quote before highlighting.
-- `AtlasLinkView` and `AtlasEvidenceProps` are component props, not an API schema.
-  The adapter must preserve stable unique link IDs and map pipeline publication and
-  outcome decisions without recalculating them. Supply excerpts from their recorded
-  source versions and express coverage gaps in `coverageNotes`. Component span offsets
-  are relative to the supplied excerpt: subtract its starting code-point offset from
-  document-relative offsets while retaining the original source provenance.
+- `AtlasGraph` draws supplied snapshot nodes and edges, with selectable connections and
+  supporting quotations. A final outcome connects the request to its article; the UI
+  does not infer an amendment-to-article causal edge. Missing outcomes add no edge.
+- `AtlasExplorer` filters assessed links by law/actor/request text, each individual
+  topic and procedure year. Published links and audit candidates have separate views.
+- `AtlasEvidence` shows the request, original legal wording, amendment and final text,
+  with URLs, pages, dates, assessment methods and limits. Unknown wording differs from
+  known empty wording. Exact Unicode code-point quotes are checked before highlighting.
+- `lib/atlas.ts` maps schema-validated `atlas-1` records into display props. It checks
+  joins, ownership, source spans and source versions;
+  it never decides publication or outcomes. Passage-local offsets are normalized.
+  It supports all four assessment states, joint actors and multiple law subjects.
 
-Agent 3 branch: `feat/atlas-explorer`; component bead: `rev-oodw`; broader graph bead:
-`rev-i006`. Base: main `0518f17`. Shared schema revision: **pending Agent 1**. Tests use
-synthetic examples only; no real influence findings or graph projection are delivered
-by these components. No route, lockfile, scorer or shared backend schema is changed.
+The adapter is a typed projection, not a runtime decoder for arbitrary API JSON.
+Its four-column evidence view can represent one source field per column and one final
+outcome per request. Unsupported multi-field or multi-source evidence and multiple final
+outcomes fail explicitly instead of silently dropping records. The integration owner
+must extend this presentation before routing such bundles to it. Shared schemas are
+owned upstream and are not changed here.
 
-Integration needs Agent 1's frozen `GraphSnapshot`, source/evidence fixtures and API
-route contract, plus Agent 2's publication decisions and outcomes (including unmatched
-asks). Agent 1 creates the separate UI integration child of `rev-qn6b`. Graph projection,
-ranking calculations, public-position enrichment, report generation and real forecast
-integration remain open.
+`AtlasAnalysis` presents pipeline-supplied ordering and counts: full, partial,
+not-reflected and unknown outcomes. Full wins are shown against assessed requests;
+unknowns are excluded from that denominator and retained in total observed coverage.
+An all-unknown sample has no rate. Getting a requested outcome does not prove causation.
+Report findings need usable citations; a usable URL does not itself establish accuracy.
+Absent findings and forecasts remain labelled gaps.
 
-Verified on 3 October 2026: 56 frontend tests, Biome, TypeScript, production build and
-package audit passed. A temporary synthetic explorer/evidence preview was inspected at desktop width and
-390-pixel mobile width; mobile content width was 390 pixels with no horizontal overflow.
-The preview route was removed. These checks verify presentation, not model accuracy,
-live data joins, any-law runtime or jury readiness.
-
-### Analysis and Report Presentation
-
-`AtlasAnalysis` renders supplied counts and findings for WHO, WHAT, TOWARDS, HOW and
-NEXT. The backend supplies row order and all counts: full wins, assessed asks, total
-observed asks, partial outcomes, not-reflected outcomes and unknowns. Full-win counts
-are shown against assessed asks; unknowns remain separate and total observed asks show
-coverage. With no assessed outcomes, a rate is unavailable. This view neither computes
-rates nor turns partial outcomes into fractional wins.
-
-Report prose requires at least one usable public citation before display; a usable URL
-does not validate its claim. The upstream report builder must supply reproducible
-queries, denominators and supporting passages. Missing findings or forecasts show
-evidence gaps. These components use synthetic tests and await a shared analysis adapter
-under `rev-1jc4`; they do not fulfill the backend rankings or public-report deliverable.
+Tracking: `rev-oodw` (explorer/graph display), `rev-1jc4` (analysis presentation),
+`rev-i006` (backend graph), `rev-5yy6` (backend aggregation), `rev-qn6b` (live integration).
+Shared contracts and synthetic fixtures arrived in PR #25. Agent 2's PR #27 adds
+retrieval, which still needs verification and outcome assessment before publication.
+Real data, any-law runtime, calibrated precision, spend-adjusted rankings, forecasting
+and the generated public report remain separate acceptance gates.

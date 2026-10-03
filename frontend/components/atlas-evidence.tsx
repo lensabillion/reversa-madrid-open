@@ -19,7 +19,7 @@ export interface AtlasEvidenceProps {
   actor: string;
   ask: string;
   assessment: {
-    status: "published" | "unconfirmed" | "contradicted";
+    status: "published" | "unconfirmed" | "contradicted" | "insufficient_evidence";
     method: string;
     explanation: string;
     limitations: readonly string[];
@@ -38,6 +38,7 @@ const assessmentLabels = {
   published: "Published link",
   unconfirmed: "Unconfirmed candidate",
   contradicted: "Contradicted candidate",
+  insufficient_evidence: "Insufficient evidence",
 } satisfies Record<AtlasEvidenceProps["assessment"]["status"], string>;
 const outcomeLabels = {
   full: "Fully reflected in final text",

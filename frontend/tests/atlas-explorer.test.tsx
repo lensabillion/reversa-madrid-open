@@ -6,7 +6,7 @@ import { AtlasExplorer, type AtlasLinkView } from "../components/atlas-explorer"
 const base: AtlasLinkView = {
   id: "link-1",
   law: "Example law",
-  topic: "Health",
+  topics: ["Health"],
   year: 2024,
   evidence: {
     actor: "Example association",
@@ -62,7 +62,7 @@ test("filters laws and actors, resets selection, and shows honest empty states",
     ...base,
     id: "other",
     law: "Energy law",
-    topic: "Energy",
+    topics: ["Energy"],
     year: 2025,
     evidence: { ...base.evidence, actor: "Energy association" },
   };
@@ -92,12 +92,12 @@ test("keeps unavailable selected filters visible when a snapshot is replaced", (
   fireEvent.change(screen.getByRole("combobox", { name: "Topic" }), {
     target: { value: "Health" },
   });
-  fireEvent.change(screen.getByRole("combobox", { name: "Year" }), {
+  fireEvent.change(screen.getByRole("combobox", { name: "Procedure year" }), {
     target: { value: "2024" },
   });
   rerender(
     <AtlasExplorer
-      links={[{ ...base, id: "new", topic: "Energy", year: 2025 }]}
+      links={[{ ...base, id: "new", topics: ["Energy"], year: 2025 }]}
       coverageNotes={[]}
     />,
   );
@@ -105,6 +105,17 @@ test("keeps unavailable selected filters visible when a snapshot is replaced", (
   expect(screen.getByRole("option", { name: "2024 (unavailable)" })).toBeDefined();
   expect(screen.getByText("No published links match these filters.")).toBeDefined();
   fireEvent.change(screen.getByRole("combobox", { name: "Topic" }), { target: { value: "" } });
-  fireEvent.change(screen.getByRole("combobox", { name: "Year" }), { target: { value: "" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Procedure year" }), {
+    target: { value: "" },
+  });
   expect(screen.getByRole("button", { name: /Example association/ })).toBeDefined();
+});
+
+test("filters a law by each of its supplied topics", () => {
+  render(<AtlasExplorer links={[{ ...base, topics: ["Health", "Energy"] }]} coverageNotes={[]} />);
+  fireEvent.change(screen.getByRole("combobox", { name: "Topic" }), {
+    target: { value: "Energy" },
+  });
+  expect(screen.getByRole("button", { name: /Example association/ })).toBeDefined();
+  expect(screen.getByRole("status").textContent).toContain("1 of 1");
 });

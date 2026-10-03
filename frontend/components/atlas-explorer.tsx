@@ -7,7 +7,7 @@ import { AtlasEvidence, type AtlasEvidenceProps } from "./atlas-evidence";
 export interface AtlasLinkView {
   id: string;
   law: string;
-  topic: string;
+  topics: readonly string[];
   year: number;
   evidence: AtlasEvidenceProps;
 }
@@ -18,23 +18,25 @@ const inputStyle =
 export function AtlasExplorer({
   links,
   coverageNotes,
+  initialSelectedId = null,
 }: {
   links: readonly AtlasLinkView[];
   coverageNotes: readonly string[];
+  initialSelectedId?: string | null;
 }) {
   const [view, setView] = useState<"published" | "audit">("published");
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("");
   const [year, setYear] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const topics = [...new Set(links.map((link) => link.topic))].sort();
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const topics = [...new Set(links.flatMap((link) => link.topics))].sort();
   const years = [...new Set(links.map((link) => link.year))].sort((a, b) => b - a);
   const viewLinks = links.filter(
     (link) => (link.evidence.assessment.status === "published") === (view === "published"),
   );
   const visible = viewLinks.filter(
     (link) =>
-      (!topic || link.topic === topic) &&
+      (!topic || link.topics.includes(topic)) &&
       (!year || String(link.year) === year) &&
       `${link.law} ${link.evidence.actor} ${link.evidence.ask}`
         .toLocaleLowerCase("en")
@@ -104,7 +106,7 @@ export function AtlasExplorer({
           </select>
         </label>
         <label className="space-y-2 text-xs text-stone-600">
-          Year
+          Procedure year
           <select
             value={year}
             onChange={(event) => {
@@ -146,7 +148,8 @@ export function AtlasExplorer({
       </nav>
       {view === "audit" && (
         <p className="mb-5 text-sm text-amber-900">
-          Unconfirmed and contradicted candidates are excluded from published influence links.
+          Unconfirmed, contradicted and insufficient-evidence candidates are excluded from published
+          influence links.
         </p>
       )}
       <p role="status" className="mb-4 text-xs tabular-nums text-stone-500">
