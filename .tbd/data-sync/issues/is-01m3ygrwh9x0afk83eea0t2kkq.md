@@ -3,14 +3,18 @@ type: is
 id: is-01m3ygrwh9x0afk83eea0t2kkq
 title: "Ask the organizers: may we use code written before today, and does anything of the first brief still count"
 kind: task
-status: open
+status: closed
 priority: 1
-version: 4
+version: 5
 labels: []
 dependencies: []
 parent_id: is-01m3ygrva6wcq297g7j12g99c2
 created_at: 2026-10-02T14:37:26.440Z
-updated_at: 2026-10-03T08:53:12.787Z
+updated_at: 2026-10-03T14:41:21.647Z
+closed_at: 2026-10-03T14:41:21.637Z
+close_reason: "Organizers answered (relayed by the team, 3 Oct ~16:45): code written before today is allowed."
+resolution: null
+duplicate_of: null
 ---
 Do test pairs arrive as text or IDs? How is recall computed from scores (threshold 0.5?)? May adoption prediction compare proposals with the final adopted text? May code and data be prepared before Saturday?
 
