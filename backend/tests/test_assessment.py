@@ -19,7 +19,13 @@ from influence.schemas.atlas import (
     span_matches,
 )
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN, ChangeSpan
-from influence.services.assessment import amendment_direction, ask_limit_reason, assess_link
+from influence.services.assessment import (
+    amendment_direction,
+    ask_limit_reason,
+    assess_link,
+    requested_direction,
+)
+from influence.services.masking import QuotedLaw
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 SOURCE = "Intro. Providers shall keep logs for at least six months after launch. Outro."
@@ -361,3 +367,124 @@ def test_a_quoted_instruction_with_extra_words_is_only_a_rewording() -> None:
     text = "Please insert 'for at least six whole calendar months' into Article 5."
     got = assess_link(_amendment(), _instruction_ask(text), text)
     assert (got.status, got.tier) == ("unconfirmed", "reworded")
+
+
+# --- The ask's direction -------------------------------------------------------------------
+
+DOTTED = "Contents " + "." * 810 + " providers retain logs"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("In Article 9(2), replace 'may' with 'shall': it must be published.", "stricter"),
+        ("In Article 9(2), replace 'shall' with 'may'.", "weaker"),
+        ("Please delete 'for at least six months'.", "weaker"),
+        ("Please insert 'for at least six months'.", "stricter"),
+        ("Please insert 'the widget'.", "unknown"),
+        ("Please insert 'shall'; insert 'may'.", "unknown"),
+        # Prose states no change: its "shall" and "required" are argument, not an edit.
+        ("Providers shall not be required to keep logs for at least six months.", "unknown"),
+        (f'replace "{DOTTED}" with "shall"', "unknown"),
+        ("   ", "unknown"),
+    ],
+)
+def test_a_quoted_instruction_states_its_direction_and_prose_does_not(
+    text: str, expected: Direction
+) -> None:
+    assert requested_direction(text) == expected
+
+
+def test_the_ask_direction_is_read_by_the_same_rule_as_the_amendment_change() -> None:
+    """The rule is symmetric: an instruction spelling out the amendment's edit agrees with it."""
+    amendment = _amendment(
+        old="The authority may publish it.", new="The authority shall publish it."
+    )
+    quote = "In Article 9, replace 'may' with 'shall'."
+    assert requested_direction(quote) == "stricter"
+    got = _assess(amendment, _ask(quote, direction=requested_direction(quote), start=0), quote)
+    assert got.signals["same_direction"] == 1.0
+
+
+def test_a_prose_ask_without_a_direction_says_the_direction_checks_did_not_run() -> None:
+    note = "direction checks did not run"
+    unread = assess_link(_amendment(), _ask(direction="unknown"), SOURCE)
+    assert any(note in text for text in unread.limitations)
+    read = assess_link(_amendment(), _ask(direction="stricter"), SOURCE)
+    assert not any(note in text for text in read.limitations)
+    instruction = "Please insert 'the widget' into Article 5."
+    uncued = assess_link(_amendment(), _ask(instruction, direction="unknown", start=0), instruction)
+    assert not any(note in text for text in uncued.limitations)
+
+
+# --- Wording quoted from the proposal --------------------------------------------------------
+
+PROPOSAL = (
+    "Providers shall keep technical logs for at least six months after the system is placed "
+    "on the market."
+)
+
+
+def test_a_passage_quoting_the_proposal_is_not_a_copy_of_an_amendment_reusing_it() -> None:
+    """An amendment may reuse the proposal's own wording; quoting the proposal is not asking."""
+    amendment = _amendment(
+        old="Providers shall keep technical logs.",
+        new=PROPOSAL,
+    )
+    source = f"As the proposal already says: {PROPOSAL.lower()} We have no further comment."
+    ask = _ask(source, direction="unknown", start=0)
+    unmasked = _assess(amendment, ask, source)
+    assert (unmasked.status, unmasked.tier) == ("published", "copied")
+    assert "quoted_law_masked_chars" not in unmasked.signals
+    masked = _assess(amendment, ask, source, quoted_law=QuotedLaw((PROPOSAL,)))
+    assert (masked.status, masked.tier) == ("insufficient_evidence", None)
+    # The mask ends at the last word: the closing full stop is not part of the quotation.
+    assert masked.signals["quoted_law_masked_chars"] == len(PROPOSAL.rstrip("."))
+    assert masked.ask_spans == masked.amendment_spans == ()
+
+
+def test_a_shared_phrase_never_bridges_a_masked_quotation() -> None:
+    """Without a break, the words either side of a masked quote would join into one long run."""
+    quote = "Member States shall designate a national supervisory authority"
+    amendment = _amendment(
+        old="Providers shall register.",
+        new="Providers shall register so independent auditors review the model every year.",
+    )
+    source = f"So independent auditors review {quote} the model every year."
+    ask = _ask(source, direction="unknown", start=0)
+    plain = _assess(amendment, ask, source)
+    masked = _assess(amendment, ask, source, quoted_law=QuotedLaw((quote,)))
+    assert plain.signals["longest_shared_run"] == masked.signals["longest_shared_run"] == 4.0
+    assert masked.tier == "reworded"
+    start = source.index(quote)
+    assert all(span.end <= start or span.start >= start + len(quote) for span in masked.ask_spans)
+    assert all(span_matches(span, source) for span in masked.ask_spans)
+
+
+# Masking counts word characters only, so the law is drawn without punctuation.
+LAW_WORDS = st.sampled_from(["shall", "may", "not", "logs", "six", "months", "keep", "the"])
+
+
+@given(
+    before=TEXTS,
+    after=TEXTS,
+    law=st.lists(LAW_WORDS, min_size=8, max_size=16).map(" ".join),
+    quoted=st.integers(min_value=8, max_value=16),
+)
+def test_no_evidence_span_ever_quotes_masked_proposal_wording(
+    before: str, after: str, law: str, quoted: int
+) -> None:
+    quote = " ".join(law.split()[:quoted])
+    source = f"{before} {quote} {after}"
+    quoted_law = QuotedLaw((law,))
+    masked = quoted_law.mask(source).spans
+    got = _assess(
+        _amendment(old="Logs.", new=f"Logs. {before} {quote} {after}"),
+        _ask(source, direction="unknown", start=0),
+        source,
+        quoted_law=quoted_law,
+    )
+    assert masked
+    for span in got.ask_spans:
+        assert span_matches(span, source)
+        assert all(span.end <= start or span.start >= end for start, end in masked)
