@@ -157,6 +157,20 @@ def test_missing_stage_text_is_unknown_with_a_reason_not_a_loss() -> None:
     assert all(o.reason for o in outcomes[1:])
 
 
+def test_punctuation_only_insert_is_not_a_word_match_in_an_aligned_provision() -> None:
+    # Keep this guard deterministic: random word/punctuation examples need not reach it.
+    amendment = _amendment("Providers shall keep logs.", "Providers shall keep logs.!")
+    final_text = "Providers shall safely keep logs."
+    final = trace_outcomes(
+        _ask(amendment.new_text),
+        amendment,
+        _link(amendment),
+        [_version("final_act", final_text)],
+    )[2]
+    assert final.result == "not_observed"
+    assert final.spans == ()
+
+
 def test_no_aligned_provision_is_unknown() -> None:
     amendment = _amendment(OLD, NEW)
     versions = [_version("final_act", "Something entirely about other matters.")]

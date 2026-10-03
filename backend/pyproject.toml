@@ -26,6 +26,11 @@ dev = [
   "pytest-cov==7.1.0",
   "ruff==0.16.8",
 ]
+models = [
+    "numpy==2.5.3",
+    "onnxruntime==1.30.0",
+    "tokenizers==0.23.2",
+]
 
 [build-system]
 # Matches the uv release the repository uses, so uv builds the package in-process instead
