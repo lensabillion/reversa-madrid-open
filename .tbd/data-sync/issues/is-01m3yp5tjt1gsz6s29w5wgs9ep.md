@@ -5,7 +5,7 @@ title: "Part 5 · Trace outcomes: heard, adopted by Parliament, won, by text sur
 kind: feature
 status: in_progress
 priority: 0
-version: 8
+version: 9
 delegate: claude-code@dani
 labels: []
 dependencies:
@@ -17,7 +17,7 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T16:11:53.305Z
-updated_at: 2026-10-03T11:53:31.934Z
+updated_at: 2026-10-03T11:57:41.627Z
 started_at: 2026-10-03T11:53:18.376Z
 ---
 Fill the 'passed Parliament' gap without vote records: reuse the change matcher to test whether each requested change survives from the Commission proposal into Parliament's first-reading/negotiating position and then into the final act. Gives the heard -> kept -> won funnel for the demo and a strong feature for adoption prediction. Validate on GDPR (LobbyPlag verified pairs; Amazon's Art. 26(1) phrase is absent from the final law). Pending architecture agreement (rev-0pmq) and dataset research (rev-rpoi).
@@ -29,3 +29,5 @@ Fill the 'passed Parliament' gap without vote records: reuse the change matcher 
 2026-10-03 13:25 CEST, state of main at bdb0c61 (recorded by cloud session claude/eloquent-allen-jbxbmy): Unclaimed; no part-5 code on main. Inputs available: repositories/cellar.py splits proposals and final acts into ArticleVersion records (AI Act final 113 articles / 500 paragraphs, proposal 85 articles; reported) and the Outcome contract (PR #25). Gap: Parliament's position text is not obtained (CELLAR links only the resolution 52024AP0138; EP API adopted-texts untested). The assignment requires outcomes for every ask, not only linked ones.
 
 2026-10-03 Agent 2: PR #31 adds services/outcomes.py (trace_outcomes): provisions aligned by text not number; full / partial / not_observed / unknown; missing text and no aligned provision are unknown; contradicted or undated asks are traced directly, not through the amendment. Differs from two fixture examples on purpose (a-acme unknown; a-city kind wording). Fixture only; status-quo wins and reworded survival not implemented.
+
+2026-10-03 Agent 2: PRs #31 (trace_outcomes) merged. PR #38 adds status-quo wins (direction keep: full, kind status_quo when the provision survives word for word; never traced through an amendment). Reworded survival still not implemented.
