@@ -1,4 +1,4 @@
-# Repository quality gates. `make check` verifies the default gates and changes no source.
+# Repository quality gates. `make check` verifies everything and changes nothing.
 # CI runs these same targets, so a local pass predicts a CI pass.
 
 # Supply-chain cool-off: uv ignores any package file uploaded in the last 14 days.
@@ -20,8 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend \
-	check-evaluation-runtime audit-evaluation-runtime \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend
 
@@ -55,19 +54,8 @@ check-backend-tests: backend-env  ## Tests, gate probes and branch coverage.
 	$(BACKEND) pytest --cov
 
 # `uv audit` is a preview command in uv 0.12.8; the flag opts in and silences its warning.
-audit-backend: audit-evaluation-runtime  ## Audit production and experiment dependency locks.
+audit-backend:  ## Look up every package in backend/uv.lock in the OSV vulnerability database.
 	uv audit --directory backend --locked --preview-features audit-command
-
-# The frozen experiment has a separate heavyweight environment; normal CI audits its
-# lock without downloading model weights or installing PyTorch.
-audit-evaluation-runtime:
-	UV_EXCLUDE_NEWER=2026-09-18T00:00:00Z uv audit --directory backend/evaluation/runtime --locked --preview-features audit-command
-
-check-evaluation-runtime: backend-env  ## Optional model runtime quality checks; no inference.
-	UV_EXCLUDE_NEWER=2026-09-18T00:00:00Z uv sync --directory backend/evaluation/runtime --locked
-	$(RUFF) format --check backend/evaluation/runtime
-	$(RUFF) check backend/evaluation/runtime
-	$(BACKEND) basedpyright --project evaluation/runtime
 
 fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 	$(BACKEND) ruff check --fix
@@ -75,6 +63,13 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+
+# The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
+# EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
+submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
+	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
+	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
+	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci

@@ -2,6 +2,13 @@
 
 **Influence Graph Primer** · Reversa × Madrid Open · Challenge 03 · Saturday 3 October 2026
 
+> **Superseded brief.** This page was written for the first Challenge 03 brief (60
+> supplied pairs and 20 proposals scored as CSVs). The organizers replaced it at kickoff on
+> 3 October with **The Influence Atlas**; read the
+> [Atlas explainer](influence-atlas-primer.md) first. Sections 1–4 here (how an EU law is
+> made, amendments, lobbying, the boilerplate trap) still hold. Sections 6 and 9–13
+> describe the old hidden test and the old seven-part architecture.
+
 This page explains Challenge 03 from zero: how a law is made in the EU, what amendments
 and lobbying are, how an amendment can be traced back to the organization that wrote it,
 what “the graph” and “who wins” mean, what the finished product would look like, and the

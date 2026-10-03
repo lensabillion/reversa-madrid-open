@@ -94,24 +94,6 @@ def test_detail_preserves_provenance_and_unknown_verification(service: DemoServi
     assert other.total_sources == 0
 
 
-def test_graph_only_shows_verified_organizations_and_deduplicates_authors(
-    service: DemoService,
-) -> None:
-    graph = service.graph("a1")
-    assert {(node.id, node.kind) for node in graph.nodes} == {
-        ("amendment:a1", "amendment"),
-        ("organization:o1", "organization"),
-        ("author:Ada Example", "author"),
-    }
-    assert {(edge.source, edge.target, edge.kind) for edge in graph.edges} == {
-        ("organization:o1", "amendment:a1", "historically_verified"),
-        ("author:Ada Example", "amendment:a1", "authored"),
-    }
-    empty_graph = service.graph("a2")
-    assert len(empty_graph.nodes) == 1
-    assert empty_graph.edges == ()
-
-
 def test_organizations_report_counts_without_win_rates(service: DemoService) -> None:
     result = service.organizations()
     assert [
@@ -121,11 +103,9 @@ def test_organizations_report_counts_without_win_rates(service: DemoService) -> 
     assert "win rates" in result.coverage_note
 
 
-@pytest.mark.parametrize("method", ["amendment", "graph"])
-def test_missing_entity(service: DemoService, method: str) -> None:
-    operation = service.amendment if method == "amendment" else service.graph
+def test_missing_amendment(service: DemoService) -> None:
     with pytest.raises(EntityNotFoundError, match="Unknown amendment missing"):
-        operation("missing")
+        service.amendment("missing")
 
 
 def test_empty_snapshot(tmp_path: Path) -> None:
@@ -209,17 +189,12 @@ def test_manually_constructed_repository_cannot_invent_attribution(service: Demo
         invalid.organization_for(repository.proposals["p1"])
 
 
-def test_source_details_are_bounded_but_counts_and_graph_are_complete(tmp_path: Path) -> None:
+def test_source_details_are_bounded_but_counts_are_complete(tmp_path: Path) -> None:
     records = write_dataset(tmp_path)
     for index in range(SOURCE_LIMIT + 2):
         records["proposals"].append({**records["proposals"][0], "uid": f"extra-{index}"})
         records["plags"].append(
-            {
-                "uid": f"extra-{index}",
-                "proposal": f"extra-{index}",
-                "amendment": "a1",
-                "verified": True,
-            }
+            {**records["plags"][0], "uid": f"extra-{index}", "proposal": f"extra-{index}"}
         )
     write_dataset(tmp_path, records)
     service = DemoService(DemoRepository.load(tmp_path))
@@ -227,8 +202,6 @@ def test_source_details_are_bounded_but_counts_and_graph_are_complete(tmp_path: 
     assert len(detail.sources) == SOURCE_LIMIT
     assert detail.total_sources == SOURCE_LIMIT + 4
     assert all(source.historically_verified for source in detail.sources)
-    graph = service.graph("a1")
-    assert sum(edge.kind == "historically_verified" for edge in graph.edges) == 1
     organization = service.organizations().items[0]
     assert organization.verified_links == SOURCE_LIMIT + 3
     assert organization.amendments_echoing == 1

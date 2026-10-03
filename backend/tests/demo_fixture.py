@@ -55,12 +55,20 @@ def write_dataset(
                 },
             ],
             "plags": [
-                {"uid": "z-verified", "amendment": "a1", "proposal": "p1", "verified": True},
+                {
+                    "uid": "z-verified",
+                    "amendment": "a1",
+                    "proposal": "p1",
+                    "verified": True,
+                    "match": 1,
+                    "processing": {"checked": 0, "verified": 0},
+                },
                 {
                     "uid": "a-unverified",
                     "amendment": "a1",
                     "proposal": "p2",
                     "verified": False,
+                    "match": 0.5,
                     "processing": {"checked": 2, "verified": 0},
                 },
             ],

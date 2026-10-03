@@ -1,7 +1,7 @@
 # Evidence Workspace
 
 The light workspace reads the [backend API](../backend/README.md). Search amendments,
-compare a lobby proposal with an amendment, and inspect verified source and author links.
+compare a lobby proposal with an amendment, and inspect each amendment's recorded sources.
 Historical verification and lexical similarity remain separate; neither proves causation
 or adoption.
 
@@ -55,8 +55,7 @@ There is no sample-data fallback: unavailable services show an error with Retry.
 
 ## Code
 
-- `components/workspace.tsx`: search, pagination, selection, source comparison and view controls
-- `components/influence-network.tsx`: small interactive SVG graph, without a graph library
+- `components/workspace.tsx`: search, pagination, selection and source comparison
 - `components/compare-texts.tsx`: user inputs, comparison request and result evidence
 - `components/evidence-columns.tsx`: shared original/amendment/submission layout and evidence routing
 - `components/document-input.tsx`: extraction, page review and provenance for uploaded text
@@ -66,10 +65,9 @@ There is no sample-data fallback: unavailable services show an error with Retry.
 - `next.config.ts`: same-origin API proxy
 
 React renders source text as text, never HTML. Switching amendments clears prior evidence;
-aborted requests cannot replace the current selection. Graph nodes are keyboard buttons.
-Narrow screens stack panels; the network scrolls within its own container. Uploads and
-comparisons use `/api/v1/documents/extract` and `/api/v1/compare`; the backend owns both
-extraction and scoring, so a future batch command can reuse them.
+aborted requests cannot replace the current selection. Narrow screens stack panels.
+Uploads and comparisons use `/api/v1/documents/extract` and `/api/v1/compare`; the backend
+owns both extraction and scoring, so a future batch command can reuse them.
 
 ## Verify
 
@@ -79,13 +77,12 @@ use synthetic API responses; the running demo uses the downloaded public data.
 
 October 2 validation: combined `make check` exited 0 with 106 backend tests (100% branch
 coverage), 38 frontend tests, a successful production build and clean dependency audits.
-Independent review regressions cover deletion-only results exposing original evidence,
-non-JSON upload errors and overlapping graph targets. In the production browser, the
+Independent review regressions cover deletion-only results exposing original evidence
+and non-JSON upload errors. In the production browser, the
 organizers' PDF uploaded as 16 pages; selecting page 12 and comparing it with a supplied
 excerpt returned highlighted evidence and retained page provenance. This is a transport
 check, not a model-quality evaluation. ITRE 616 displayed Amazon's historical verified
-link separately from its 0.71 lexical score. At a 390-pixel viewport, document width
-remained 390 pixels with the network open. No browser warnings/errors were observed;
+link separately from its 0.71 lexical score. No browser warnings/errors were observed;
 exhaustive device and screen-reader testing remains unverified. For the three-column
 follow-up, production-browser checks measured equal 270-pixel columns at a 1280-pixel
 viewport; at 390 pixels they stacked in order and document width stayed 390 pixels.
