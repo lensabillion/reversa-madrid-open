@@ -1,0 +1,59 @@
+{
+  "pairs": 272,
+  "positives": 172,
+  "second_stage": "same-object-v1",
+  "practice_0.5": {
+    "threshold": 0.5,
+    "four_questions": {
+      "selected": 111,
+      "true_positives": 105,
+      "false_positives": 6,
+      "precision": 0.9459,
+      "precision_wilson95": [
+        0.8871,
+        0.975
+      ],
+      "recall": 0.6105
+    },
+    "four_and_same_object": {
+      "selected": 108,
+      "true_positives": 102,
+      "false_positives": 6,
+      "precision": 0.9444,
+      "precision_wilson95": [
+        0.8841,
+        0.9743
+      ],
+      "recall": 0.593
+    },
+    "dropped_true": 3,
+    "dropped_false": 0
+  },
+  "pipeline_cutoff": {
+    "threshold": 0.67,
+    "four_questions": {
+      "selected": 49,
+      "true_positives": 48,
+      "false_positives": 1,
+      "precision": 0.9796,
+      "precision_wilson95": [
+        0.8931,
+        0.9964
+      ],
+      "recall": 0.2791
+    },
+    "four_and_same_object": {
+      "selected": 49,
+      "true_positives": 48,
+      "false_positives": 1,
+      "precision": 0.9796,
+      "precision_wilson95": [
+        0.8931,
+        0.9964
+      ],
+      "recall": 0.2791
+    },
+    "dropped_true": 0,
+    "dropped_false": 0
+  }
+}

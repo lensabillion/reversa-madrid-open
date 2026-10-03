@@ -10,7 +10,11 @@ wording reached the final act:
 2. Each (passage, amendment) pair goes to Jev with PR #63's frozen prompt
    (`jev_judge.judge_request`); answers are cached by request and the spend is capped.
 3. A pair whose four answers all clear `jev_judge.CUTOFF` (the weakest answer, read in the
-   direction that supports a link, is `JevAnswers.support`) becomes an `OriginMatch` of
+   direction that supports a link, is `JevAnswers.support`) is asked one more question
+   (`jev_judge.SAME_OBJECT_QUESTION`: same object and provision?), within what is left of
+   the budget. Measured on LobbyPlag's 272 pairs at the cutoff it drops no pair, true or
+   false (`evaluation/lineage-same-object.json`); on the AI Act it removes pairs that share
+   a safeguard but not its object. A pair that also clears it becomes an `OriginMatch` of
    kind "semantic": the whole passage is quoted, `similarity` holds that support, and the
    dates decide `precedes` as for a verbatim origin. A pair already found word for word is
    not repeated.
@@ -23,16 +27,19 @@ pairs). The cost is one Jev call per distinct pair, about 5 per adopting amendme
 
 import hashlib
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 
 from influence.schemas.atlas import Actor, Amendment, Ask
 from influence.schemas.lineage import AmendmentAdoption, OriginMatch, TimeEligibility
 from influence.services.jev import JevRequest
 from influence.services.jev_judge import (
     CUTOFF,
+    SAME_OBJECT_REVISION,
     JevJudge,
     judge_request,
     proposal_articles,
     request_bytes,
+    same_object_request,
 )
 from influence.services.pipeline import Collected, asks_from_passages, find_candidates
 from influence.services.prose_match import words_of
@@ -71,6 +78,7 @@ def reworded_origins(
     candidates = find_candidates((amendments[i] for i in sorted(amendments)), tuple(asks.values()))
     pairs: list[tuple[str, str, str]] = []  # (request key, ask id, amendment id)
     requests: list[JevRequest] = []
+    by_key: dict[str, JevRequest] = {}
     unjudgeable = 0
     for candidate in candidates:
         ask = asks[candidate.ask_id]
@@ -85,7 +93,20 @@ def reworded_origins(
         key = hashlib.sha256(request_bytes(request)).hexdigest()
         pairs.append((key, ask.ask_id, candidate.amendment_id))
         requests.append(request)
+        by_key[key] = request
     report = judge.run(requests)
+
+    # Second stage, only for pairs that cleared the four: same object and provision?
+    cleared = sorted(
+        {key for key, _, _ in pairs if (a := report.answers.get(key)) and a.support >= CUTOFF}
+    )
+    second_key = {
+        key: hashlib.sha256(request_bytes(same_object_request(by_key[key]))).hexdigest()
+        for key in cleared
+    }
+    stage = replace(judge, max_usd=max(0.0, judge.max_usd - report.spent_usd)).same_object(
+        same_object_request(by_key[key]) for key in cleared
+    )
 
     found: dict[tuple[str, str], OriginMatch] = {}
     for key, ask_id, amendment_id in pairs:
@@ -93,17 +114,25 @@ def reworded_origins(
         ask = asks[ask_id]
         if answers is None or answers.support < CUTOFF:
             continue
+        same = stage.answers.get(second_key[key])
+        if same is None or same < CUTOFF:
+            # Not asked (budget) or a different object: never a link.
+            continue
         if (ask.document_id, amendment_id) in found:
             continue
         found[ask.document_id, amendment_id] = _origin(
             ask, amendments[amendment_id], phrase_of[amendment_id], submitters, answers.support
         )
+    kept = len({k for k in cleared if (v := stage.answers.get(second_key[k])) and v >= CUTOFF})
     note = (
         f"Reworded origins ({METHOD}): Jev judged {len(report.answers)} of {len(set(pairs))} "
         f"distinct BM25 pairs for {len(amendments)} adopting amendment(s) "
         f"({report.cached} cached, {len(report.failures)} not judged, {unjudgeable} over the "
-        f"request bound, {report.spent_usd:.2f} USD); {len(found)} cleared {CUTOFF} on all "
-        "four answers. Jev's answers are evidence of the same legal change, not of authorship."
+        f"request bound); {len(cleared)} cleared {CUTOFF} on all four answers, and "
+        f"{kept} of them also on {SAME_OBJECT_REVISION} (same object and provision; "
+        f"{len(stage.failures)} not asked), {report.spent_usd + stage.spent_usd:.2f} USD in "
+        f"all; {len(found)} origin(s). Jev's answers are evidence of the same legal change, "
+        "not of authorship."
     )
     return tuple(sorted(found.values(), key=lambda o: (o.document_id, o.amendment_ids))), note
 

@@ -68,31 +68,35 @@ def _amendment(old: str | None = "Providers shall keep the logs.") -> Amendment:
 
 
 class FakeJev:
-    """Answers each request from `answer(state)`; raises for states `fail` selects."""
+    """Answers each request from `answer(state)`, or `same(state)` for the second stage.
+
+    Raises for states `fail` selects.
+    """
 
     def __init__(
         self,
         answer: Callable[[dict[str, object]], dict[str, float]] = lambda _: SUPPORTING,
         fail: Callable[[dict[str, object]], bool] = lambda _: False,
+        same: Callable[[dict[str, object]], float] = lambda _: 0.9,
     ) -> None:
-        self.answer, self.fail = answer, fail
+        self.answer, self.fail, self.same = answer, fail, same
         self.states: list[dict[str, object]] = []
+        self.second_stage: list[dict[str, object]] = []
 
     def __call__(
         self, body: bytes, api_key: SecretStr, timeout: float, context: ssl.SSLContext
     ) -> bytes:
         request = json.loads(body)
         state: dict[str, object] = request["state"]
-        self.states.append(state)
+        second = jev_judge.SAME_OBJECT in request["questions"]
+        (self.second_stage if second else self.states).append(state)
         if self.fail(state):
             raise OSError("connection reset")
+        values = {jev_judge.SAME_OBJECT: self.same(state)} if second else self.answer(state)
         return json.dumps(
             {
                 "model": jev.MODEL,
-                "answers": {
-                    key: {"type": "noul", "noul": value}
-                    for key, value in self.answer(state).items()
-                },
+                "answers": {key: {"type": "noul", "noul": value} for key, value in values.items()},
                 "usage": {"input_tokens": 1000, "output_tokens": 40},
             }
         ).encode()
@@ -237,3 +241,67 @@ def test_an_answer_missing_a_question_is_a_failure_not_a_score(tmp_path: Path) -
 
     assert report.answers == {}
     assert "no Noul value for same_legal_change" in report.failures[key]
+
+
+# --- The second stage: same object and provision -------------------------------------------
+
+# The second-stage question. LobbyPlag's 272 pairs measured it at the cutoff
+# (`evaluation/lineage-same-object.json`); an edit must fail here and be measured again.
+SAME_OBJECT_SHA256 = "05168abc2993cab79e1ddf468798c125971f168b481dd0f1a55cc56f6163401b"
+
+
+def test_the_second_stage_asks_one_question_of_the_same_state() -> None:
+    request = jev_judge.judge_request(_ask(), _amendment(), SOURCE, {})
+    assert request is not None
+
+    second = jev_judge.same_object_request(request)
+
+    assert second.state == request.state
+    assert list(second.questions) == [jev_judge.SAME_OBJECT]
+    assert jev_judge.SAME_OBJECT_REVISION == "same-object-v1"
+    question = jev_judge.SAME_OBJECT_QUESTION
+    assert hashlib.sha256(question.encode()).hexdigest() == SAME_OBJECT_SHA256
+
+
+def test_the_second_stage_answers_by_request_and_reuses_the_cache(tmp_path: Path) -> None:
+    fake = FakeJev(same=lambda _: 0.3)
+    request = jev_judge.judge_request(_ask(), _amendment(), SOURCE, {})
+    assert request is not None
+    second = jev_judge.same_object_request(request)
+    key = hashlib.sha256(jev_judge.request_bytes(second)).hexdigest()
+
+    first = _judge(tmp_path, fake).same_object([second, second])
+    again = _judge(tmp_path, fake).same_object([second])
+
+    assert first.answers == {key: pytest.approx(0.3)}
+    assert (first.asked, first.cached, again.asked, again.cached) == (1, 0, 0, 1)
+    assert len(fake.second_stage) == 1
+    assert first.spent_usd == pytest.approx(1000 * jev_judge.PRICE_PER_TOKEN)
+
+
+def test_a_second_stage_answer_that_is_not_a_probability_is_a_failure(tmp_path: Path) -> None:
+    request = jev_judge.judge_request(_ask(), _amendment(), SOURCE, {})
+    assert request is not None
+    second = jev_judge.same_object_request(request)
+    key = hashlib.sha256(jev_judge.request_bytes(second)).hexdigest()
+    (tmp_path / "jev").mkdir()
+    choice = jev.JevResult.model_validate(
+        {
+            "model": jev.MODEL,
+            "answers": {
+                jev_judge.SAME_OBJECT: {
+                    "type": "choice",
+                    "choice": "yes",
+                    "probabilities": {"yes": 0.6, "no": 0.4},
+                    "confidence": 0.6,
+                }
+            },
+            "usage": {"input_tokens": 10, "output_tokens": 1},
+        }
+    )
+    (tmp_path / "jev" / f"{key}.json").write_text(choice.model_dump_json())
+
+    report = _judge(tmp_path, FakeJev()).same_object([second])
+
+    assert report.answers == {}
+    assert "no Noul value for same_object" in report.failures[key]

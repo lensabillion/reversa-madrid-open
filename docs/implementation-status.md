@@ -243,8 +243,17 @@ cloud container, Have Your Say index not built, so title search): collect 560.6 
 9 m 34 s; 631 adopted phrases from 838 of 5,660 amendments; 10,454 of 73,606 new final-act
 words traced; 195 of 788 documents said wording first; 153 named organisations. Its
 `lineage.json` is committed as `mock-data/laws/2021-0106-COD/lineage.json`
-(`INFLUENCE_DATA_ROOT=mock-data make dev-backend` serves it). Not verified: the run with
-`--jev` (semantic origins), and any audit of the shown links. Observed, not explained: all
+(`INFLUENCE_DATA_ROOT=mock-data make dev-backend` serves it). With `--jev` (5 m 20 s, 0.22 USD,
+3,829 pairs judged) Jev's four questions kept 36 reworded pairs; the owner judged one
+(E.ON, Art. 11 trade secrets against Art. 54(1)(g) sandbox personal data) to share only a
+safeguard, and asked for an automatic check, not human review. A second Jev question
+(`same-object-v1`) now runs only on pairs that clear the four: on LobbyPlag (272 pairs,
+0.0067 USD) it drops nothing at the 0.67 cutoff (48 of 49 correct before and after); on the
+AI Act it keeps 9 of 36. The mock holds that view (589 lexical, 9 semantic origins). The
+explorer opens on a summary, keeps the detail in tabs (Who, How, Graph, Evidence, Check 3
+links), and adds a clickable graph (organisation → tabler → provision). Not verified: the
+precision of the 9 semantic links on the AI Act (LobbyPlag cannot show the second
+question's gain: its pairs are mostly verbatim copies). Observed, not explained: all
 530 dated non-citation matches have the submission first (0 amendment-first).
 
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026

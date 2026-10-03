@@ -79,6 +79,22 @@ _QUESTIONS = {
 }
 
 
+# A second, separate question, asked only of pairs that clear the four above, so the frozen
+# prompt and its measured cutoff stay untouched. On the AI Act Jev's four answers paired a
+# request to keep trade secrets in technical documentation confidential (Art. 11) with an
+# amendment protecting personal data in the sandbox (Art. 54(1)(g)): the same safeguard on
+# a different object. This question asks for the object and the provision.
+SAME_OBJECT_REVISION = "same-object-v1"
+SAME_OBJECT = "same_object"
+SAME_OBJECT_QUESTION = (
+    "Do the submission request and the amendment's actual change concern the same object: "
+    "the same information, data, document, system, duty or right, in the same provision "
+    "or one it expressly refers to? Answer no when they only share a safeguard, a "
+    "procedure, a principle or general wording applied to different objects or provisions. "
+    "Answer only from the provided evidence."
+)
+
+
 class _LegalState(BaseModel):
     """PR #63's `LegalState`, field for field and in order: the order fixes the request bytes."""
 
@@ -124,6 +140,14 @@ def _request(state: _LegalState) -> JevRequest:
     return JevRequest(
         state=payload,
         questions={key: NoulQuestion(instructions=text) for key, text in _QUESTIONS.items()},
+    )
+
+
+def same_object_request(request: JevRequest) -> JevRequest:
+    """The state of a four-question request, asked only whether both concern the same object."""
+    return JevRequest(
+        state=request.state,
+        questions={SAME_OBJECT: NoulQuestion(instructions=SAME_OBJECT_QUESTION)},
     )
 
 
@@ -193,6 +217,17 @@ class JudgeReport:
 
 
 @dataclass(frozen=True)
+class SameObjectReport:
+    """The second stage's answers by request key, its failures, and its spend."""
+
+    answers: dict[str, float]
+    failures: dict[str, str]
+    cached: int
+    asked: int
+    spent_usd: float
+
+
+@dataclass(frozen=True)
 class JevJudge:
     """Asks Jev once per distinct request, caches every answer, and stops at a dollar cap.
 
@@ -221,7 +256,10 @@ class JevJudge:
         write_bytes_atomic(self.cache / f"{key}.json", result.model_dump_json().encode())
         return result
 
-    def run(self, requests: Iterable[JevRequest]) -> JudgeReport:
+    def _results(
+        self, requests: Iterable[JevRequest]
+    ) -> tuple[dict[str, JevResult], dict[str, str], int, float]:
+        """Every distinct request's result, from the cache or one budgeted call, and why not."""
         unique = {hashlib.sha256(request_bytes(r)).hexdigest(): r for r in requests}
         results: dict[str, JevResult] = {}
         failures: dict[str, str] = {}
@@ -251,6 +289,10 @@ class JevJudge:
                         continue
                     results[key] = result
                     spent += result.usage.input_tokens * PRICE_PER_TOKEN
+        return results, failures, cached_count, spent
+
+    def run(self, requests: Iterable[JevRequest]) -> JudgeReport:
+        results, failures, cached_count, spent = self._results(requests)
         answers: dict[str, JevAnswers] = {}
         for key, result in results.items():
             try:
@@ -258,6 +300,24 @@ class JevJudge:
             except JevError as error:
                 failures[key] = str(error)
         return JudgeReport(
+            answers=answers,
+            failures=failures,
+            cached=cached_count,
+            asked=len(results) - cached_count,
+            spent_usd=spent,
+        )
+
+    def same_object(self, requests: Iterable[JevRequest]) -> SameObjectReport:
+        """Jev's `same_object` answer per request key (the key of the request sent)."""
+        results, failures, cached_count, spent = self._results(requests)
+        answers: dict[str, float] = {}
+        for key, result in results.items():
+            answer = result.answers.get(SAME_OBJECT)
+            if isinstance(answer, NoulAnswer):
+                answers[key] = answer.noul
+            else:
+                failures[key] = f"Jev returned no Noul value for {SAME_OBJECT}"
+        return SameObjectReport(
             answers=answers,
             failures=failures,
             cached=cached_count,

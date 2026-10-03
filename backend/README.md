@@ -369,7 +369,15 @@ part 3's BM25 shortlist the 5 consultation passages that share its rare changed 
 asks Jev PR #63's frozen four-question prompt for each pair (`services/jev_judge.py`).
 A pair whose four answers all clear 0.67 becomes an origin of kind `semantic`, quoting the
 whole passage, with `similarity` set to the weakest supporting answer and dated like a
-verbatim origin. Answers are cached under `data/cache/jev/` by request hash. BM25 bounds
+verbatim origin, but only if it also clears a second, separate question
+(`same-object-v1`, `jev_judge.SAME_OBJECT_QUESTION`): do the request and the amendment
+concern the same object, in the same provision or one it refers to? The four frozen
+questions stay untouched. Measured on LobbyPlag's 272 pairs at the 0.67 cutoff, the second
+question drops no pair, true or false (`evaluation/lineage-same-object.json`, built by
+`benchmarks/lineage_same_object.py`); on the AI Act it keeps 9 of the 36 pairs that cleared
+the four, removing pairs with the same safeguard on a different object (E.ON's request on
+trade secrets in technical documentation, Art. 11, against an amendment on personal data
+in the sandbox, Art. 54(1)(g)). Answers are cached under `data/cache/jev/` by request hash. BM25 bounds
 what Jev sees (recall@5 0.663 on LobbyPlag's verified pairs), and adoption itself stays
 word for word.
 

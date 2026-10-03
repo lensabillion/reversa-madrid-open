@@ -229,3 +229,48 @@ def test_the_lineage_command_hands_the_view_a_cached_jev_judge(
     (judge,) = seen
     assert judge is not None
     assert (judge.cache, judge.max_usd) == (tmp_path / "cache" / "jev", 2.0)
+
+
+def test_a_pair_with_a_different_object_is_no_origin(tmp_path: Path) -> None:
+    world = _world()
+    other_object = FakeJev(same=lambda _: 0.4)
+
+    origins, note = reworded_origins(
+        world,
+        adopt(world).adoptions,
+        _judge(tmp_path, other_object),
+        submitters=_submitters(world),
+    )
+
+    assert origins == ()
+    assert other_object.second_stage  # asked only of pairs that cleared the four
+    assert len(other_object.second_stage) <= len(other_object.states)
+    assert "and 0 of them also on same-object-v1" in note
+    assert "; 0 origin(s)." in note
+
+
+def test_a_second_stage_the_budget_left_unasked_is_no_origin(tmp_path: Path) -> None:
+    world = _world()
+    first = FakeJev()
+    judge = _judge(tmp_path, first)
+    reworded_origins(world, adopt(world).adoptions, judge, submitters=_submitters(world))
+    # Keep the four answers cached and forget the second stage's: with no budget left, it
+    # cannot be asked again.
+    for name in [p.name for p in (tmp_path / "jev").iterdir()]:
+        result = jev.JevResult.model_validate_json((tmp_path / "jev" / name).read_bytes())
+        if jev_judge.SAME_OBJECT in result.answers:
+            (tmp_path / "jev" / name).unlink()
+    broke = FakeJev()
+
+    origins, note = reworded_origins(
+        world,
+        adopt(world).adoptions,
+        _judge(tmp_path, broke, max_usd=0.0),
+        submitters=_submitters(world),
+    )
+
+    assert origins == ()
+    assert broke.states == []  # the four came from the cache
+    assert broke.second_stage == []
+    assert "not asked)" in note
+    assert "0 not asked)" not in note
