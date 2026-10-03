@@ -5,7 +5,7 @@ title: "Part 6 · Atlas graph: actor -> ask -> amendment -> final article, plus 
 kind: feature
 status: in_progress
 priority: 0
-version: 9
+version: 10
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -22,11 +22,11 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-03T08:53:51.277Z
-updated_at: 2026-10-03T10:20:54.787Z
+updated_at: 2026-10-03T10:37:13.597Z
 started_at: 2026-10-03T10:00:59.971Z
 ---
 Atlas part 6. Built only from part 4's published links and part 5's outcomes, never from LobbyPlag labels. Store as plain files (JSONL/Parquet) per law plus one merged index; each edge carries its evidence record id. Serves the explorer, rankings and report. NetworkX for analysis; no graph database unless measured need.
 
 ## Notes
 
-Agent 3 active in feat/atlas-explorer; PR24 https://github.com/lensabillion/reversa-madrid-open/pull/24 prepares evidence/explorer (rev-oodw). Subagent verified 2026-10-03: Agent1 published branch and main remain 0518f17; Agent2 d1cf813 exposes retrieval-only types. No frozen schemas/atlas.py, GraphSnapshot or fixtures available, so graph service not implemented. Required contract: canonical IDs/revision; sources and exact document-relative code-point quotes; chronology/publication flags; stage-specific outcomes including unmatched asks; coverage/run metadata; deterministic node/edge and audit shape. Graph must reject dangling/conflicting duplicate IDs, deduplicate identical paths, retain joint asks, allow published heard links with unknown final outcome. Frontend adapter must translate document-relative spans to excerpt-relative offsets. Pure build_graph service follows after handoff. Analysis/report display preparation delegated under rev-1jc4; real rankings/report/demo remain open.
+2026-10-03 main check: CONTRACT BLOCKER RESOLVED. PR25 https://github.com/lensabillion/reversa-madrid-open/pull/25 merged at c5365dc; all 9 CI checks passed. atlas-1 provides shared records, GraphSnapshot, exact SourceSpan rules and generated two-law consumer fixtures covering supported/opposite/short-edit/ambiguous/missing-date/missing-final/partial cases. Graph projection and ranking calculations can now be built/tested against these fixtures; real pipeline remains pending (Agent1 draft PR26, Agent2 outputs). PR24 presentation at933385a remains open. Next integration must handle insufficient_evidence status, span offsets relative to each record field, and separate heard/parliament_position/final_act outcomes; keep unknown separate and all observed asks including unmatched asks for coverage. No backend graph service implemented yet. Fetched main only; current feat/atlas-explorer checkout and local synthetic preview on port3013 preserved.
