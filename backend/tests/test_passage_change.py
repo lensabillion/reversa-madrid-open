@@ -9,7 +9,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from influence.schemas.scoring import ScoreRequest, TextChange
-from influence.services.passage_change import read_changes
+from influence.services.passage_change import opposed_sentence, read_changes
 from influence.services.scoring import score_pair
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
@@ -112,3 +112,74 @@ def test_bridge_lets_the_scorer_see_the_shall_may_change() -> None:
     )
     assert round(before.score, 2) == 0.03
     assert after.score == 1.0
+
+
+@pytest.mark.parametrize(
+    "passage",
+    [
+        "Insert 'the provider's obligation to keep logs for ten years' in Article 12.",
+        "Delete \N{LEFT SINGLE QUOTATION MARK}the deployer\N{RIGHT SINGLE QUOTATION MARK}s right "
+        "to object\N{RIGHT SINGLE QUOTATION MARK} please",
+    ],
+)
+def test_an_apostrophe_is_not_read_as_the_closing_quote(passage: str) -> None:
+    """Review round 2 (r2.py): "the provider's" was read as the instruction 'the provider'."""
+    (change,) = read_changes(passage)
+    assert change.kind == "statement"
+    assert change.new == passage
+
+
+@pytest.mark.parametrize("after", [".", ",", " ", ")", "2", ""])
+def test_a_closing_quote_before_punctuation_or_a_digit_still_closes(after: str) -> None:
+    (change,) = read_changes(f"insert 'keep logs'{after}")
+    assert (change.kind, change.new) == ("insert", "keep logs")
+
+
+@pytest.mark.parametrize(
+    ("passage", "sentence"),
+    [
+        (
+            "Intro. We strongly oppose any proposal to insert 'keep logs'. Thanks.",
+            "We strongly oppose any proposal to insert 'keep logs'.",
+        ),
+        ("Please do not delete 'keep logs'", "Please do not delete 'keep logs'"),
+        ("We don't want to delete 'keep logs'; fine.", "We don't want to delete 'keep logs';"),
+        (
+            "Members shouldn\N{RIGHT SINGLE QUOTATION MARK}t remove 'keep logs'.",
+            "Members shouldn\N{RIGHT SINGLE QUOTATION MARK}t remove 'keep logs'.",
+        ),
+        ("Ok.\n  We reject the move to add 'keep logs'", "We reject the move to add 'keep logs'"),
+        (
+            "We object to the plan to change 'a' to 'b' here.",
+            "We object to the plan to change 'a' to 'b' here.",
+        ),
+    ],
+)
+def test_an_opposition_cue_before_the_instruction_gives_the_whole_sentence(
+    passage: str, sentence: str
+) -> None:
+    (change,) = read_changes(passage)
+    bounds = opposed_sentence(passage, change)
+    assert bounds is not None
+    assert passage[bounds[0] : bounds[1]] == sentence
+
+
+@pytest.mark.parametrize(
+    "passage",
+    [
+        "Insert 'keep logs'.",
+        "We oppose the ban. Insert 'keep logs'.",
+        "Insert 'keep logs', not the ban.",
+        "We oppose the ban; insert 'keep logs'.",
+        "Note the annotation. Insert 'keep logs'.",
+    ],
+)
+def test_no_opposition_cue_before_the_instruction_in_its_sentence(passage: str) -> None:
+    (change,) = read_changes(passage)
+    assert change.kind == "insert"
+    assert opposed_sentence(passage, change) is None
+
+
+def test_a_statement_has_no_opposed_instruction() -> None:
+    (change,) = read_changes("We do not support logging.")
+    assert opposed_sentence("We do not support logging.", change) is None

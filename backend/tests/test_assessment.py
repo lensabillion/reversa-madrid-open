@@ -19,7 +19,12 @@ from influence.schemas.atlas import (
     span_matches,
 )
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN, ChangeSpan
-from influence.services.assessment import amendment_direction, ask_limit_reason, assess_link
+from influence.services.assessment import (
+    amendment_direction,
+    ask_limit_reason,
+    assess_link,
+    cue_mismatch,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 SOURCE = "Intro. Providers shall keep logs for at least six months after launch. Outro."
@@ -361,3 +366,150 @@ def test_a_quoted_instruction_with_extra_words_is_only_a_rewording() -> None:
     text = "Please insert 'for at least six whole calendar months' into Article 5."
     got = assess_link(_amendment(), _instruction_ask(text), text)
     assert (got.status, got.tier) == ("unconfirmed", "reworded")
+
+
+# --- Review round 2 regressions (scratchpad review-r2/r1.py to r3.py) ----------------------
+
+LOGS = "keep the logs for ten years after the system is placed on the market"
+
+
+def _passage_ask(text: str) -> Ask:
+    """An ask read from a passage: no declared direction, as `asks_from_passages` makes."""
+    return _ask(text, direction="unknown", start=0)
+
+
+@pytest.mark.parametrize("modal", ["shall", "must"])
+def test_a_one_modal_difference_is_contradicted_not_copied(modal: str) -> None:
+    amendment = _amendment(old="", new=f"Providers {modal} {LOGS}.")
+    text = f"We ask the co-legislators to insert 'Providers may {LOGS}'."
+    got = assess_link(amendment, _passage_ask(text), text)
+    assert (got.status, got.tier, got.support_score) == ("contradicted", None, 0.0)
+    assert any(f"(may, {modal})" in note for note in got.limitations)
+
+
+def test_a_one_number_difference_cannot_be_a_copy() -> None:
+    amendment = _amendment(
+        old="",
+        new="The notification shall be made at least 30 days before the system is placed "
+        "on the market.",
+    )
+    text = (
+        "Add 'The notification shall be made at least 90 days before the system is placed "
+        "on the market'."
+    )
+    got = assess_link(amendment, _passage_ask(text), text)
+    assert (got.status, got.tier) == ("unconfirmed", "reworded")
+    assert any("(30, 90)" in note for note in got.limitations)
+
+
+def test_a_different_article_number_in_a_replacement_cannot_be_a_copy() -> None:
+    amendment = _amendment(
+        old="Article 5(2) applies to all providers placing systems on the market.",
+        new="Article 5(1) applies to all providers placing systems on the market within the Union.",
+    )
+    text = (
+        "replace 'Article 5(2) applies to all providers placing systems on the market.' with "
+        "'Article 5(3) applies to all providers placing systems on the market within the Union.'"
+    )
+    got = assess_link(amendment, _passage_ask(text), text)
+    assert got.status != "published"
+    assert got.tier == "reworded"
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "text", "sentence"),
+    [
+        (
+            "",
+            f"Providers shall {LOGS}.",
+            f"Intro. We strongly oppose any proposal to insert 'Providers shall {LOGS}'. Thanks.",
+            f"We strongly oppose any proposal to insert 'Providers shall {LOGS}'.",
+        ),
+        (
+            f"Providers shall {LOGS}.",
+            "",
+            f"Please do not delete 'Providers shall {LOGS}'.",
+            f"Please do not delete 'Providers shall {LOGS}'.",
+        ),
+    ],
+)
+def test_an_instruction_the_ask_opposes_is_never_published(
+    old: str, new: str, text: str, sentence: str
+) -> None:
+    got = assess_link(_amendment(old=old, new=new), _passage_ask(text), text)
+    assert (got.status, got.tier) == ("unconfirmed", "copied")
+    assert [span.text for span in got.ask_spans] == [sentence]
+    assert all(span_matches(span, text) for span in got.ask_spans)
+    assert any("opposition cue" in note for note in got.limitations)
+
+
+def test_an_opposed_instruction_with_no_tier_is_insufficient_evidence() -> None:
+    text = "We reject any plan to insert 'unrelated wording entirely here'."
+    got = assess_link(_amendment(), _passage_ask(text), text)
+    assert got.status == "insufficient_evidence"
+    assert any("opposition cue" in note for note in got.limitations)
+
+
+@pytest.mark.parametrize(
+    ("new", "inserted"),
+    [
+        (f"Providers shall {LOGS}.", f"Providers shall not {LOGS}"),
+        (
+            "This Regulation shall apply to systems used for military purposes.",
+            "This Regulation shall not apply to systems used for military purposes",
+        ),
+        (
+            "This Regulation shall apply to systems used for military purposes.",
+            "This Regulation shall apply only to systems not used for military purposes",
+        ),
+    ],
+)
+def test_the_same_wording_with_its_sense_reversed_is_contradicted(new: str, inserted: str) -> None:
+    text = f"Insert '{inserted}'."
+    got = assess_link(_amendment(old="", new=new), _passage_ask(text), text)
+    assert (got.status, got.tier, got.support_score) == ("contradicted", None, 0.0)
+    assert got.amendment_spans
+    assert got.signals["polarity_conflict"] == 1.0
+
+
+def test_a_negation_with_unrelated_wording_stays_insufficient_evidence() -> None:
+    text = "Insert 'nothing here is not alike at all'."
+    got = assess_link(_amendment(old="", new=f"Providers shall {LOGS}."), _passage_ask(text), text)
+    assert got.status == "insufficient_evidence"
+    assert got.signals["polarity_conflict"] == 0.0
+
+
+def test_an_apostrophe_inside_the_quote_leaves_the_ask_unpublished_prose() -> None:
+    text = "Insert 'the provider's obligation shall not apply' to SMEs."
+    amendment = _amendment(old="", new="the provider's obligation shall not apply")
+    got = assess_link(amendment, _passage_ask(text), text)
+    assert got.status != "published"
+    assert "longest_shared_run" in got.signals
+
+
+def test_matching_cues_still_publish_a_copy() -> None:
+    amendment = _amendment(old="", new=f"Providers shall {LOGS} within 30 days.")
+    text = f"Insert 'Providers shall {LOGS} within 30 days'."
+    got = assess_link(amendment, _passage_ask(text), text)
+    assert (got.status, got.tier) == ("published", "copied")
+
+
+@pytest.mark.parametrize(
+    ("amendment", "ask", "expected"),
+    [
+        ((("insert", "shall keep 30"),), (("insert", "may keep 30"),), ("may", "shall")),
+        ((("insert", "keep 30"),), (("insert", "keep 90"),), ("30", "90")),
+        ((("insert", "keep"), ("delete", "may")), (("insert", "keep"),), ()),
+        ((("delete", "not"),), (("delete", "never"),), ("never", "not")),
+        ((("insert", "keep logs"),), (("insert", "keep logs"),), ()),
+    ],
+)
+def test_cue_mismatch_compares_operations_both_sides_perform(
+    amendment: tuple[tuple[str, str], ...],
+    ask: tuple[tuple[str, str], ...],
+    expected: tuple[str, ...],
+) -> None:
+    mine = [_span(operation, text) for operation, text in amendment]
+    theirs = [_span(operation, text) for operation, text in ask]
+    assert cue_mismatch(mine, theirs) == expected
+    assert cue_mismatch(theirs, mine) == expected
