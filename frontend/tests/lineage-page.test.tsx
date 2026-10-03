@@ -452,3 +452,26 @@ test("clicking a graph node follows its paths and lists their evidence", async (
   fireEvent.click(within(section).getByRole("button", { name: "Back to the overview" }));
   expect(within(section).queryByRole("article")).toBeNull();
 });
+
+test("the Method tab walks the four steps with this law's own counts", async () => {
+  serve(view);
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  render(<LineagePage />);
+
+  await openTab("Method");
+  const method = await screen.findByRole("region", { name: "How this analysis works" });
+  expect(
+    within(method)
+      .getAllByRole("heading", { level: 4 })
+      .map((h) => h.textContent),
+  ).toEqual([
+    "Compare the two texts",
+    "Find the amendment",
+    "Find who said it first",
+    "Rank and check",
+  ]);
+  expect(within(method).getByText("103 new words")).toBeDefined();
+  expect(within(method).getByText("1 phrases from 1 amendments")).toBeDefined();
+  expect(within(method).getByText("1 of 5 documents")).toBeDefined();
+  expect(within(method).getByText("What this does not prove")).toBeDefined();
+});

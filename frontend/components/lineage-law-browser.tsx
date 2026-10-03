@@ -46,6 +46,7 @@ import {
   WhoShaped,
 } from "./lineage-insights";
 import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
+import { LineageMethod } from "./lineage-method";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
 /** Phrases shown before "Show more"; the AI Act has hundreds, and each card is tall. */
@@ -489,7 +490,7 @@ type Prepared =
   | { ok: false; error: string };
 
 /** One view at a time: the summary first, the detail only when the reader asks for it. */
-export type LawTab = "summary" | "who" | "how" | "graph" | "evidence" | "check";
+export type LawTab = "summary" | "who" | "how" | "graph" | "evidence" | "check" | "method";
 
 function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
   const [tab, setTab] = useState<LawTab>("summary");
@@ -534,6 +535,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
     { id: "graph", label: "Graph" },
     { id: "evidence", label: "Evidence" },
     { id: "check", label: "Check 3 links" },
+    { id: "method", label: "Method" },
   ];
   const card = (phrase: LineagePhraseRow) => <PhraseCard key={phrase.phraseId} phrase={phrase} />;
   return (
@@ -595,6 +597,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
         )}
         {tab === "evidence" && <Phrases lineage={lineage} />}
         {tab === "check" && <LinkCheck pool={pool} renderLink={card} />}
+        {tab === "method" && <LineageMethod view={view} />}
       </div>
       <details
         id="lineage-limits"
