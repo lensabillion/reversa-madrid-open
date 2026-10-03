@@ -53,9 +53,11 @@ METHOD_REVISION = "rules-3"
 # lower bound at or above each tier's floor; the held-out folds only check it. Copied (floor
 # 0.90): 97 of 101 correct on development (lower bound 0.9026), and 35 of 36 held out
 # (0.9722) but with a held-out lower bound of 0.8583, below the floor: too few held-out pairs
-# confirm it, so 0.75 is provisional. Reworded (floor 0.80): 104 of 119 on development (lower
-# bound 0.8024), 36 of 50 held out (0.72, lower bound 0.5833), so it is labelled but not
-# published until an audit shows otherwise. Proposals, not frozen values: the practice loop
+# confirm it, so 0.75 is provisional. Reworded (floor 0.80): the artifact's 104 of 119 and
+# 36 of 50 count every pair scoring 0.32 or more, copies included; on the tier's own band
+# [0.32, 0.75) the same file gives 7 of 18 on development and 1 of 14 held out, so 0.32 is
+# stale and the tier is labelled but never published until the artifact is regenerated and
+# an audit shows otherwise. Proposals, not frozen values: the practice loop
 # owner freezes them before the blind audit. Weak negatives, one law, mostly verbatim copies.
 COPIED_THRESHOLD = 0.75
 REWORDED_THRESHOLD = 0.32
