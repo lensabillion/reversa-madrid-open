@@ -288,3 +288,61 @@ Completion needs a real bundle of source texts/provenance, resolved actors, all 
 asks, published assessments, outcomes including unmatched/unknown asks, and coverage.
 Then rehearse three random published links and the five-minute presentation. No real
 any-law, model-quality, large-graph or final mobile-integration claim is made here.
+
+## Gate 3 Real-Data Check — 3 October 2026
+
+Gate 3 in `docs/plan.md` is **not passed**. Main `2fbb229` plus the bounded-ask fix
+`104e462` can build a real AI Act view from the completed collection, but publishes only
+**2 links**, below the required 20. Only those two can be read; the requested random
+sample of ten cannot be drawn. This check is separate from Gate 7's later two-reader,
+40-link blind audit. No scores, links or thresholds were edited to meet the target.
+
+The public collection contains 437 feedback records (133 roadmap and 304 proposal),
+352 downloaded attachments, 29,061 passages, 5,660 amendments (4,852 committee and
+808 plenary), and 1,088 articles (376 proposal and 712 final-act). Missing/extraction
+failures remain explicit, and consultation discovery used the labelled title fallback
+because the initiative index was absent. Official input URL/hash provenance is retained
+under ignored `data/raw/provenance/`. This is one law, not verified coverage since 2019.
+
+The refreshed full CLI failed after 459.815 seconds: five table-of-contents passages in
+one attachment exceeded the scorer's 800-token bound despite having fewer than 120
+whitespace words. `rev-g2bi` now checks each parsed ask against the existing `TextChange`
+contract before retrieval, preserves original source records, and reports excluded IDs
+and reasons. Direct assessment returns `insufficient_evidence` for unsupported asks.
+It does not truncate text or change valid scores or publication thresholds.
+
+A measured rebuild from the completed collection succeeded in **249.318 seconds** on
+an Apple M5 MacBook Air with 24 GB RAM: retrieval 221.605 seconds for 28,229 candidates,
+assessment 15.945 seconds, and outcome tracing 11.235 seconds. This cached service-level
+rebuild is not a fresh end-to-end CLI rerun. Collection run `20261003T123800Z` and the
+rebuild's separate source fingerprint are recorded in
+`data/laws/2021-0106-COD/gate3-build-timing-1791032235984379000.json`.
+The view contains 2 published links, 646 unconfirmed links, 11,357 contradicted links,
+and a graph of 7 nodes and 6 edges; other insufficient candidates are omitted by the
+existing view contract.
+
+`gate3-audit-seed0.json` beside that view records zero structural errors across 27
+published-link spans, 12 associated outcome spans, and 29 graph-edge spans checked
+against original source text. Four link source citations and two outcome source URLs
+are present. There are **zero final-act evidence spans for the published links**; their
+absence is not successful outcome verification. Seed zero selects both available links.
+
+Reading both links found the same AI definition matched to ITRE amendment 270. Philips'
+surrounding text attributes the definition to the AI High-Level Expert Group; Novartis'
+passage is a glossary definition. These are exact wording associations, not evidence of
+submission-specific origin. This agent plausibility review is not an independent human
+precision audit and is never fed back as hidden labels or edited scores.
+
+Remaining Gate 3 blockers include prose-aware, background-aware verification and a
+freshly evaluated threshold (`rev-nuk5`, `rev-zzur`), plus legal polarity (`rev-sbrp`):
+a reproduced permission-versus-obligation example is published at support 0.7843 by
+`rules-2`. The existing 0.75 cutoff is traceable to `evaluation/link-calibration.json`,
+but its held-out Wilson lower bound is 0.8583, not the 0.90 floor claimed in a source
+comment (`rev-ffsz`). Local-model evaluation in PR #48 does not activate a replacement
+runtime or establish reworded-link precision. Gate 3 remains open.
+
+The bounds-fix branch passed `make check`: 751 backend tests with 100% branch coverage
+(4,780 statements and 1,182 branches), 94 frontend tests across 12 files, production
+build, strict types, Ruff/Biome, six catalogs, and clean backend/frontend dependency
+audits. A deterministic punctuation-only outcome regression also makes an existing
+coverage branch independent of chance-based property-test generation.
