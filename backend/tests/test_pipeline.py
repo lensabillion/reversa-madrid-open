@@ -20,7 +20,7 @@ from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.repositories import hys
 from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, span_matches
-from influence.services import pipeline
+from influence.services import assessment, pipeline
 from influence.services.pipeline import PipelineError
 
 AI_ACT = "2021/0106(COD)"
@@ -85,6 +85,10 @@ def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path
         "Artificial Intelligence Act",
     )
     assert (view.ask_method, view.limitations) == (pipeline.ASK_METHOD, pipeline.LIMITATIONS)
+    # The scoring sentence names the revision and published tiers part 4 actually uses.
+    scoring = view.limitations[1]
+    assert f"({assessment.METHOD_REVISION})" in scoring
+    assert all(f"{tier}-tier" in scoring for tier in assessment.DEFAULT_PUBLISHABLE)
     assert view.coverage == view.bundle.laws[0].coverage
     assert view.generated_at == LATER
 
