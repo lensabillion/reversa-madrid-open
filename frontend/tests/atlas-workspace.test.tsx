@@ -109,7 +109,8 @@ test("keeps long warnings inside collapsed details and lets readers expand and c
     throw new Error("Data details disclosure missing");
   }
   expect(details.open).toBe(false);
-  expect(within(section).getByText(summary).closest("details")).toBeNull();
+  // The notice is one line until opened, so it never pushes the graph out of the first screen.
+  expect(within(section).getByText(summary).closest("details")).toBe(details);
   expect(within(section).getByText(warning).closest("details")).toBe(details);
   expect(within(section).getByText(notice).closest("details")).toBe(details);
   expect(screen.getByRole("region", { name: "Graph display" })).toBeDefined();
@@ -120,6 +121,46 @@ test("keeps long warnings inside collapsed details and lets readers expand and c
   expect(within(details).getByText(warning).textContent).toContain(identifier);
   fireEvent.click(toggle);
   expect(details.open).toBe(false);
+});
+
+test("keeps the investigation guide collapsed to one line above the graph", () => {
+  render(workspace());
+  const guide = screen.getByRole("list", { name: "How to read the investigation" });
+  const disclosure = guide.closest("details");
+  if (disclosure === null) {
+    throw new Error("Investigation guide disclosure missing");
+  }
+  expect(disclosure.open).toBe(false);
+  expect(disclosure.querySelector("summary")?.textContent).toBe("How does the investigation work?");
+  expect(within(disclosure).getByText(/We connect those requests/)).toBeDefined();
+});
+
+test("source layers follow a drawn graph and lead an empty one, whose emptiness they explain", () => {
+  const drawn: AtlasGraphSnapshot = {
+    snapshot_id: "drawn",
+    nodes: [{ node_id: "ask:a", kind: "ask", label: "Keep logs", record_id: "ask:a" }],
+    edges: [],
+  };
+  const { rerender } = render(
+    <AtlasWorkspace
+      snapshot={drawn}
+      links={links}
+      coverage={[]}
+      coverageNotes={[]}
+      dataNotice={{ summary: "Summary", details: [] }}
+      analysis={null}
+    />,
+  );
+  const graph = screen.getByRole("region", { name: "Graph display" });
+  const layers = screen.getByRole("region", { name: "Source layers" });
+  expect(graph.compareDocumentPosition(layers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  rerender(workspace());
+  const emptyGraph = screen.getByRole("region", { name: "Graph display" });
+  const emptyLayers = screen.getByRole("region", { name: "Source layers" });
+  expect(
+    emptyGraph.compareDocumentPosition(emptyLayers) & Node.DOCUMENT_POSITION_PRECEDING,
+  ).toBeTruthy();
 });
 
 test("graph callbacks open the exact link and a later graph selection replaces evidence selection", () => {
