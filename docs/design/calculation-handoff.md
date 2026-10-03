@@ -59,7 +59,7 @@ instead of selecting one supposed author. The default accepted-artifact set is e
 A caller must record the evaluation evidence that justifies adding an artifact.
 
 Evidence is bound to exact record hashes and model revisions. Publication audits also
-bind the corpus, feature order and calculation revision. Identifiers and hashes detect
+bind the corpus, feature order, calculation revision and reused assessor revision. Identifiers and hashes detect
 accidental reuse; they cannot establish that an asserted human audit really happened.
 The two-reader audit must actually be performed.
 
@@ -125,10 +125,40 @@ of the lexical incumbent is introduced.
 | Blind 40-link, two-reader audit | Sampling/Wilson reporting exists on main; publication binding is implemented. No real independent 2019+ audit has been completed by this work. |
 | Outcomes | Agent 2's merged `trace_outcomes` supplies Parliament/final wording survival. This work does not convert semantic similarity into a literal win. Reworded survival remains a separately proposed outcome. |
 | Ranking denominators and coalitions | Merged Agent 3 `atlas_analysis.py` counts distinct canonical requests; full/partial/not-observed/unknown remain separate, with no fractional causal credit. |
-| Spend residuals, rising-actor intervals and rolling forecasts | Separate part 7 deliverables (`rev-5yy6`, `rev-104q`), requiring dated spend/consultation/outcome data. They are not supplied by a pair-support calculation. |
-| Collected law → live explorer | Collection, graph consumer and explorer are merged. Wiring the full inference run, persisting artifacts and serving its snapshot remains the any-law integration (`rev-qn6b`); a synthetic graph is not a real-data rehearsal. |
+| Spend residuals, rising-actor intervals and rolling forecasts | PR #39 adds a cautious forecast baseline and rolling validation service; it is not wired into the Atlas view and has no real historical validation here. Spend/trend calculations still require dated data (`rev-5yy6`, `rev-104q`). |
+| Collected law → live explorer | PR #45 adds `influence atlas`, `atlas.json` and `/api/v1/atlas` views through the lexical assessor. PR #46 adds the frontend `/atlas` route; fitted-model integration remains missing (`rev-qn6b`). The review below identifies pipeline counting and publication gaps. |
 
 The operational acceptance sequence is: collect one complete law; freeze a fitted model
 and corpus; choose its cutoff using separate development groups; perform a tier-specific
 blind audit; enable only passing tiers; persist links and outcomes; build the graph;
 rehearse the any-law command. A missing gate is reported, not bypassed to fill the graph.
+
+
+## Review of Newly Merged Main `00033b1`
+
+PRs #37–45 add the reproducible LobbyPlag fetch, status-quo outcomes, forecast baseline,
+practice threshold experiment, fused lexical retrieval experiment, timezone data,
+copied-only default publication, corrected passage windows, and the Atlas command/API.
+The calculation branch incorporates them. Their existence does not mean every feature
+is connected in the running product:
+
+- `pipeline.build_view` uses BM25 top five and `assess_link` defaults. The new fitted
+  calculator, dense retrieval and forecast service are not called by that path.
+- At `00033b1`, the frontend `/atlas` route was absent. PR #46 subsequently adds it
+  and connects the view API. PR #47 fixes JSON Lines with U+2028 and reports long/empty
+  amendments as unsearchable. The current integrated main is `2fbb229`; the route gap
+  is superseded, while the counting/publication findings below still apply.
+- Pipeline rankings receive only displayed asks. Unmatched/insufficient asks are omitted,
+  aggregate coverage warnings are dropped, and unmatched asks are not traced directly to
+  final articles. Origin selection can prefer a later ineligible link. `rev-539s`.
+- Copied cutoff 0.75 has held-out point precision 35/36, but Wilson lower bound 0.8583,
+  below the proposed 0.90 floor. The source comment overstates the lower-bound result.
+  Runtime default publication does not enforce an independent audit. `rev-ffsz`.
+- PR #40's fixed-step five-feature combiner is retained as its historical comparison;
+  it is not the standardized, convergence-checked artifact used by `calculate_links`.
+  Both experiments reject automatic promotion. Shared fitting/interval infrastructure
+  should be consolidated with versioned re-evaluation, preserving the historical results.
+
+This PR does not silently replace the newly merged runtime with an unapproved model or
+claim its publication gates now govern that runtime. The plan's remaining integration
+work must establish one accepted, audited production path and an actual live-law view.

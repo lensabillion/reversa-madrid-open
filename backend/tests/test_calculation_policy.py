@@ -140,3 +140,11 @@ def test_changing_enabled_model_revision_invalidates_audit(
             entailment_model=("judge", "v2" if revision == "judge" else "v1"),
             entailment_decision="v2" if revision == "decision" else "v1",
         )
+
+
+def test_changing_base_assessor_invalidates_fitted_audit(
+    monkeypatch: pytest.MonkeyPatch, model: FittedCombiner, corpus: SignalCorpus
+) -> None:
+    original = model_digest(model, corpus)
+    monkeypatch.setattr("influence.services.calculation.ASSESSMENT_REVISION", "future-rules")
+    assert model_digest(model, corpus) != original

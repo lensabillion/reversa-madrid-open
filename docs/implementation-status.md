@@ -323,3 +323,21 @@ vulnerabilities in its 57-package audit. Generated grouped evaluation reports ar
 implementation hashes match the tested source. Baseline mean precision@20 is 0.9801;
 fitted deterministic/background is 0.9765, Qwen full-signals/NLI 0.9671 and E5 0.9718.
 No fitted replacement is activated. CI status and PR identity remain on the beads.
+
+
+### Follow-Up Main Review at `2fbb229`
+
+The calculation branch integrates PRs #37–47, including the Atlas command/API (#45),
+frontend `/atlas` route (#46), status-quo outcomes, cautious forecast baseline,
+calibration/retrieval experiments and the real-data JSON Lines/long-amendment fixes (#47).
+The whole gate passed after this integration: 941 backend tests, 100% coverage
+(5,310 statements, 1,386 branches), 94 frontend tests, production `/atlas` build and both
+audits clean. New calculation audit digests also bind the reused assessor revision.
+
+An initial real AI Act command stopped on missing raw input files. These have now been
+prepared from official downloads and existing public dumps with hash/URL provenance.
+A real run is in progress; successful live-law output is not yet claimed. A synthetic
+check measured five generated asks but only two in the view/ranking input, confirming
+`rev-539s`. Runtime publication's independent audit gap is `rev-ffsz`. The initial
+frontend 404 (`rev-13x8`) was on `00033b1`; PR #46 adds the route and its browser check
+is being repeated against the current backend. Final test findings follow below.

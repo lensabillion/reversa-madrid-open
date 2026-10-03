@@ -22,6 +22,7 @@ from influence.schemas.atlas import (
     span_matches,
 )
 from influence.schemas.scoring import TOKEN_PATTERN, ScoreRequest, TextChange
+from influence.services.assessment import METHOD_REVISION as ASSESSMENT_REVISION
 from influence.services.assessment import assess_link
 from influence.services.audit import AuditReport, wilson_interval
 from influence.services.calibration import FittedCombiner
@@ -45,6 +46,7 @@ def model_digest(
     """Bind audits/approval to fitted weights, corpus and every enabled model revision."""
     value = (
         METHOD,
+        ASSESSMENT_REVISION,
         model.model_dump(mode="json"),
         corpus.fingerprint,
         semantic_model,
