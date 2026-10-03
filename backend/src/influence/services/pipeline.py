@@ -14,6 +14,7 @@ outcome counts count passages, not distinct requests, and the view says so.
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import chain
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -49,6 +50,7 @@ from influence.services.assessment import DEFAULT_PUBLISHABLE, METHOD_REVISION, 
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.outcomes import trace_outcomes
+from influence.services.prose_match import rarity_weights
 from influence.services.retrieval import PassageIndex
 
 ASK_METHOD = "passage-v0"
@@ -204,8 +206,16 @@ def assess_candidates(
     amendments: Mapping[str, Amendment],
     asks: Mapping[str, Ask],
     texts: Mapping[str, str],
+    background: Iterable[str] = (),
+    publish_prose: bool = False,
 ) -> tuple[LinkAssessment, ...]:
-    """Part 4's verdict on every candidate, quoting the ask against its document's text."""
+    """Part 4's verdict on every candidate, quoting the ask against its document's text.
+
+    Word rarity is measured over the law's own passages and its provisions (`background`),
+    so a phrase every submission or the Act itself uses ("placed on the market") counts for
+    little against one that only a few use.
+    """
+    rarity = rarity_weights(chain((ask.span.text for ask in asks.values()), background))
     verdicts: list[LinkAssessment] = []
     for candidate in candidates:
         ask = asks[candidate.ask_id]
@@ -215,6 +225,8 @@ def assess_candidates(
                 ask,
                 texts[ask.document_id],
                 candidate_id=candidate.candidate_id,
+                rarity=rarity,
+                publish_prose=publish_prose,
             )
         )
     return tuple(verdicts)
@@ -269,7 +281,9 @@ def _rankings(
     )
 
 
-def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
+def build_view(
+    collected: Collected, *, generated_at: datetime, publish_prose: bool = False
+) -> AtlasView:
     """Run parts 3 to 7 and keep every record the shown links reach, and only those.
 
     The graph and the bundle are built from the same records, so the frontend adapter
@@ -282,7 +296,12 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
     texts = {text.document_id: text.text for text in collected.document_texts}
     unsearchable: list[str] = []
     links = assess_candidates(
-        find_candidates(collected.amendments, asks, unsearchable), amendments, asks_by_id, texts
+        find_candidates(collected.amendments, asks, unsearchable),
+        amendments,
+        asks_by_id,
+        texts,
+        (article.text for article in collected.articles),
+        publish_prose,
     )
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)

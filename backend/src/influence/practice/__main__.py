@@ -38,6 +38,7 @@ from influence.practice.labels import (
     PracticePair,
     build_practice_set,
 )
+from influence.practice.prose import prose_coverage_scores, prose_dice_scores
 from influence.repositories.lobbyplag import (
     DatasetInvalidError,
     DatasetUnavailableError,
@@ -138,6 +139,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             "LobbyPlag's stored match score (plags.json match), from the matcher that proposed "
             "every candidate; a sanity baseline, unavailable for the hidden test",
             stored_match_scorer(repository),
+        ),
+        "prose-dice": (
+            "The edit scorer's symmetric overlap with the proposal's new wording as an insertion "
+            "and its original treated as unknown: what the assessor computed for prose",
+            prose_dice_scores,
+        ),
+        "prose-phrase-coverage": (
+            "Rarity-weighted share of the amendment's inserted words that the proposal's new "
+            "wording repeats as phrases of three or more words (services/prose_match.py)",
+            prose_coverage_scores,
         ),
     }
     scores: dict[str, tuple[float, ...]] = {}
