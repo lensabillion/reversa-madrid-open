@@ -2,10 +2,12 @@
 
 The audit measures how often the links we publish are right, so labels live apart from the
 pipeline's output and nothing here changes a link, a score or a threshold. The sample is
-spread over (procedure, tier) in proportion to how many links each holds, so a large law or
-tier cannot hide a weak one, and it is a pure function of the links and the seed, so a
-reader can redraw it. `summarise` counts a link only when both readers agree; a link they
-split on is reported as unresolved, never decided for them. Linear in the number of links.
+spread over (procedure, tier) in proportion to how many links each holds, with at least one
+seat for every stratum, so a large law or tier cannot hide a small weak one, and it is a
+pure function of the links and the seed, so a reader can redraw it. `summarise` reports
+precision with every link the readers split on counted as incorrect, so disagreement cannot
+raise it; the precision among agreed links alone is kept beside it, labelled as such.
+Linear in the number of links.
 """
 
 import random
@@ -34,10 +36,13 @@ class AuditReport:
     correct: int
     unresolved: int
     unlabelled: int
+    # Correct over resolved plus unresolved: a split verdict counts as incorrect.
     precision: float | None
     low: float
     high: float
     by_tier: Mapping[str, tuple[int, int]]
+    # Correct over resolved only, leaving split verdicts out; biased upward, never the headline.
+    agreed_precision: float | None = None
 
 
 def wilson_interval(correct: int, total: int, z: float = Z_95) -> tuple[float, float]:
@@ -64,8 +69,10 @@ def draw_sample(
 ) -> tuple[LinkAssessment, ...]:
     """Draw `size` published links, spread over (procedure, tier) in proportion to its size.
 
-    Seats go by largest remainder, so the sample has exactly `size` links unless fewer are
-    published, in which case every published link is returned. Never samples a link that is
+    Seats go by largest remainder; then every stratum left without a seat takes one from the
+    stratum most over its exact share, so no stratum is left out. The sample has exactly
+    `size` links, unless fewer are published (every published link is returned) or there
+    are more strata than seats (one link from each stratum). Never samples a link that is
     not published. O(n log n) in the number of published links.
     """
     published = sorted(
@@ -83,6 +90,12 @@ def draw_sample(
         :spare
     ]:
         seats[key] += 1
+    for key in sorted(key for key, count in seats.items() if not count):
+        donors = [other for other, count in seats.items() if count > 1]
+        if donors:
+            donor = max(donors, key=lambda item: (seats[item] - exact[item], item))
+            seats[donor] -= 1
+        seats[key] += 1
     # Deliberate: a seeded, reproducible draw is the requirement; nothing here is secret.
     rng = random.Random(seed)  # noqa: S311
     chosen = [link for key in sorted(strata) for link in rng.sample(strata[key], seats[key])]
@@ -93,12 +106,14 @@ def summarise(
     sample: Sequence[LinkAssessment],
     labels: Mapping[str, Mapping[str, Verdict]],
 ) -> AuditReport:
-    """Precision among links both readers agree on, with its Wilson interval.
+    """Precision of the labelled links, with its Wilson interval.
 
     `labels` maps a link ID to each reader's verdict. A link outside the sample is an error
     (it would let a label audit something we did not draw); a sampled link with fewer than
-    two readers is unlabelled, and one the readers split on is unresolved. Neither counts
-    toward precision, and both are reported so a thin audit cannot look complete.
+    two readers is unlabelled, and one the readers split on is unresolved. An unresolved
+    link counts as incorrect in `precision` (dropping it would bias precision upward);
+    `agreed_precision` leaves it out. Unlabelled links count in neither, and both counts are
+    reported so a thin audit cannot look complete.
     """
     in_sample = {link.link_id: link for link in sample}
     stray = sorted(set(labels) - set(in_sample))
@@ -119,15 +134,17 @@ def summarise(
             tier = tiers[link.tier or ""]
             tier[0] += right
             tier[1] += 1
-    low, high = wilson_interval(correct, resolved)
+    judged = resolved + unresolved
+    low, high = wilson_interval(correct, judged)
     return AuditReport(
         sampled=len(in_sample),
         resolved=resolved,
         correct=correct,
         unresolved=unresolved,
         unlabelled=unlabelled,
-        precision=correct / resolved if resolved else None,
+        precision=correct / judged if judged else None,
         low=low,
         high=high,
         by_tier={tier: (counts[0], counts[1]) for tier, counts in sorted(tiers.items())},
+        agreed_precision=correct / resolved if resolved else None,
     )

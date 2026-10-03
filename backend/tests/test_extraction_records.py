@@ -20,6 +20,7 @@ from influence.schemas.atlas import (
     LawRecord,
     RunManifest,
     StageReceipt,
+    StageStatus,
 )
 
 FIXTURE = build_fixture()
@@ -27,15 +28,19 @@ STARTED = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
 INPUTS = input_hash("2099/0001(COD)", "revision-1")
 
 
-def saved(store: StageStore) -> StageReceipt:
+def saved(
+    store: StageStore,
+    status: StageStatus = "partial",
+    errors: tuple[str, ...] = ("1 attachment failed",),
+) -> StageReceipt:
     return store.save(
         "collect",
         INPUTS,
         {"amendments.jsonl": FIXTURE.amendments, "laws.jsonl": FIXTURE.laws},
-        status="partial",
+        status=status,
         seconds=1.25,
         counts={"amendments": 3},
-        errors=["1 attachment failed"],
+        errors=errors,
     )
 
 
@@ -92,10 +97,23 @@ def test_save_writes_files_and_a_receipt_with_relative_paths(tmp_path: Path) -> 
         store.read_output(receipt, "absent.jsonl", LawRecord)
 
 
+@pytest.mark.parametrize(
+    ("status", "errors"),
+    [("partial", ("CELLAR did not answer",)), ("partial", ()), ("complete", ("1 failed",))],
+)
+def test_load_never_reuses_a_stage_saved_partial_or_with_errors(
+    tmp_path: Path, status: StageStatus, errors: tuple[str, ...]
+) -> None:
+    # A gap caused by one bad run (a source down) must not outlive it: rerun the stage.
+    store = StageStore(tmp_path)
+    saved(store, status, errors)
+    assert store.load("collect", INPUTS) is None
+
+
 def test_load_reuses_only_an_intact_stage(tmp_path: Path) -> None:
     store = StageStore(tmp_path)
     assert store.load("collect", INPUTS) is None
-    receipt = saved(store)
+    receipt = saved(store, "complete", ())
     reused = store.load("collect", INPUTS)
     assert reused is not None
     assert reused.status == "reused"
@@ -107,7 +125,8 @@ def test_load_reuses_only_an_intact_stage(tmp_path: Path) -> None:
 
 def test_load_ignores_a_corrupt_receipt_and_a_deleted_output(tmp_path: Path) -> None:
     store = StageStore(tmp_path)
-    receipt = saved(store)
+    receipt = saved(store, "complete", ())
+    assert store.load("collect", INPUTS) is not None
     store.output_path(receipt.outputs[1]).unlink()
     assert store.load("collect", INPUTS) is None
     (store.stage_directory("collect", INPUTS) / "receipt.json").write_text("{", encoding="utf-8")

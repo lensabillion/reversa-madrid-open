@@ -1,21 +1,22 @@
-# Influence Graph Backend
+# Influence Atlas Backend
 
-This service provides the public GDPR evidence needed for the first Challenge 03 demo:
-browse amendments, inspect proposed changes alongside lobby submissions, and show the
-organizations and authors connected by historically verified links. An amendment is a
-proposed edit to a law; a submission records changes an organization requested.
+The Python service and pipeline behind our Influence Atlas entry (Reversa Challenge 03,
+[Atlas brief](../docs/brief/influence-atlas-challenge-brief.pdf)). The `influence`
+command collects one EU law's public record (proposal, amendments, final act,
+consultation feedback and its senders), proposes and verifies links from an
+organization's ask to an amendment, traces each ask to the final law, and writes a view
+per law under `data/laws/<procedure>/`, which the API serves to the explorer. Further
+commands list coordinated amendments, the channels a law was lobbied through and the
+direction of each amendment. The [Atlas explainer](../docs/explainer/influence-atlas-primer.md)
+explains the design from first principles; the
+[implementation status](../docs/implementation-status.md) records what is verified,
+decided and next.
 
-The [organizers' brief](../docs/brief/madrid-open-reversa-challenges.pdf), pages 12–15,
-also requires semantic influence scoring and adoption forecasting. This backend is the
-starting evidence demo and an executable lexical baseline. Its `influence submit` command
-writes the first competition CSV, `pairs.csv`, from the lexical comparison score; it does
-not yet deliver `proposals.csv`, a trained influence probability, or an adoption forecast.
-See the [primer](../docs/explainer/influence-graph-primer.md) for the broader design.
-See [implementation status](../docs/implementation-status.md) for verified capabilities,
-remaining competition work and handoff instructions.
+Parts of this backend were built for the superseded first brief and are kept where they
+still serve: the LobbyPlag (GDPR, 2013) evidence routes below, the lexical comparison that
+part 4 builds on, and the `influence submit` pairs command (see "Submission Command").
 The [frozen semantic experiment](evaluation/README.md) records the lexical baseline's
-failure cases and a local reranker comparison, including why it is not ready to replace
-production scoring.
+failure cases and a local reranker comparison.
 
 ## Run With Public Data
 
@@ -225,8 +226,13 @@ counts and timings are not measured yet.
 ## Atlas Command and View API (Parts 3 to 8)
 
 `influence atlas <law>` (`make atlas LAW='2021/0106(COD)'`) runs `influence collect`, then
-`services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. The
-pipeline adds no logic of its own; it calls each part's code in order:
+`services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. It
+also writes `coordinated.json`, the law's coordinated amendments (clusters of near-identical
+inserted wording tabled by Members of different political groups, `services/coordinated.py`,
+the same code and file as `influence coordinated <law>`), and prints one line with how many
+clusters span political groups. Both files are built before either is written, and the view
+is written last, so a listed law has the clusters of the same run beside it. The pipeline
+adds no logic of its own; it calls each part's code in order:
 
 | Step | Code | Writes into the view |
 | --- | --- | --- |
@@ -236,14 +242,30 @@ pipeline adds no logic of its own; it calls each part's code in order:
 | Outcomes | `services/outcomes.py` for each ask's strongest published or unconfirmed link | outcomes |
 | Graph | `services/atlas_graph.py` from the same records as the bundle | `snapshot` |
 | Counts | `services/atlas_analysis.py`, final-act rows in its order | `rankings` |
+| Mode labels | `services/modes.py` from the law's typed coverage and status | `modes` |
 
 The view keeps every record the shown links reach and nothing else, so the frontend
 adapter (`frontend/lib/atlas.ts`) re-validates exactly what the graph shows.
 
 | Endpoint | Answer |
 | --- | --- |
-| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links}]}` for every law with an `atlas.json` |
-| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): coverage, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links, cross_group_clusters}]}` for every law with an `atlas.json`. `cross_group_clusters` counts the clusters of the law's `coordinated.json` that span political groups, and is `null` when the law has no such file (not computed, which is not zero). 500 when a view or a clusters file on disk is invalid |
+| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): `coverage`, `modes`, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+| `GET /api/v1/atlas/{slug}/coordinated` | The `CoordinatedView` (`schemas/coordinated.py`), field names in snake_case: `counts`, `clusters` (each with `cross_group`, `political_groups`, `members` and their quoted `inserted` spans), the method's thresholds and `limitations`. 404 when the law has no `coordinated.json`; 422 for a malformed slug; 500 when the file on disk is invalid |
+
+`modes` holds the mode labels of [the plan, section 6](../docs/plan.md#6-typed-partial-results):
+what a gap in the law's layers means for a reader. Each is derived from the coverage rows
+part 1 recorded and from the law's status, never from an empty list:
+
+| Label | Applies when |
+| --- | --- |
+| `Contextual evidence, not textual` | The asks layer is `missing`, `not_collected`, `not_applicable`, has no row, or counted zero |
+| `No amendment stage` | Both the committee and the plenary amendment layers are `missing` or `not_applicable`, or counted zero. A layer that is `not_collected` is unknown and does not count as absent |
+| `Negotiation in progress` | The law's status is `ongoing` and its final act was not read (the layer is not `complete`, `partial` or `stale`) |
+| `Partial amendment coverage` | Either amendment layer is `partial` or `stale` |
+
+The plan's fifth label, "Not analysed (DE)", needs per-passage language counts the view does
+not carry yet and is not derived.
 
 The API reads the same data root as the command (`INFLUENCE_DATA_ROOT`, default the
 repository's `data/`; `create_app(atlas_data_root=...)` in tests).
@@ -253,10 +275,24 @@ ask, so outcome counts count passages, not distinct requests. Only copied-tier l
 published, at part 4's thresholds calibrated on LobbyPlag (one 2013 law), and their precision
 on new laws is unaudited; the sentence is built from `assessment.py`'s revision and tiers.
 Outcomes are traced only for asks with a published or
-unconfirmed link. Only quoted instructions carry a direction, so part 4's same-direction and
+unconfirmed link; rankings count only outcomes traced through published links. Only quoted instructions carry a direction, so part 4's same-direction and
 opposite-direction checks do not run on prose asks, and each prose link says so; when the
-proposal's text is missing, the view says its quotations were not masked. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
-timed.
+proposal's text is missing, the view says its quotations were not masked. Tested offline (`tests/test_pipeline.py`, `tests/test_modes.py`, and
+`tests/test_coordinated.py` for the clusters route). One real run (`measured`,
+3 October): `influence atlas '2021/0106(COD)'` on the AI Act finished in 310 s with the
+public downloads already cached (no uncached timing, one law only), and its `rules-3` view
+published 0 links (859 unconfirmed, 82 contradicted); see
+[implementation status](../docs/implementation-status.md).
+
+**Stale calibration artifacts.** `evaluation/link-calibration.json` (`link-calibration-v1`)
+and `evaluation/dense-meaning.json` (`dense-meaning-v1`) predate three practice-loop fixes:
+the reworded tier is now chosen and reported on its own band below the copied cut, identical
+inputs from different organizations now share one test fold, and the judge's and embedder's
+input cuts are counted. Their numbers (including the 0.32 reworded cut) are not current
+until regenerated: `make fetch-lobbyplag`, then `python -m influence.practice.calibrate` and,
+with the models fetched, `make evaluate-dense` (commands in the module docstrings). The fold
+change also touches every other fold-based result (`practice-results.json`,
+`calculation-*.json`): rerun `python -m influence.practice` and `benchmarks/calculation_plan.py`.
 
 ## Coordinated Amendments Command (Part 3)
 
@@ -295,6 +331,31 @@ changed group after tabling is listed under the later group (the AI Act's list s
 "Patriots for Europe Group", founded in 2024, on 2022 amendments). Members also agree
 wording among themselves, so a cluster shows shared wording, not its author. The clusters
 are not yet in `atlas.json` or the explorer.
+
+## Lineage Command (Outcome First)
+
+`influence lineage <law>` (`make lineage LAW='2021/0106(COD)'`) collects the law, then
+starts from the final act: every stretch of it that is not in the Commission's proposal and
+that an amendment's new text holds (a run of at least 8 words with an inserted word and 3
+of the law's rare words) is an adopted phrase, keyed by its place in the final act, so one
+stretch is never counted twice. It then searches the law's consultation documents (Have
+Your Say feedback and attachments, never the law's own texts) for the adopted wording and
+for wording amendments inserted that was not adopted. The output is
+`data/laws/<procedure>/lineage.json` (`schemas/lineage.py`, `LineageView`), written
+atomically, with `status`, `reason`, `counts`, `adopted_phrases`, `tabled_phrases`,
+`adoptions`, `origins`, `credits` and `limitations`.
+
+Counting follows `docs/plan.md` section 7. Every holder of a phrase is credited with the
+whole phrase and a shared one is flagged joint (no fractional credit); each credit carries
+the amendments adopted and the amendments tabled, so Members are ranked by rate per
+amendment tabled ("N of M"). An amendment with no resolved author is credited to the group
+or name it gives, and to the committee text only when no carrier of the phrase names an
+author. An author whose group is unknown credits no group (`phrases_without_group`). A
+document counts as an origin only when it is dated before every carrying amendment
+(`eligibility` "ask_first") and is not a citation. Without the proposal or the final act the
+view is `status: "unknown"` with its reason, and every count that could not be computed is
+null, never zero. `python -m influence.practice.lineage_review` draws a seeded uniform
+sample of phrases for two readers to label. Nothing in this view has been audited yet.
 
 ## Channels Command (Part 7, HOW)
 

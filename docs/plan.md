@@ -1,8 +1,9 @@
 # The Influence Atlas: Consolidated Execution Plan
 
-3 October 2026, Madrid. Tracked by bead `rev-f090`. Status: `proposed` until the project
-owner merges the pull request that adds this file; the eight-part architecture it builds
-on was agreed when the owner merged PR #21.
+3 October 2026, Madrid. Tracked by bead `rev-f090`. Status: `decided`: the owner merged
+the pull request that added this file to `main`, and bead `rev-f090` is closed. The
+eight-part architecture it builds on was agreed when the owner merged PR #21. Changes
+proposed after that merge are marked **Proposed** where they appear.
 
 On 3 October, three documents described our Challenge 03 entry. They were written in
 parallel and do not fully agree:
@@ -64,7 +65,7 @@ requirement below has an owner in this plan; the right column names where.
 | p. 6, rank | Ranked by real wins, by topic and by year | Part 7 rank with §7's counting; topics from Legislative Observatory subject codes |
 | p. 6, explain | What each actor says in public versus what it asks, and the playbook that wins | Gate 7b minimum, gate 10 in full |
 | p. 6, forecast | Who is rising and fading; which asks will land in laws negotiated now | Gate 9 with rolling time splits; open files need asks from Have Your Say and amendments from the EP after Parltrack's February 2026 cut-off (a stated risk) |
-| p. 6, hand-in | A graph explored live, a short public report on the five questions, a repository anyone can rerun | Gates 6, 8 and 11 |
+| p. 6, hand-in | A graph explored live, a short public report on the five questions, a repository anyone can rerun | Gates 6, 8 and 11. Decided by the team on 3 October: **no live frontend demo**; the explorer stays in the repository, but the demo does not depend on it |
 | p. 7, data | The EU record (register, meetings, Have Your Say, Legislative Observatory, amendments, HowTheyVote, EUR-Lex, LobbyFacts); public voice (websites, position papers, press releases, op-eds, social media, news through GDELT); then go global | The EU record: §5. Public voice: organizations' own websites, position papers and press releases, for a sample of actors. **Cut today, and said so in the report**: social media; GDELT (rate-limited from our network, `verified`); non-EU registers (the US disclosure API answered 403, `verified`) |
 | p. 7, "the magic is in the comparison" | What an actor says in public, what it asks, and what ends up in the law, side by side | The evidence card (part 8) plus gate 7b's public-voice cards for the actors with the strongest links |
 | p. 8, the bar | Every edge shows the ask, the amendment and the final article; wins "even when it is not who spends most"; positions and the playbook; the next years with reasons; a report a journalist could publish | Parts 4, 5 and 8; wins against spend (§4, part 7); forecasts with reasons (gate 9); the report outline in explainer §11 |
@@ -72,9 +73,10 @@ requirement below has an owner in this plan; the right column names where.
 | p. 10, rules | No data or labels handed out; public sources only; public repository with an open licence; teams of three or four; "your own models, editors and agents" | Labels are our own audit, kept apart; D6 before 19:30 (gate 11); the rules allow our own models, so D1 is the owner's call on cost and measured gain, not a rules question |
 | p. 11, the day | Demos at 19:30, five minutes each | The explainer's five-minute demo script (§11) and the cut lines in §8 |
 
-What the brief does not say, and we therefore treat as open: whether code written before
-today may be used ("nothing prepared, on purpose", `rev-qvmx`), and the exact meaning of
-"since 2019" (§10).
+What the brief does not say, and we therefore treat as open: the exact meaning of
+"since 2019" (§10). The other question, whether code written before today may be used
+("nothing prepared, on purpose", `rev-qvmx`), is answered: the organizers allow it
+(3 October; bead `rev-qvmx` closed).
 
 ## 3. What All Three Agree On
 
@@ -124,7 +126,7 @@ Rows the uploaded plan got right but under-specified say "Retained, with".
 | Stage runner | `@stage` decorator, Parquet cache, `--from <stage>` | Retained, with plain functions per part, outputs keyed by input hashes, a run manifest, and `--from` and `--refresh` flags | Same rerun behaviour without a framework |
 | Run outputs | One `out/<law>/` folder per law | Each run writes a fresh run directory and is marked complete only after every artifact validates | The submission command's two renames are not a transaction (design, PR #19 assessment) |
 | Configuration | `config.yaml` with defaults, including thresholds | Typed settings in Python, recorded in every run manifest; thresholds come from practice-loop output files, not defaults | A threshold must cite the evidence that set it (`AGENTS.md`, evaluation rule) |
-| Entry points | `atlas run --law X` | `influence collect <procedure>` and `influence atlas <query>` on the existing CLI; `make atlas`, `make atlas-sample` (`proposed` names) | One CLI, one install |
+| Entry points | `atlas run --law X` | `influence collect <procedure>` and `influence atlas <query>` on the existing CLI; `make atlas` (`make atlas-sample` was proposed and never built; the rerun path is `make setup && make atlas LAW='AI Act'`) | One CLI, one install |
 
 ### Part 1 · Collect
 
@@ -318,18 +320,23 @@ Madrid time, and the cut lines there apply.
 | Gate | Work | Beads | Done when | Target |
 | --- | --- | --- | --- | --- |
 | 0 | Background downloads; the two setup catalogs (§5) | `rev-pjk2` | Dossiers, MEPs, the Have Your Say index and the AI Act's texts and attachments are on disk with manifests | Started now |
-| 1 | Collect one law | `rev-pjk2`, `rev-xltz` | `influence collect 2021/0106(COD)` writes the bundle; counts match the research (4,852 amendments; 304 feedback items, 259 with attachments); a second procedure (for example 2022/0140(COD)) runs with no code change; missing layers are typed | 12:30 |
+| 1 | Collect one law | `rev-pjk2`, `rev-xltz` | `influence collect 2021/0106(COD)` writes the bundle; counts match the research at the proposal stage (4,852 committee amendments; 304 feedback items on the proposal). The real AI Act collection holds 437 feedback items in all (133 on the roadmap, 304 on the proposal) and 352 downloaded attachments; a second procedure (for example 2022/0140(COD)) runs with no code change; missing layers are typed | 12:30 |
 | 2 | Find candidates; coordinated amendments | `rev-aapn`, `rev-00x6`, `rev-637f` | Recall@20 on LobbyPlag reported for BM25, dense and fused; candidates for the AI Act; coordinated amendments listed from Parltrack alone | 13:00 |
 | 3 | Verify links | `rev-nuk5`, `rev-sbrp`, `rev-zzur`, `rev-jaig` | Every published span is an exact substring at its offsets; polarity tests pass; the threshold comes from a practice-loop file; at least 20 published AI Act links and 10 read at random; D1 decided on the measured reworded-link evidence | **13:30 checkpoint** |
 | 4 | Trace outcomes | `rev-uhpq` | Tests cover renumbered, partial, deletion, status-quo and unknown cases; Parliament position before final act | 14:30 |
 | 5 | Resolve actors; atlas graph | `rev-1vxz`, `rev-i006` | Two Register IDs are never merged; the graph is built only from published links and outcomes; every edge opens its evidence | 15:00 |
 | 6 | Any-law command and explorer | `rev-qn6b` | A teammate names a law not used in development; it appears with layer badges and no code change; cached and uncached times recorded with hardware | **15:00 cut line** |
-| 7 | Blind audit | `rev-sn3u` | 40 links, two readers, Wilson interval in the report; if short, the threshold moves for every link | 17:00 freeze |
+| 7 | Blind audit | `rev-sn3u` | 40 links, two readers, Wilson interval in the report; if short, the threshold moves for every link. **Proposed** re-scope: see the note below the table | 17:00 freeze |
 | 7b | Minimum answers to TOWARDS and HOW | `rev-rg6l` | TOWARDS: the direction of each top actor's asks (stricter, weaker, delete, delay, exempt) from its changes, and public-voice cards for 3–5 actors with strong links, the public quote beside the ask and the law, labelled as a sample with no automatic stance. HOW: counts computable from collected data (consultation stage, tabling MEPs and their groups, coalition asks, timing against the proposal and votes), meetings where loaded | 17:00 freeze |
 | 8 | Rank; report | `rev-5yy6`, `rev-fod0` | Every number in the report comes from a recorded query; rankings use §7's counting; each of the five questions has a number, a named actor or law, evidence links and a limitation | 17:00; report text until 18:30 |
 | 9 | Batch; forecast | `rev-0who`, `rev-104q` | Coverage banner from manifests; forecast on rolling time splits, or the rapporteur-draft rule as the labelled fallback | 17:00 freeze |
 | 10 | Explain in full: stance scoring over more actors, meetings, the playbook per actor | `rev-rg6l` | Each flag shows both quotes and a person checked it; the sample is labelled as a sample | Before 17:00, if time allows |
-| 11 | Release | `rev-nzqr`, `rev-p61s`, `rev-qvmx` | Licence and public repository (owner, D6); a fresh checkout reruns `make atlas-sample` | 18:30 code freeze |
+| 11 | Release | `rev-nzqr`, `rev-p61s`, `rev-qvmx` | Licence and public repository (owner, D6); a fresh checkout reruns `make setup && make atlas LAW='AI Act'`; the organizers allow code written before today (`rev-qvmx`, answered 3 October) | 18:30 code freeze |
+
+**Proposed (3 October, not decided): re-scope gate 7.** Audit a seeded random sample of
+*unconfirmed* prose links to set the prose threshold, because gate 3 needs a threshold that
+only an audit can give: the last real AI Act run (`rules-3`) published 0 links, so a blind
+audit of published links has nothing to sample. Only the project owner can adopt this.
 
 If a gate slips, the explainer's 15:00 cut line applies: keep about twelve flagship laws,
 keep the amendment layer for all of 2019–2026, badge multilingual scoring as off, use the
@@ -360,7 +367,8 @@ committed).
 - **D6**, licence and public repository (`rev-nzqr`): owner only.
 - **Scope of "since 2019"**: proposed as procedures with legislative activity since
   1 January 2019 (design).
-- **Organizer question** (`rev-qvmx`): may we use code written before today?
+- **Organizer question** (`rev-qvmx`), answered 3 October: code written before today
+  may be used.
 - **A graph-drawing library** for the explorer: its own pull request, if the evidence
   workspace needs one.
 

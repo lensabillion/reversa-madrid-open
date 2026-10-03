@@ -4,6 +4,7 @@ import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -17,7 +18,11 @@ from influence.schemas.atlas import (
     SourceSpan,
     span_matches,
 )
-from influence.services.outcomes import outcome_result, trace_outcomes
+from influence.services.outcomes import (
+    _word_set,  # pyright: ignore[reportPrivateUsage]
+    outcome_result,
+    trace_outcomes,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 
@@ -48,11 +53,14 @@ def test_fixture_outcomes_match_the_contract_examples() -> None:
         for r in _rows("outcomes.jsonl")
     }
     traced = _fixture_outcomes()
-    # Two examples differ on purpose. `a-acme` has no provision that lines up, which is
+    # Three examples differ on purpose. `a-acme` has no provision that lines up, which is
     # unknown here (failing to find the place is not proof the wording was lost), where the
-    # fixture says not_observed. `a-city` keeps the label "wording": its requested word
-    # survives verbatim, and only the surrounding scope changed; the fixture says reworded.
-    differ = {("ask:a-acme", "final_act"), ("ask:a-city", "final_act")}
+    # fixture says not_observed. `a-watch` is a statement that quotes no change, so there is
+    # no requested wording to look for: unknown, where the fixture says not_observed.
+    # `a-city` keeps the label "wording": its requested word survives verbatim, and only
+    # the surrounding scope changed; the fixture says reworded.
+    differ = {("ask:a-acme", "final_act"), ("ask:a-watch", "final_act")}
+    differ.add(("ask:a-city", "final_act"))
     for key, outcome in expected.items():
         got = traced[key]
         if key in differ:
@@ -63,6 +71,7 @@ def test_fixture_outcomes_match_the_contract_examples() -> None:
             outcome.article_id,
         ), key
     assert traced[("ask:a-acme", "final_act")].result == "unknown"
+    assert traced[("ask:a-watch", "final_act")].result == "unknown"
     city = traced[("ask:a-city", "final_act")]
     assert (city.result, city.article_id) == ("partial", "art:32099R0001:article-11-2")
 
@@ -70,7 +79,8 @@ def test_fixture_outcomes_match_the_contract_examples() -> None:
 def test_a_contradicted_ask_does_not_inherit_the_amendments_win() -> None:
     traced = _fixture_outcomes()
     watch = traced[("ask:a-watch", "final_act")]
-    assert (watch.relation, watch.result) == ("direct_to_final", "not_observed")
+    assert (watch.relation, watch.result) == ("direct_to_final", "unknown")
+    assert "No requested wording" in (watch.reason or "")
     assert ("ask:a-watch", "heard") not in traced
 
 
@@ -179,10 +189,11 @@ def test_no_aligned_provision_is_unknown() -> None:
     assert "lines up" in (final.reason or "")
 
 
-def test_an_unpublished_link_is_not_heard() -> None:
+def test_an_unconfirmed_link_is_unknown_at_heard_not_a_loss() -> None:
     amendment = _amendment(OLD, NEW)
     heard = trace_outcomes(_ask(NEW), amendment, _link(amendment, "unconfirmed"), [])[0]
-    assert (heard.result, heard.link_id, heard.relation) == ("not_observed", None, "via_amendment")
+    assert (heard.result, heard.link_id, heard.relation) == ("unknown", None, "via_amendment")
+    assert "unconfirmed" in (heard.reason or "")
 
 
 def test_requested_words_with_changed_surroundings_are_partial() -> None:
@@ -213,10 +224,19 @@ def test_a_deletion_wins_when_the_words_are_gone_and_loses_when_they_remain() ->
     assert won.spans
 
 
-def test_a_replacement_with_the_old_words_still_present_is_partial() -> None:
+def test_a_replacement_whose_whole_wording_survives_is_full() -> None:
     amendment = _amendment("The authority shall publish it.", "The authority may publish it.")
     versions = [_version("final_act", "The authority may publish it, and shall archive it.")]
     final = trace_outcomes(_ask("x"), amendment, _link(amendment), versions)[2]
+    assert (final.result, final.kind) == ("full", "wording")
+
+
+def test_a_replacement_with_the_old_words_still_in_place_is_partial() -> None:
+    amendment = _amendment("The authority shall publish it.", "The authority may publish it.")
+    final_text = "Each authority may publish it, and the authority shall publish it online."
+    final = trace_outcomes(
+        _ask("x"), amendment, _link(amendment), [_version("final_act", final_text)]
+    )[2]
     assert final.result == "partial"
     assert "removed" in (final.reason or "")
 
@@ -306,3 +326,124 @@ def test_a_keep_ask_is_never_traced_through_an_amendment() -> None:
     amendment = _amendment(OLD, NEW)
     outcomes = trace_outcomes(_keep_ask(), amendment, _link(amendment), [])
     assert [(o.stage, o.relation) for o in outcomes] == [("final_act", "direct_to_final")]
+
+
+# --- Regressions from the review of 3 October ----------------------------------------------
+
+REGISTER = (
+    "Member States shall maintain a register of all widget makers established on their territory."
+)
+
+
+@pytest.mark.parametrize("marker", ["deleted", " (Deleted) ", ""])
+def test_a_deletion_marker_is_never_read_as_requested_wording(marker: str) -> None:
+    # Parltrack writes a whole-provision deletion as new_text "deleted". A rejected deletion
+    # whose rewritten provision happens to contain the word "deleted" was once a full win.
+    old = "States shall maintain a register of widget makers and the register is public."
+    rewritten = "States shall maintain a register of widget makers; entries shall be deleted."
+    amendment = _amendment(old, marker)
+    versions = [_version("parliament_position", rewritten), _version("final_act", rewritten)]
+    outcomes = trace_outcomes(_ask("Remove the register."), amendment, _link(amendment), versions)
+    assert [(o.result, o.kind) for o in outcomes[1:]] == [("unknown", None)] * 2
+    assert all("rewritten" in (o.reason or "") for o in outcomes[1:])
+
+
+@pytest.mark.parametrize("marker", ["deleted", ""])
+def test_a_rejected_deletion_whose_provision_was_lightly_edited_is_not_observed(
+    marker: str,
+) -> None:
+    kept = REGISTER.replace("a register", "a public register")
+    amendment = _amendment(REGISTER, marker)
+    versions = [_version("parliament_position", REGISTER), _version("final_act", kept)]
+    outcomes = trace_outcomes(_ask("Drop the register."), amendment, _link(amendment), versions)
+    assert [(o.result, o.kind) for o in outcomes[1:]] == [("not_observed", None)] * 2
+    assert all(o.article_id for o in outcomes[1:])
+
+
+def test_a_deleted_provision_with_no_counterpart_is_labelled_as_likely_achieved() -> None:
+    amendment = _amendment(REGISTER, "deleted")
+    versions = [_version("final_act", "Providers shall keep technical logs for six months.")]
+    final = trace_outcomes(_ask("Drop the register."), amendment, _link(amendment), versions)[2]
+    assert (final.result, final.spans, final.article_id) == ("unknown", (), None)
+    assert (final.reason or "").startswith("Deletion likely achieved")
+
+
+def test_a_deletion_with_no_recorded_old_text_has_nothing_to_look_for() -> None:
+    amendment = _amendment(None, "deleted")
+    versions = [_version("final_act", REGISTER)]
+    final = trace_outcomes(_ask("Drop the register."), amendment, _link(amendment), versions)[2]
+    assert final.result == "unknown"
+    assert "No requested wording" in (final.reason or "")
+
+
+LOGS_OLD = "Providers shall keep logs and shall notify the authority."
+LOGS_NEW = "Providers shall keep logs and may notify the authority."
+
+
+def test_an_adopted_replacement_is_full_when_the_replaced_word_survives_elsewhere() -> None:
+    amendment = _amendment(LOGS_OLD, LOGS_NEW)
+    versions = [_version("parliament_position", LOGS_NEW), _version("final_act", LOGS_NEW)]
+    outcomes = trace_outcomes(_ask(LOGS_NEW), amendment, _link(amendment), versions)
+    assert [(o.result, o.kind) for o in outcomes[1:]] == [("full", "wording")] * 2
+
+
+def test_a_rejected_replacement_is_not_partial_because_the_new_word_appears_elsewhere() -> None:
+    old = "The authority shall publish the report. Operators may request a copy."
+    new = "The authority may publish the report. Operators may request a copy."
+    amendment = _amendment(old, new)
+    versions = [_version("parliament_position", old), _version("final_act", old)]
+    outcomes = trace_outcomes(_ask(new), amendment, _link(amendment), versions)
+    assert [o.result for o in outcomes[1:]] == ["not_observed"] * 2
+
+
+def test_a_fragment_deletion_with_rewritten_surroundings_is_partial() -> None:
+    amendment = _amendment(
+        "Providers shall keep logs and audit reports.", "Providers shall keep logs."
+    )
+    versions = [_version("final_act", "Providers shall store logs for audits.")]
+    final = trace_outcomes(_ask("x"), amendment, _link(amendment), versions)[2]
+    assert (final.result, final.kind) == ("partial", "deletion")
+    assert all(span_matches(span, versions[0].text) for span in final.spans)
+
+
+def test_a_statement_ask_has_no_requested_wording_to_trace() -> None:
+    final_text = "Providers of high-risk AI systems shall keep the logs for at least six months."
+    ask = _ask("We support the obligation that providers of high-risk AI systems keep the logs.")
+    (final,) = trace_outcomes(ask, None, None, [_version("final_act", final_text)])
+    assert (final.result, final.relation) == ("unknown", "direct_to_final")
+    assert "No requested wording" in (final.reason or "")
+    (blank,) = trace_outcomes(_ask("   "), None, None, [_version("final_act", final_text)])
+    assert (blank.result, blank.article_id) == ("unknown", None)
+    assert "No requested wording" in (blank.reason or "")
+
+
+TWO_INSTRUCTIONS = (
+    "Replace 'shall' with 'may' and delete 'automatically generated': providers of "
+    "high-risk AI systems may keep the logs."
+)
+
+
+def test_every_quoted_instruction_counts_and_honouring_some_is_partial() -> None:
+    some = "Providers of high-risk AI systems may keep the logs automatically generated."
+    every = "Providers of high-risk AI systems may keep the logs."
+    ask = _ask(TWO_INSTRUCTIONS)
+    (partial,) = trace_outcomes(ask, None, None, [_version("final_act", some)])
+    assert partial.result == "partial"
+    assert "removed" in (partial.reason or "")
+    (full,) = trace_outcomes(ask, None, None, [_version("final_act", every)])
+    assert (full.result, full.kind) == ("full", "wording")
+
+
+def test_provisions_are_tokenised_once_however_many_asks_are_traced() -> None:
+    versions = [
+        _version("final_act", f"Provision {index} sets duty {index} for operators.", str(index))
+        for index in range(50)
+    ]
+    ask = _ask("In Article 3, replace 'shall' with 'may': operators may set duty 3.")
+    trace_outcomes(ask, None, None, versions)
+    before = _word_set.cache_info()
+    for _ in range(5):
+        trace_outcomes(ask, None, None, versions)
+    after = _word_set.cache_info()
+    assert after.misses == before.misses
+    assert after.hits - before.hits >= 5 * len(versions)

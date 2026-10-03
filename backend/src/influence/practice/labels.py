@@ -97,8 +97,9 @@ def build_practice_set(repository: DemoRepository) -> PracticeSet:
 
     Identical inputs with opposite labels are excluded from the metrics: no scorer can rank
     one above the other, and at least one label must be wrong for that input. Identical
-    inputs with the same label stay, as separate historical pairs; the folds keep them
-    together. O(C log C) for C candidates (1,957 in the public snapshot).
+    inputs with the same label stay, as separate historical pairs; `make_folds` puts every
+    copy of one input in the same test fold, under either grouping, even when different
+    organizations submitted it. O(C log C) for C candidates (1,957 in the public snapshot).
     """
     outcomes: Counter[str] = Counter()
     labelled: list[LabelledPair] = []

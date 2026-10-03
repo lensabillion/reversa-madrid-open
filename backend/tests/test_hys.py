@@ -21,8 +21,12 @@ from influence.repositories.hys import (
     HysError,
     HysUnavailable,
     IndexEntry,
+    IndexFailure,
+    Publication,
+    com_references_in,
     crawl_index,
     download_url,
+    failures_path,
     feedback_records,
     feedback_url,
     fetch_attachment,
@@ -34,8 +38,10 @@ from influence.repositories.hys import (
     normalise_com_reference,
     parse_feedback,
     parse_hys_datetime,
+    read_failures,
     read_index,
     search_url,
+    write_failures,
     write_index,
 )
 
@@ -624,3 +630,108 @@ def test_attachment_that_cannot_be_downloaded_is_a_typed_error(tmp_path: Path) -
     item = parse_feedback(feedback(1), 14488)
     with pytest.raises(HysError, match="090166e5e1cd1796 not downloaded"):
         fetch_attachment(make_fetcher(tmp_path, {}), item.attachments[0], item, procedure_id=None)
+
+
+def test_a_citizens_attachment_never_publishes_its_file_name(tmp_path: Path) -> None:
+    named = [{"id": 1, "fileName": "Letter from Jeannette Example.pdf", "documentId": "D1"}]
+    citizen = feedback(
+        9, userType="EU_CITIZEN", organization=None, trNumber=None, attachments=named
+    )
+    item = parse_feedback(citizen, 14488)
+    body = make_pdf(("I support the proposal.",))
+    fetcher = make_fetcher(
+        tmp_path, {download_url("D1"): RawResponse(200, "application/pdf", body)}
+    )
+
+    document, text = fetch_attachment(fetcher, item.attachments[0], item, procedure_id=PROCEDURE)
+
+    assert document.title is None
+    assert text is not None
+
+
+def test_refresh_asks_the_feedback_and_the_attachment_again(tmp_path: Path) -> None:
+    item = parse_feedback(feedback(1), 14488)
+    attachment = item.attachments[0]
+    page = feedback_url(14488, 0)
+    download = download_url(attachment.document_id)
+    fetcher = make_fetcher(
+        tmp_path,
+        {
+            page: as_json(feedback_page([feedback(1)], last=True)),
+            download: RawResponse(200, "application/pdf", make_pdf(("Text.",))),
+        },
+    )
+    for refresh in (False, False, True):
+        list(iter_feedback(fetcher, 14488, refresh=refresh))
+        fetch_attachment(fetcher, attachment, item, procedure_id=PROCEDURE, refresh=refresh)
+
+    # Once from the source, once from the cache, and once more because of the refresh.
+    assert calls(fetcher) == [page, download, page, download]
+
+
+def test_every_com_reference_of_a_package_publication_finds_its_initiative() -> None:
+    package = "COM(2020)0825 and COM(2020)842 final"
+    assert com_references_in(package) == ("COM(2020)825", "COM(2020)842")
+    assert com_references_in("COM(2020)825; COM(2020)825") == ("COM(2020)825",)
+    assert com_references_in(None) == ()
+    assert normalise_com_reference(package) == "COM(2020)825"
+    publication = Publication(
+        publication_id=1,
+        type="PROP_REG",
+        reference=package,
+        com_reference="COM(2020)825",
+        total_feedback=None,
+        published_at=None,
+        adopted_at=None,
+        feedback_end_at=None,
+    )
+    # As an index built before every reference was kept: only the first one is listed.
+    entry = IndexEntry(
+        initiative_id=1,
+        short_title=None,
+        reference=None,
+        com_references=("COM(2020)825",),
+        publications=(publication,),
+    )
+    assert find_initiatives([entry], "COM(2020)842") == (entry,)
+    assert find_initiatives([entry], "COM(2020)825") == (entry,)
+    assert find_initiatives([entry], "COM(2020)900") == ()
+
+
+def test_crawled_initiative_lists_every_reference_of_its_publications(tmp_path: Path) -> None:
+    raw = initiative(7, [{"id": 2, "type": "PROP_REG", "reference": "COM(2020)825, COM(2020)842"}])
+    fetcher = make_fetcher(tmp_path, {initiative_url(7): as_json(raw)})
+    assert fetch_initiative(fetcher, 7).com_references == ("COM(2020)825", "COM(2020)842")
+
+
+def test_failed_initiatives_round_trip_beside_the_index(tmp_path: Path) -> None:
+    index = tmp_path / "hys-index.jsonl"
+    path = failures_path(index)
+    assert path == tmp_path / "hys-index.failed.jsonl"
+    assert read_failures(path) == ()
+    failures = (IndexFailure(initiative_id=404, error="HTTP 404"),)
+    assert write_failures(path, failures) == 1
+    assert read_failures(path) == failures
+    path.write_text("not json\n", encoding="utf-8")
+    with pytest.raises(HysError, match="failed initiatives"):
+        read_failures(path)
+
+
+def test_a_recoverable_pdf_is_read_rather_than_rejected(tmp_path: Path) -> None:
+    pdf = make_pdf(("We ask for a notice period of at least six months.",))
+    offset = pdf.rindex(b"startxref") + len(b"startxref\n")
+    end = pdf.index(b"\n", offset)
+    # An xref offset a few bytes off, as incremental saves and editors leave it.
+    shifted = pdf[:offset] + str(int(pdf[offset:end]) + 3).encode() + pdf[end:]
+    item = parse_feedback(feedback(1), 14488)
+    attachment = item.attachments[0]
+    fetcher = make_fetcher(
+        tmp_path,
+        {download_url(attachment.document_id): RawResponse(200, "application/pdf", shifted)},
+    )
+
+    document, text = fetch_attachment(fetcher, attachment, item, procedure_id=PROCEDURE)
+
+    assert document.extraction_status == "extracted"
+    assert text is not None
+    assert text.text == "We ask for a notice period of at least six months."

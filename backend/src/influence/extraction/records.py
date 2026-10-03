@@ -86,16 +86,22 @@ class StageStore:
                 raise RecordError(f"{output.path} no longer matches its receipt")
 
     def load(self, stage: str, inputs: str) -> StageReceipt | None:
-        """The receipt for these inputs when its outputs are intact, otherwise None.
+        """The receipt for these inputs when it is reusable, otherwise None.
 
-        A missing receipt and a receipt whose files changed both mean "run the stage":
-        the caller never has to tell them apart.
+        Reusable means saved `complete`, with no errors, and with its outputs intact. A
+        missing receipt, a receipt whose files changed, and a stage that was saved
+        partial or failed (a source was down, a request failed) all mean "run the stage
+        again": a gap caused by one bad run must not outlive it. Because only complete
+        receipts are reused, a returned receipt's `reused` status always stands for a
+        stage that was complete when it was saved.
         """
         path = self.stage_directory(stage, inputs) / RECEIPT_NAME
         try:
             receipt = StageReceipt.model_validate_json(path.read_bytes())
             self.verify(receipt)
         except OSError, ValidationError, RecordError:
+            return None
+        if receipt.status != "complete" or receipt.errors:
             return None
         return receipt.model_copy(update={"status": "reused"})
 

@@ -25,6 +25,7 @@ from influence.practice.calibrate import (
     main,
     render,
     signals,
+    tier_proposals,
     wilson_interval,
 )
 from influence.practice.labels import PracticePair
@@ -161,6 +162,59 @@ def test_a_proposal_is_none_when_no_threshold_clears_the_floor() -> None:
     assert ok.threshold is not None
     assert ok.development is not None
     assert ok.held_out == counts([], [], ok.threshold)
+    assert ok.below is None
+
+
+def test_counts_can_stop_below_an_upper_cut() -> None:
+    scores = [0.2, 0.5, 0.75, 0.9]
+    labels = [False, True, True, True]
+    assert counts(scores, labels, 0.5).pairs == 3
+    band = counts(scores, labels, 0.3, below=0.75)
+    assert (band.pairs, band.positives) == (1, 1)
+
+
+def test_the_reworded_tier_is_chosen_on_its_own_band_not_on_the_copies_above_it() -> None:
+    # Review finding: the reworded cut was chosen on every pair at or above it, copies
+    # included. Here 60 correct copies at 0.9 lift a band of 20 pairs at 0.5 that is right
+    # only 5 times: counted together they clear 0.80 (65 of 80); the band alone (5 of 20)
+    # never does, so the reworded tier gets no threshold.
+    scores = [0.9] * 60 + [0.5] * 20
+    labels = [True] * 60 + [True] * 5 + [False] * 15
+    together = choose_threshold(scores, labels, floor=0.7)
+    assert together is not None
+    assert together <= 0.5
+    copied, reworded = tier_proposals(scores, labels, list(range(80)), [])
+    assert copied.threshold is not None
+    assert 0.5 < copied.threshold <= 0.9
+    assert copied.below is None
+    assert reworded.below == copied.threshold
+    assert reworded.threshold is None
+    assert reworded.development is None
+
+
+def test_a_clean_band_below_the_copied_cut_gets_its_own_threshold() -> None:
+    # 40 sure copies at 0.9, a band of 200 at 0.5 that is right 176 times (0.88), and 40
+    # misses at 0.1; each entry is doubled so the even (development) and odd (held-out)
+    # indices see the same data. Copies and band together (216 of 240, 0.90) miss the copied
+    # floor, so the copied cut sits above the band, which then clears the reworded floor alone.
+    unique = [(0.9, True)] * 40 + [(0.5, True)] * 176 + [(0.5, False)] * 24 + [(0.1, False)] * 40
+    scores = [score for score, _ in unique for _ in range(2)]
+    labels = [label for _, label in unique for _ in range(2)]
+    development, held_out = list(range(0, len(scores), 2)), list(range(1, len(scores), 2))
+    copied, reworded = tier_proposals(scores, labels, development, held_out)
+    assert copied.threshold is not None
+    assert 0.5 < copied.threshold <= 0.9
+    assert reworded.threshold is not None
+    assert 0.1 < reworded.threshold <= 0.5
+    assert reworded.development is not None
+    assert reworded.held_out is not None
+    # Only the 0.5 band is counted, never the copies above it.
+    assert (reworded.development.pairs, reworded.development.positives) == (200, 176)
+    assert reworded.held_out == reworded.development
+
+
+def test_no_grid_threshold_at_or_above_the_upper_cut_is_tried() -> None:
+    assert choose_threshold([0.9] * 30, [True] * 30, floor=0.5, below=0.0) is None
 
 
 def _report(tmp_path: Path) -> CalibrationReport:
@@ -190,6 +244,8 @@ def test_the_report_compares_both_scorers_on_the_same_folds(tmp_path: Path) -> N
     for tiers in report.proposals.values():
         assert [tier.tier for tier in tiers] == ["copied", "reworded"]
         assert tiers[0].floor > tiers[1].floor
+        assert (tiers[0].below, tiers[1].below) == (None, tiers[0].threshold)
+    assert report.kind == "link-calibration-v2"
     assert set(report.combiner_weights_all_pairs) == {*FEATURES, "bias"}
     assert report.rule
     assert report.caveats
@@ -204,6 +260,7 @@ def test_print_covers_a_missing_threshold(
         floor=0.9,
         min_pairs=MIN_PAIRS,
         threshold=None,
+        below=None,
         development=None,
         held_out=None,
     )

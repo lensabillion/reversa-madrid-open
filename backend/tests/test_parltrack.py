@@ -536,3 +536,74 @@ def test_mep_actors_skips_and_counts_members_it_cannot_describe(tmp_path: Path) 
     assert [actor.mep_id for actor in actors] == [8]
     assert skipped == {"no_name": 1, "invalid": 1}
     assert list(parltrack.mep_actors(dump, [])) == []
+
+
+def switcher(mep_id: int = 197000) -> Record:
+    """A Member who moved from Renew to the EPP in July 2024."""
+    return {
+        "UserID": mep_id,
+        "Name": {"full": "Some MEP"},
+        "Groups": [
+            {"groupid": "Renew", "start": "2019-07-02T00:00:00", "end": "2024-07-15T00:00:00"},
+            {"groupid": "EPP", "start": "2024-07-15T00:00:00", "end": "9999-12-31T00:00:00"},
+            {"groupid": "NI", "start": None, "end": None},
+        ],
+    }
+
+
+def test_a_member_keeps_every_group_spell_and_the_group_on_a_day_is_the_one_then(
+    tmp_path: Path,
+) -> None:
+    dump = write_dump(tmp_path / "ep_meps.json.zst", [switcher()])
+
+    (member,) = parltrack.mep_members(dump, [197000])
+
+    # The actor shows the latest group; an amendment tabled in 2022 was tabled by Renew.
+    assert member.actor.political_group == "EPP"
+    spells = member.groups
+    assert parltrack.group_on(spells, date(2022, 1, 25)) == "Renew"
+    assert parltrack.group_on(spells, date(2025, 1, 1)) == "EPP"
+    # The day both spells cover: the one that started last wins, not the undated one.
+    assert parltrack.group_on(spells, date(2024, 7, 15)) == "EPP"
+    assert parltrack.group_on(spells, None) is None
+    assert parltrack.group_on(spells[:2], date(2010, 1, 1)) is None
+    assert parltrack.group_on(spells[2:], date(2010, 1, 1)) == "NI"
+
+
+def test_author_groups_align_with_the_authors_and_stay_out_of_json_when_empty(
+    tmp_path: Path,
+) -> None:
+    dump = write_dump(tmp_path / "ep_amendments.json.zst", [committee_record()])
+    (amendment,) = parltrack.committee_amendments(dump, AI_ACT, RETRIEVED_AT)
+    # Written before the field existed: the bytes, and so the stage hashes, are unchanged.
+    assert "author_groups" not in amendment.model_dump_json()
+    annotated = amendment.model_copy(update={"author_groups": ("Renew", None)})
+    assert Amendment.model_validate_json(annotated.model_dump_json()) == annotated
+    with pytest.raises(ValueError, match="align with author_ids"):
+        Amendment.model_validate({**amendment.model_dump(), "author_groups": ["Renew"]})
+
+
+def test_lone_surrogates_are_replaced_so_the_records_can_be_written(tmp_path: Path) -> None:
+    record = committee_record(
+        new=["Emoji half \ud83d here"], authors="Name \udc00 X", justification="J \ud800"
+    )
+    # Escaped as JSON writes it: the dump holds `\ud83d`, which decodes to a lone surrogate.
+    dump = write_lines(tmp_path / "ep_amendments.json.zst", ["[" + json.dumps(record), "]"])
+
+    (amendment,) = parltrack.committee_amendments(dump, AI_ACT, RETRIEVED_AT)
+
+    assert amendment.new_text == "Emoji half � here"
+    assert amendment.author_names == ("Name � X",)
+    assert amendment.justification == "J �"
+    assert amendment.model_dump_json().encode("utf-8")
+
+
+def test_latest_date_is_how_far_a_dump_reaches(tmp_path: Path) -> None:
+    dump = write_dump(
+        tmp_path / "ep_amendments.json.zst",
+        [committee_record(), committee_record(id="X", date="2026-09-01T00:00:00"), {"id": 1}],
+    )
+    assert parltrack.latest_date(dump) == date(2026, 9, 1)
+    assert parltrack.latest_date(write_dump(tmp_path / "none.json.zst", [{"id": 1}])) is None
+    with pytest.raises(ParltrackError, match="unreadable Parltrack dump"):
+        parltrack.latest_date(tmp_path / "absent.json.zst")

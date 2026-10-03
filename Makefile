@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -64,8 +64,7 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
 
-# The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
-# EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
+# The any-law command: collect, then parts 3 to 7, into data/laws/<procedure>/atlas.json.
 atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
 	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
 	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
@@ -84,6 +83,11 @@ coordinated:  ## List near-identical amendments tabled across political groups: 
 	$(if $(LAW),,$(error LAW is required: make coordinated LAW='2021/0106(COD)'))
 	$(BACKEND) influence coordinated "$(LAW)" $(ARGS)
 
+# Lineage, outcome-first: the final act's new wording traced to amendments and documents.
+lineage:  ## Trace one law's adopted wording to its amendments and documents: make lineage LAW='2021/0106(COD)' [ARGS=--no-attachments]
+	$(if $(LAW),,$(error LAW is required: make lineage LAW='2021/0106(COD)'))
+	$(BACKEND) influence lineage "$(LAW)" $(ARGS)
+
 channels:  ## Count the channels one law was lobbied through: make channels LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make channels LAW='2021/0106(COD)'))
 	$(BACKEND) influence channels "$(LAW)" $(ARGS)
@@ -93,6 +97,9 @@ directions:  ## Count which way amendments and actors' asks move a law: make dir
 	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
 	$(BACKEND) influence directions "$(LAW)" $(ARGS)
 
+# First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
+# made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
+# (60) stays the one copy.
 submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
 	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))

@@ -9,16 +9,18 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from hypothesis import given
 from hypothesis import strategies as st
 from test_collect import make_world, scripted_cli
 from test_parltrack import committee_record, mep_record, write_dump
 
 from influence import cli
+from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.schemas.atlas import Actor, Amendment, LawRecord, span_matches
 from influence.schemas.coordinated import CoordinatedView
-from influence.services import coordinated
+from influence.services import coordinated, pipeline
 from influence.services.pipeline import PipelineError
 
 AI_ACT = "2021/0106(COD)"
@@ -341,6 +343,30 @@ def test_the_view_records_its_method_and_round_trips_through_its_file(tmp_path: 
     assert CoordinatedView.model_validate_json(path.read_bytes()) == view
 
 
+def test_clusters_are_read_back_by_slug_and_a_broken_file_is_an_error(tmp_path: Path) -> None:
+    assert coordinated.read_coordination(tmp_path, SLUG) is None
+    assert coordinated.cross_group_clusters(tmp_path, SLUG) is None
+    bundle = tmp_path / "laws" / SLUG
+    bundle.mkdir(parents=True)
+    amendments = [
+        amendment("PE1-1", authors=(1,)),
+        amendment("PE1-2", authors=(2,)),
+        # A second cluster, tabled twice by one group: built, and not counted as crossing.
+        amendment("PE1-3", " ".join(f"other{n}" for n in range(30)), authors=(1,)),
+        amendment("PE1-4", " ".join(f"other{n}" for n in range(30)), authors=(3,)),
+    ]
+    view = coordinated.build_coordination(law(), "run-1", amendments, MEPS, generated_at=LATER)
+    coordinated.write_coordination(view, bundle)
+
+    assert coordinated.read_coordination(tmp_path, SLUG) == view
+    assert [cluster.cross_group for cluster in view.clusters] == [True, False]
+    assert coordinated.cross_group_clusters(tmp_path, SLUG) == 1
+
+    (bundle / coordinated.VIEW_FILE).write_text("{}")
+    with pytest.raises(coordinated.CoordinationError, match="invalid"):
+        coordinated.read_coordination(tmp_path, SLUG)
+
+
 def coordinated_world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`test_collect`'s world with the draft tabled by a PPE and an S&D Member."""
     world = make_world(tmp_path)
@@ -414,3 +440,93 @@ def test_the_command_keeps_the_bundle_when_the_clusters_cannot_be_written(
     )
     assert StageStore(tmp_path / "laws" / SLUG).current() is not None
     assert not (tmp_path / "laws" / SLUG / coordinated.VIEW_FILE).exists()
+
+
+# --- The atlas command and the API -----------------------------------------------------------
+
+
+def test_the_atlas_command_writes_the_clusters_beside_the_view_and_the_api_serves_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    coordinated_world(tmp_path, monkeypatch)
+
+    status = cli.main(["atlas", AI_ACT, "--data-root", str(tmp_path)])
+
+    output = capsys.readouterr().out
+    path = tmp_path / "laws" / SLUG / coordinated.VIEW_FILE
+    assert status == 0
+    assert (
+        "Coordinated amendments: 1 of 1 clusters span political groups "
+        "(4 amendments: 2 compared, 2 too short, 0 not comparable)\n"
+    ) in output
+    assert f"clusters: {path}\n" in output
+    written = CoordinatedView.model_validate_json(path.read_bytes())
+    view = pipeline.read_view(tmp_path, SLUG)
+    assert view is not None
+    # One run, one clock: the clusters belong to the view they are served beside.
+    assert (written.run_id, written.generated_at) == (view.run_id, view.generated_at)
+
+    client = TestClient(create_app(atlas_data_root=tmp_path))
+    served = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
+    assert served.status_code == 200
+    body = served.json()
+    assert CoordinatedView.model_validate(body) == written
+    assert set(body) == {
+        "schema_version",
+        "procedure_id",
+        "slug",
+        "title",
+        "run_id",
+        "generated_at",
+        "method",
+        "min_inserted_words",
+        "shingle_words",
+        "similarity_threshold",
+        "counts",
+        "clusters",
+        "limitations",
+    }
+    (cluster,) = body["clusters"]
+    assert (cluster["cross_group"], cluster["political_groups"]) == (True, ["PPE", "S&D"])
+    assert set(cluster["members"][0]) == {
+        "amendment_id",
+        "stage",
+        "committee",
+        "tabled_on",
+        "target_provision",
+        "author_ids",
+        "author_names",
+        "political_groups",
+        "inserted",
+    }
+    (listed,) = client.get("/api/v1/atlas").json()["laws"]
+    assert (listed["slug"], listed["cross_group_clusters"]) == (SLUG, 1)
+
+
+def test_the_api_answers_unknown_malformed_and_broken_clusters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = TestClient(create_app(atlas_data_root=tmp_path))
+
+    missing = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
+    assert missing.status_code == 404
+    assert missing.json()["detail"] == (
+        f"No coordinated amendments for {SLUG}: run `make atlas LAW=...` for that law first"
+    )
+    assert client.get("/api/v1/atlas/not-a-law/coordinated").status_code == 422
+
+    coordinated_world(tmp_path, monkeypatch)
+    assert cli.main(["atlas", AI_ACT, "--data-root", str(tmp_path)]) == 0
+    (tmp_path / "laws" / SLUG / coordinated.VIEW_FILE).write_text("{}")
+    broken = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
+    assert broken.status_code == 500
+    assert "are invalid" in broken.json()["detail"]
+    # A broken cluster file leaves the law listed with an unknown count, and says why.
+    listing = client.get("/api/v1/atlas")
+    assert listing.status_code == 200
+    (listed,) = listing.json()["laws"]
+    assert (listed["slug"], listed["cross_group_clusters"]) == (SLUG, None)
+    (invalid,) = listing.json()["invalid"]
+    assert invalid["slug"] == SLUG
+    assert "are invalid" in invalid["reason"]
+    assert client.get(f"/api/v1/atlas/{SLUG}").status_code == 200

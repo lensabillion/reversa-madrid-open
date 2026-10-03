@@ -31,7 +31,7 @@ practice-loop evidence first. The cue lists here are phrase-aware versions of it
 
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -294,14 +294,30 @@ def _example(amendment: Amendment, reading: Reading) -> DirectionExample | None:
 
 
 def _actor_directions(
-    atlas: AtlasView | None,
+    atlas: AtlasView | None, run_id: str, current: Mapping[str, Amendment]
 ) -> tuple[ActorsStatus, str | None, tuple[ActorDirections, ...]]:
-    """Directions per asking actor, read only through the view's published links."""
+    """Directions per asking actor, read only through the view's published links.
+
+    The view must fit the collect run (`run_id`) whose amendments are counted beside it.
+    Every command collects again, so a later run of unchanged records is normal; a view of
+    another run is used only when every amendment it carries is unchanged in `current`,
+    and otherwise its links would be mixed with newer amendments.
+    """
     if atlas is None:
         return (
             "no_atlas_view",
             "No atlas view exists for this law; run `influence atlas` first. Actor "
             "directions are read only through published links.",
+            (),
+        )
+    if atlas.run_id != run_id and any(
+        current.get(amendment.amendment_id) != amendment for amendment in atlas.bundle.amendments
+    ):
+        return (
+            "stale_atlas_view",
+            f"The atlas view was built from collect run {atlas.run_id}, not the current run "
+            f"{run_id}, and amendments it carries have changed since; run `influence atlas` "
+            "again. Actor directions are read only from a view of the same records.",
             (),
         )
     published = sorted(
@@ -384,7 +400,9 @@ def build_directions(
         if example is not None and direction not in examples:
             examples[direction] = example
     reasons = Counter(reading.unknown_reason for reading in readings)
-    status, reason, actor_rows = _actor_directions(atlas)
+    status, reason, actor_rows = _actor_directions(
+        atlas, run_id, {amendment.amendment_id: amendment for amendment in ordered}
+    )
     members = sorted(by_member.items(), key=lambda item: (-len(item[1]), item[0]))
     return DirectionsView(
         procedure_id=law.procedure_id,

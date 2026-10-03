@@ -15,9 +15,14 @@ from influence.schemas.retrieval import PassageChange
 _OPEN = "\"'\N{LEFT SINGLE QUOTATION MARK}\N{LEFT DOUBLE QUOTATION MARK}"
 _CLOSE = "\"'\N{RIGHT SINGLE QUOTATION MARK}\N{RIGHT DOUBLE QUOTATION MARK}"
 _QUOTES = _OPEN + _CLOSE
-# A quoted fragment starts and ends on a non-space and holds no quotation mark, so an
-# apostrophe inside a fragment ends it early and the instruction is left unclassified.
-_FRAGMENT = rf"[{_OPEN}](?P<{{name}}>[^{_QUOTES}\s](?:[^{_QUOTES}]*[^{_QUOTES}\s])?)[{_CLOSE}]"
+# A quoted fragment starts and ends on a non-space and holds no quotation mark. Its closing
+# mark must not be followed by a letter: in "the provider's obligation" the apostrophe is not
+# a closing quote, and reading 'the provider' as the whole fragment would invent an
+# instruction. Such a passage is left unclassified rather than cut short.
+_FRAGMENT = (
+    rf"[{_OPEN}](?P<{{name}}>[^{_QUOTES}\s](?:[^{_QUOTES}]*[^{_QUOTES}\s])?)[{_CLOSE}]"
+    r"(?![^\W\d_])"
+)
 
 
 def _fragment(name: str) -> str:
@@ -29,6 +34,16 @@ _INSTRUCTION = re.compile(
     rf"\s+(?:with|by|to)\s+{_fragment('new')}"
     rf"|(?P<delete>delete|remove|strike)\s+{_fragment('gone')}"
     rf"|(?P<insert>insert|add)\s+{_fragment('added')})",
+    re.IGNORECASE,
+)
+# A sentence ends at . ! ? or ; followed by a space or a line feed, or at a line feed.
+_SENTENCE_END = re.compile("[.!?;][ \N{LINE FEED}]|\N{LINE FEED}")
+# Words that turn an instruction into its opposite when they precede it in the same sentence:
+# "we oppose any proposal to insert 'X'", "please do not delete 'X'". The list is
+# deliberately broad; a false hit only withholds publication, a miss publishes a reversal.
+_OPPOSITION = re.compile(
+    r"\b(?:not|no|never|cannot|\w+n['\N{RIGHT SINGLE QUOTATION MARK}]t|oppos\w*|reject\w*"
+    r"|against|object(?:s|ed|ing)?\s+to|objection|avoid\w*|refrain\w*)\b",
     re.IGNORECASE,
 )
 
@@ -75,3 +90,24 @@ def read_changes(passage: str) -> tuple[PassageChange, ...]:
             text=stripped,
         ),
     )
+
+
+def opposed_sentence(passage: str, change: PassageChange) -> tuple[int, int] | None:
+    """The sentence holding `change`, when an opposition cue precedes the instruction in it.
+
+    Returns the sentence's half-open offsets in `passage` (trimmed of surrounding blanks) so
+    a caller can quote the whole sentence, "do not" included, or None when no cue precedes.
+    A statement is never an instruction, so it has no opposition to read. Linear in the
+    passage length.
+    """
+    if change.kind == "statement":
+        return None
+    start = max((end.end() for end in _SENTENCE_END.finditer(passage, 0, change.start)), default=0)
+    if not _OPPOSITION.search(passage, start, change.start):
+        return None
+    ender = _SENTENCE_END.search(passage, change.end)
+    end = len(passage) if ender is None else ender.start() + 1
+    sentence = passage[start:end]
+    stripped = sentence.strip()
+    first = start + sentence.index(stripped)
+    return first, first + len(stripped)

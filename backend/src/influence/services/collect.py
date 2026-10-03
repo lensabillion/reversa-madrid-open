@@ -8,11 +8,13 @@ passages; the Transparency Register resolves who sent them. Nothing here names a
 procedure number, CELEX, COM reference, common name or title all take the same path.
 
 Every stage saves through `StageStore`, keyed by its inputs and the source revision, so a
-rerun reuses finished work and a code change redoes it. Each stage also saves a partial
-`LawRecord` with the identifiers it learned and the coverage of its layers, so a reused
-stage still reports its gaps. A missing required input stops the run before any work; an
-optional source that fails becomes a labelled gap (plan §6). The run manifest is
-published last, after every output re-verifies.
+rerun reuses finished work and a code change redoes it. Only a stage saved complete is
+reused: one that a failed request left partial is built again on the next run. Each
+stage also saves a partial `LawRecord` with the identifiers it learned and the coverage
+of its layers, so a reused stage still reports the gaps its source has. A missing
+required input stops the run before any work; an optional source that fails becomes a
+labelled gap (plan §6). The run manifest is published last, after every output
+re-verifies.
 """
 
 import hashlib
@@ -27,6 +29,7 @@ from typing import Self
 
 from influence.extraction.cache import request_key
 from influence.extraction.fetching import CachedFetcher
+from influence.extraction.files import write_bytes_atomic
 from influence.extraction.layout import procedure_slug
 from influence.extraction.records import StageStore, input_hash
 from influence.repositories import cellar, hys, parltrack
@@ -34,6 +37,7 @@ from influence.repositories.parltrack import ParltrackError, ProcedureEntry
 from influence.repositories.register import RegisterError, iter_register
 from influence.schemas.atlas import (
     Actor,
+    Amendment,
     ArticleStage,
     ArticleVersion,
     AtlasRecord,
@@ -450,7 +454,33 @@ def _retrieved_at(path: Path) -> datetime:
     return datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
 
 
-def _amendment_coverage(layer: Layer, count: int, ongoing: bool) -> LayerCoverage:
+def dump_reach(path: Path, sha256: str, directory: Path) -> date | None:
+    """The latest date in an amendments dump, scanned once per dump file and cached.
+
+    The cache file is named by the dump's hash, like the procedure catalog; "none" is
+    stored for a dump that states no date. One scan is linear in the dump's size.
+    """
+    cached = directory / f"reach-{sha256[:16]}.txt"
+    try:
+        stored = cached.read_text(encoding="ascii").strip()
+    except OSError:
+        try:
+            reach = parltrack.latest_date(path)
+        except ParltrackError as error:
+            raise CollectError(f"A Parltrack dump is unreadable: {error}") from error
+        write_bytes_atomic(cached, (reach.isoformat() if reach else "none").encode("ascii"))
+        return reach
+    return None if stored == "none" else date.fromisoformat(stored)
+
+
+def _amendment_coverage(
+    layer: Layer, count: int, ongoing: bool, reach: Callable[[], date | None], active: date | None
+) -> LayerCoverage:
+    """`reach` is asked only when it decides: amendments found on a finished procedure.
+
+    `active` is the procedure's last activity in the dossiers dump. A dump that ends
+    before it may lack the amendments tabled after its end, so the layer is partial.
+    """
     stage = "committee" if layer == "committee_amendments" else "plenary"
     if count == 0:
         reason = f"No {stage} amendments for this procedure in the Parltrack dump"
@@ -458,6 +488,15 @@ def _amendment_coverage(layer: Layer, count: int, ongoing: bool) -> LayerCoverag
     if ongoing:
         reason = "Procedure ongoing: the dump may predate later amendments"
         return LayerCoverage(layer=layer, status="partial", count=count, reason=reason)
+    if active is not None:
+        ends = reach()
+        if ends is None or ends < active:
+            reason = (
+                f"The Parltrack {stage} amendments dump ends on {ends or 'an unknown date'}, "
+                f"before the procedure's last activity on {active}: later amendments may "
+                "be absent"
+            )
+            return LayerCoverage(layer=layer, status="partial", count=count, reason=reason)
     return LayerCoverage(layer=layer, status="complete", count=count)
 
 
@@ -484,9 +523,12 @@ def _amendments(run: _Run, dumps: Sequence[SourceDocument]) -> _Built:
                 if author.startswith(_MEP_PREFIX)
             }
         )
-        found = tuple(parltrack.mep_actors(run.inputs.meps, mep_ids, skipped))
+        members = tuple(parltrack.mep_members(run.inputs.meps, mep_ids, skipped))
     except ParltrackError as error:
         raise CollectError(f"A Parltrack dump is unreadable: {error}") from error
+    found = tuple(member.actor for member in members)
+    spells = {member.actor.actor_id: member.groups for member in members}
+    committee, plenary = _with_groups(committee, spells), _with_groups(plenary, spells)
     named = {actor.mep_id for actor in found}
     # An author the MEP dump lacks keeps an identity, so no amendment cites a missing actor.
     unnamed = tuple(
@@ -501,10 +543,28 @@ def _amendments(run: _Run, dumps: Sequence[SourceDocument]) -> _Built:
         if mep_id not in named
     )
     meps = (*found, *unnamed)
+    # A completed law takes amendments until Parliament's work ends, not until the latest
+    # implementation document; any other law may still be amended at its last activity.
+    entry = run.law.entry
+    active = (entry.completed_on or entry.last_activity_on) if entry else None
+    catalog = run.settings.data_root / "catalog"
+    committee_dump, plenary_dump = dumps[0], dumps[1]
     law = run.law_record(
         [
-            _amendment_coverage("committee_amendments", len(committee), run.ongoing),
-            _amendment_coverage("plenary_amendments", len(plenary), run.ongoing),
+            _amendment_coverage(
+                "committee_amendments",
+                len(committee),
+                run.ongoing,
+                lambda: dump_reach(run.inputs.committee_amendments, committee_dump.sha256, catalog),
+                active,
+            ),
+            _amendment_coverage(
+                "plenary_amendments",
+                len(plenary),
+                run.ongoing,
+                lambda: dump_reach(run.inputs.plenary_amendments, plenary_dump.sha256, catalog),
+                active,
+            ),
         ]
     )
     counts = {
@@ -525,6 +585,27 @@ def _amendments(run: _Run, dumps: Sequence[SourceDocument]) -> _Built:
     )
 
 
+def _with_groups(
+    amendments: Iterable[Amendment], spells: Mapping[str, Sequence[parltrack.GroupSpell]]
+) -> tuple[Amendment, ...]:
+    """Each amendment with its authors' groups on the day it was tabled.
+
+    An author the MEP dump lacks, or an undated amendment, gets None for that author:
+    the group then is unknown, and the latest group is not put in its place.
+    """
+    return tuple(
+        amendment.model_copy(
+            update={
+                "author_groups": tuple(
+                    parltrack.group_on(spells.get(author, ()), amendment.tabled_on)
+                    for author in amendment.author_ids
+                )
+            }
+        )
+        for amendment in amendments
+    )
+
+
 @dataclass
 class _Asks:
     """What the asks stage gathers before it becomes records and coverage."""
@@ -535,16 +616,23 @@ class _Asks:
     actors: list[Actor] = field(default_factory=list[Actor])
     feedback: int = 0
     unread_publications: list[str] = field(default_factory=list[str])
+    # Publications that answered `bad_request`: the source does not serve them.
+    unserved_publications: list[str] = field(default_factory=list[str])
+    other_laws: int = 0
     attachment_errors: list[str] = field(default_factory=list[str])
-    attachments_unreadable: int = 0
+    # Extraction failure code (`ocr_required`, `invalid_pdf`, ...) per unreadable file.
+    attachments_unreadable: Counter[str] = field(default_factory=Counter[str])
     attachments_skipped: int = 0
 
     def problems(self) -> list[str]:
         """Why the layer is incomplete, one clause per kind of gap."""
+        codes = ", ".join(f"{code} {n}" for code, n in sorted(self.attachments_unreadable.items()))
+        unreadable = sum(self.attachments_unreadable.values())
         found = [
-            (len(self.unread_publications), "publication(s) not served or not read"),
+            (len(self.unserved_publications), "publication(s) not served by the API"),
+            (len(self.unread_publications), "publication(s) not read: the request failed"),
             (len(self.attachment_errors), "attachment(s) not downloaded"),
-            (self.attachments_unreadable, "attachment(s) with no extractable text"),
+            (unreadable, f"attachment(s) with no extractable text ({codes})"),
             (self.attachments_skipped, "attachment(s) skipped by request"),
         ]
         return [f"{number} {what}" for number, what in found if number]
@@ -563,25 +651,51 @@ def fetched_at(fetcher: CachedFetcher, url: str, fallback: datetime) -> datetime
     return fallback if cached is None else cached.metadata.fetched_at
 
 
-def _initiatives(run: _Run, com: str, title: str) -> tuple[tuple[hys.IndexEntry, ...], str | None]:
+@dataclass(frozen=True)
+class _Found:
+    """The initiatives carrying the COM reference, and how far that answer can be trusted.
+
+    `note` qualifies a found answer; `failure` says the search itself did not finish, so
+    an empty answer is not evidence that no consultation exists.
+    """
+
+    initiatives: tuple[hys.IndexEntry, ...]
+    note: str | None = None
+    failure: str | None = None
+
+
+def _initiatives(run: _Run, com: str, title: str) -> _Found:
     """Initiatives carrying the COM reference: from the index, else a labelled title search."""
     if run.inputs.hys_index.is_file():
         try:
-            return hys.find_initiatives(hys.read_index(run.inputs.hys_index), com), None
+            found = hys.find_initiatives(hys.read_index(run.inputs.hys_index), com)
+            failed = hys.read_failures(hys.failures_path(run.inputs.hys_index))
         except hys.HysError as error:
             raise CollectError(f"The Have Your Say index is unreadable: {error}") from error
+        if not failed:
+            return _Found(found)
+        listed = ", ".join(str(failure.initiative_id) for failure in failed[:5])
+        more = ", ..." if len(failed) > 5 else ""
+        gap = (
+            f"The Have Your Say index lacks {len(failed)} initiative(s) its crawl could not "
+            f"read ({listed}{more}); run setup again to retry them"
+        )
+        return _Found(found, note=gap) if found else _Found(found, failure=gap)
     note = "Initiative found by title search: the Have Your Say index is not built"
     try:
-        return hys.find_by_title(run.fetcher, title, com), note
+        return _Found(hys.find_by_title(run.fetcher, title, com), note=note)
     except hys.HysError as error:
-        return (), f"Have Your Say title search failed: {error}"
+        return _Found((), failure=f"Have Your Say title search failed: {error}")
 
 
 def _publication(run: _Run, publication_id: int, resolver: ActorResolver, found: _Asks) -> None:
     """Every feedback of one publication, with its attachments, passages and actor."""
     procedure = run.law.procedure_id
     try:
-        items = tuple(hys.iter_feedback(run.fetcher, publication_id))
+        items = tuple(hys.iter_feedback(run.fetcher, publication_id, refresh=run.settings.refresh))
+    except hys.HysUnavailable as error:
+        found.unserved_publications.append(str(error))
+        return
     except hys.HysError as error:
         found.unread_publications.append(str(error))
         return
@@ -612,13 +726,18 @@ def _publication(run: _Run, publication_id: int, resolver: ActorResolver, found:
         for attachment in item.attachments:
             try:
                 attached, attached_text = hys.fetch_attachment(
-                    run.fetcher, attachment, item, procedure_id=procedure
+                    run.fetcher,
+                    attachment,
+                    item,
+                    procedure_id=procedure,
+                    refresh=run.settings.refresh,
                 )
             except hys.HysError as error:
                 found.attachment_errors.append(str(error))
                 continue
             if attached_text is None:
-                found.attachments_unreadable += 1
+                code = (attached.extraction_method or "").removeprefix(f"{hys.ATTACHMENT_METHOD}:")
+                found.attachments_unreadable[code] += 1
                 found.documents.append(attached)
                 continue
             found.add(
@@ -644,12 +763,22 @@ def _passages(
     )
 
 
-def _asks_coverage(found: _Asks, note: str | None, com: str) -> LayerCoverage:
+def _asks_coverage(found: _Asks, search: _Found, com: str) -> LayerCoverage:
+    """`missing` only when every request was answered and no feedback exists.
+
+    No feedback after a failed request (title search, a feedback page) is
+    `not_collected`: this run did not get it, and the source may well hold it.
+    """
     problems = found.problems()
-    reasons = [*problems, *([note] if note else [])]
+    notes = [note for note in (search.note, search.failure) if note]
+    if found.other_laws:
+        notes.append(f"{found.other_laws} publication(s) of another law of the package skipped")
+    reasons = [*problems, *notes]
     if found.feedback == 0:
         reason = "; ".join(reasons) or f"No feedback on the initiatives carrying {com}"
-        return LayerCoverage(layer="asks", status="missing", count=0, reason=reason)
+        failed = search.failure is not None or bool(found.unread_publications)
+        status = "not_collected" if failed else "missing"
+        return LayerCoverage(layer="asks", status=status, count=0, reason=reason)
     return LayerCoverage(
         layer="asks",
         status="partial" if problems else "complete",
@@ -658,34 +787,55 @@ def _asks_coverage(found: _Asks, note: str | None, com: str) -> LayerCoverage:
     )
 
 
-def _asks(run: _Run, com: str | None) -> _Built:
-    """Stage 3: consultation feedback and attachments, split into passages, with actors."""
-    if com is None:
+def _no_com(run: _Run, unresolved: str | None) -> _Built:
+    """No COM reference: missing when CELLAR answered, not collected when it could not."""
+    if unresolved is None:
         reason = "No COM reference is known, and Have Your Say is joined by COM reference only"
-        law = run.law_record([LayerCoverage(layer="asks", status="missing", reason=reason)])
-        return _Built(_files(_ASKS_FILES, law=law), {"feedback": 0})
+        layer = LayerCoverage(layer="asks", status="missing", reason=reason)
+        return _Built(_files(_ASKS_FILES, law=run.law_record([layer])), {"feedback": 0})
+    reason = f"No COM reference was resolved, so Have Your Say was not searched: {unresolved}"
+    layer = LayerCoverage(layer="asks", status="not_collected", reason=reason)
+    return _Built(_files(_ASKS_FILES, law=run.law_record([layer])), {"feedback": 0}, (reason,))
+
+
+def _for_this_law(publication: hys.Publication, com: str) -> bool:
+    """A publication naming only other COM references belongs to another law of a package."""
+    references = hys.com_references_in(publication.reference)
+    return not references or com in references
+
+
+def _asks(run: _Run, com: str | None, unresolved: str | None = None) -> _Built:
+    """Stage 3: consultation feedback and attachments, split into passages, with actors.
+
+    `unresolved` says why the proposal, and so its COM reference, is unknown when CELLAR
+    failed or listed several; without a COM reference Have Your Say cannot be joined.
+    """
+    if com is None:
+        return _no_com(run, unresolved)
     title = run.law.entry.title if run.law.entry else run.law.procedure_id
-    initiatives, note = _initiatives(run, com, title)
+    search = _initiatives(run, com, title)
+    initiatives = search.initiatives
     found = _Asks()
     if initiatives:
         try:
             resolver = ActorResolver.build(iter_register(run.inputs.register))
         except RegisterError as error:
             raise CollectError(f"The register export is unreadable: {error}") from error
-        publications = sorted(
-            {p.publication_id for initiative in initiatives for p in initiative.publications}
-        )
-        for publication_id in publications:
+        publications = {p.publication_id: p for i in initiatives for p in i.publications}
+        for publication_id in sorted(publications):
+            if not _for_this_law(publications[publication_id], com):
+                found.other_laws += 1
+                continue
             _publication(run, publication_id, resolver, found)
     actors = merge_actors(found.actors)
-    law = run.law_record([_asks_coverage(found, note, com)])
+    law = run.law_record([_asks_coverage(found, search, com)])
     counts = {
         "initiatives": len(initiatives),
         "feedback": found.feedback,
         "documents": len(found.documents),
         "passages": len(found.passages),
         "attachments_failed": len(found.attachment_errors),
-        "attachments_unreadable": found.attachments_unreadable,
+        "attachments_unreadable": sum(found.attachments_unreadable.values()),
     } | {f"actors_{method}": n for method, n in resolution_summary(actors).items()}
     return _Built(
         {
@@ -696,7 +846,11 @@ def _asks(run: _Run, com: str | None) -> _Built:
             "actors.jsonl": actors,
         },
         counts,
-        (*found.unread_publications, *found.attachment_errors),
+        (
+            *([search.failure] if search.failure else ()),
+            *found.unread_publications,
+            *found.attachment_errors,
+        ),
     )
 
 
@@ -759,8 +913,11 @@ def collect_law(
     bundle = settings.data_root / "laws" / procedure_slug(law.procedure_id)
     run = _Run(StageStore(bundle), fetcher, inputs, settings, law, started_at)
     procedure, revision = law.procedure_id, settings.code_revision
+    # The catalog entry feeds every stage's law record, so a refreshed dossiers dump that
+    # changed it (the law completed, a new stage) rebuilds them; one that did not, does not.
+    entry = law.entry.model_dump_json() if law.entry else "no-entry"
 
-    texts = run.stage("texts", input_hash("texts", procedure, revision), lambda: _texts(run))
+    texts = run.stage("texts", input_hash("texts", procedure, revision, entry), lambda: _texts(run))
     (texts_law,) = run.store.read_output(texts, "law.jsonl", LawRecord)
 
     try:
@@ -772,13 +929,17 @@ def collect_law(
         raise CollectError(f"A Parltrack dump is unreadable: {error}") from error
     amendments = run.stage(
         "amendments",
-        input_hash("amendments", procedure, revision, *(dump.sha256 for dump in dumps)),
+        input_hash("amendments", procedure, revision, entry, *(dump.sha256 for dump in dumps)),
         lambda: _amendments(run, dumps),
     )
     (amendments_law,) = run.store.read_output(amendments, "law.jsonl", LawRecord)
 
     com = texts_law.com_reference
     index = file_sha256(inputs.hys_index) if inputs.hys_index.is_file() else "no-index"
+    failures = hys.failures_path(inputs.hys_index)
+    failed = file_sha256(failures) if failures.is_file() else "no-failures"
+    proposal = next(row for row in texts_law.coverage if row.layer == "proposal")
+    unresolved = proposal.reason if com is None and proposal.status == "not_collected" else None
     asks = run.stage(
         "asks",
         input_hash(
@@ -787,10 +948,11 @@ def collect_law(
             revision,
             com or "no-com",
             index,
+            failed,
             file_sha256(inputs.register),
             str(settings.attachments),
         ),
-        lambda: _asks(run, com),
+        lambda: _asks(run, com, unresolved),
     )
     (asks_law,) = run.store.read_output(asks, "law.jsonl", LawRecord)
 
@@ -812,9 +974,16 @@ def collect_law(
         raise CollectError(
             f"{procedure} has no amendments and no consultation submissions to analyse"
         )
+    # Keyed by what the stages wrote, not only by their keys: a stage rebuilt under the
+    # same key after a failed run wrote other records, and the law must follow them.
     run.stage(
         "law",
-        input_hash("law", *(receipt.input_hash for receipt in run.receipts)),
+        input_hash(
+            "law",
+            entry,
+            *(receipt.input_hash for receipt in run.receipts),
+            *(output.sha256 for receipt in run.receipts for output in receipt.outputs),
+        ),
         lambda: _Built({"laws.jsonl": (record,), "actors.jsonl": actors}, {"actors": len(actors)}),
     )
     manifest = RunManifest(

@@ -27,6 +27,7 @@ from influence.practice.folds import make_folds
 from influence.practice.labels import PracticeDataError, PracticePair, build_practice_set
 from influence.repositories.lobbyplag import DemoRepository, RawText
 from influence.services.embedding import EmbeddingCache
+from influence.services.qwen_onnx import QwenEmbedder
 
 DIMENSIONS = 64
 
@@ -248,7 +249,9 @@ def test_a_judge_that_separates_the_classes_gets_thresholds_that_hold_out(
     practice = build_practice_set(repository)
     plan = make_folds(practice.pairs, 5)
     perfect = [0.95 if item.influenced else 0.05 for item in practice.pairs]
-    report = judge_report("perfect", perfect, practice, plan, {"model.onnx": "0" * 64})
+    report = judge_report(
+        "perfect", perfect, practice, plan, {"model.onnx": "0" * 64}, changes_only=False
+    )
     assert report.scorer == "perfect"
     assert report.separation.positives_mean > 0.9 > 0.1 > report.separation.negatives_mean
     assert report.development_folds == (0, 2, 4)
@@ -259,6 +262,9 @@ def test_a_judge_that_separates_the_classes_gets_thresholds_that_hold_out(
     assert copied.threshold is not None
     assert copied.held_out is not None
     assert copied.held_out.positives == copied.held_out.pairs
+    # The reworded tier is read on its own band, below the copied cut.
+    assert (copied.below, reworded.below) == (None, copied.threshold)
+    assert report.clipped_prompts == 0
     assert len(report.table) == 9
 
 
@@ -266,10 +272,50 @@ def test_a_judge_that_cannot_separate_the_classes_gets_no_threshold(tmp_path: Pa
     repository, _ = _load(tmp_path, _records())
     practice = build_practice_set(repository)
     plan = make_folds(practice.pairs, 5)
-    report = judge_report("flat", [0.5] * len(practice.pairs), practice, plan, {})
+    report = judge_report(
+        "flat", [0.5] * len(practice.pairs), practice, plan, {}, changes_only=True
+    )
     assert all(found.threshold is None for found in report.proposals)
     assert all(found.development is None and found.held_out is None for found in report.proposals)
     assert report.separation.positives_mean == report.separation.negatives_mean == 0.5
+
+
+def test_the_judge_report_counts_the_prompts_it_saw_cut(tmp_path: Path) -> None:
+    records = _records()
+    long = "Article 0-1 requires consent " + "and much more " * 120
+    next(p for p in records["proposals"] if p["uid"] == "p0-1")["text"] = {
+        "old": "Article 0-1 requires consent.",
+        "new": long,
+    }
+    repository, _ = _load(tmp_path, records)
+    practice = build_practice_set(repository)
+    plan = make_folds(practice.pairs, 5)
+    flat = [0.5] * len(practice.pairs)
+    cut = sum(item.pair.proposal_id == "p0-1" for item in practice.pairs)
+    assert cut > 0
+    for changes_only in (False, True):
+        report = judge_report("flat", flat, practice, plan, {}, changes_only=changes_only)
+        assert report.clipped_prompts == cut
+
+
+class _CountingEmbedder(QwenEmbedder):
+    """The fake embedder, seen by the command as a Qwen embedder that cut three texts."""
+
+    def __init__(self) -> None:  # pyright: ignore[reportMissingSuperCall]
+        self.truncated = 3
+
+    def __call__(self, texts: Sequence[str]) -> list[list[float]]:
+        return embed(texts)
+
+
+def test_the_command_prints_how_many_texts_the_embedder_cut(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_dataset(tmp_path, _records())
+    out = tmp_path / "dense.json"
+    argv = ["--data", str(tmp_path), "--model", str(tmp_path / "model"), "--out", str(out)]
+    assert main(argv, load=lambda directory: _CountingEmbedder()) == 0
+    assert "The embedder cut 3 texts at 512 tokens" in capsys.readouterr().out
 
 
 def _run(data: Path, out: Path, *extra: str) -> int:
@@ -296,7 +342,7 @@ def test_the_command_writes_deterministic_json_and_prints_every_table(
     first = out.read_text(encoding="utf-8")
     report = DenseReport.model_validate_json(first)
     assert first == render(report)
-    assert report.kind == "dense-meaning-v1"
+    assert report.kind == "dense-meaning-v2"
     assert set(report.input_sha256) == {
         "amendments.json",
         "proposals.json",
@@ -336,14 +382,15 @@ def test_printing_names_a_threshold_or_says_none_reaches_the_floor(
         practice,
         plan,
         {},
+        changes_only=False,
     )
-    flat = judge_report("flat", [0.5] * len(practice.pairs), practice, plan, {})
+    flat = judge_report("flat", [0.5] * len(practice.pairs), practice, plan, {}, changes_only=False)
     rows, verified, passages = measure_retrieval(
         repository, practice, embed, model_id="fake", cache=None
     )
     measured, _ = measure_scorers(practice, embed, None, model_id="fake", cache=None)
     report = DenseReport(
-        kind="dense-meaning-v1",
+        kind="dense-meaning-v2",
         model_id="fake",
         input_sha256={},
         model_sha256={},

@@ -13,9 +13,13 @@ scorer's alone:
 The threshold rule is fixed here, before any result is read. Folds with an even index are
 development folds and folds with an odd index are held out. On development pairs only,
 the proposed threshold for a tier is the smallest value on a 0.01 grid at which at least
-`MIN_PAIRS` development pairs score at or above it and the Wilson 95% lower bound of their
-precision reaches the tier's floor (`COPIED_FLOOR` 0.90, `REWORDED_FLOOR` 0.80). The held-out
-folds then show what that threshold does on pairs it was not chosen on. A threshold is a
+`MIN_PAIRS` development pairs fall in the tier's band and the Wilson 95% lower bound of their
+precision reaches the tier's floor (`COPIED_FLOOR` 0.90, `REWORDED_FLOOR` 0.80). A tier's band
+runs from its threshold up to, not including, the threshold of the tier above it: the copied
+tier has none above it, and the reworded tier stops at the copied threshold. So the reworded
+tier is judged on the pairs it alone would publish, not on copies that already clear the
+copied cut (the first version counted those too and overstated its precision). The held-out
+folds then show what that band does on pairs it was not chosen on. A threshold is a
 proposal: the practice-loop owner freezes it, and nothing here establishes it.
 
 Run from the repository root:
@@ -90,8 +94,10 @@ CAVEATS = (
     "finding R1). Most rest on one check, so precision here is against weak negatives.",
     "One law (GDPR) in one year (2013); the 170 largest-group positives are mostly verbatim "
     "copies, so precision for reworded links is unmeasured.",
-    "Folds are organization groups with purged training pairs, so a scorer never sees the "
-    "organization or texts it is tested on; the development and held-out halves are folds, "
+    "Folds are organization groups, joined where two organizations submitted an identical "
+    "input, with purged training pairs, so a scorer never sees the organization or texts it "
+    "is tested on and no identical input is in both halves; the development and held-out "
+    "halves are folds, "
     "and the combiner for a development fold was fitted partly on held-out folds' labels, "
     "so the held-out check is optimistic by that overlap.",
     "A threshold here is a proposal only. The practice-loop owner freezes it before the "
@@ -104,7 +110,8 @@ class Contract(BaseModel):
 
 
 class Counts(Contract):
-    """Pairs scoring at or above a threshold, with their precision and its Wilson interval."""
+    """Pairs scoring in a band (at or above a threshold and, when bounded, below an upper
+    cut), with their precision and its Wilson interval."""
 
     pairs: int
     positives: int
@@ -124,12 +131,14 @@ class Proposal(Contract):
     floor: float
     min_pairs: int
     threshold: float | None
+    # The band's exclusive upper end: the next tier's threshold, or None when nothing is above.
+    below: float | None
     development: Counts | None
     held_out: Counts | None
 
 
 class CalibrationReport(Contract):
-    kind: Literal["link-calibration-v1"]
+    kind: Literal["link-calibration-v2"]
     input_sha256: dict[str, str]
     simulated_tests: SimulationSettings
     grouping: str
@@ -245,8 +254,18 @@ def combiner_scores(training: Sequence[LabelledPair], test: Sequence[PracticePai
     return [_predict(weights, signals(pair)) for pair in test]
 
 
-def counts(scores: Sequence[float], labels: Sequence[bool], threshold: float) -> Counts:
-    kept = [label for score, label in zip(scores, labels, strict=True) if score >= threshold]
+def counts(
+    scores: Sequence[float],
+    labels: Sequence[bool],
+    threshold: float,
+    below: float | None = None,
+) -> Counts:
+    """Pairs with `threshold <= score < below` (no upper end when `below` is None)."""
+    kept = [
+        label
+        for score, label in zip(scores, labels, strict=True)
+        if score >= threshold and (below is None or score < below)
+    ]
     low, high = wilson_interval(sum(kept), len(kept))
     return Counts(
         pairs=len(kept),
@@ -257,10 +276,21 @@ def counts(scores: Sequence[float], labels: Sequence[bool], threshold: float) ->
     )
 
 
-def choose_threshold(scores: Sequence[float], labels: Sequence[bool], floor: float) -> float | None:
-    """The smallest grid threshold whose development precision clears `floor` (see module)."""
+def choose_threshold(
+    scores: Sequence[float],
+    labels: Sequence[bool],
+    floor: float,
+    below: float | None = None,
+) -> float | None:
+    """The smallest grid threshold whose band's development precision clears `floor`.
+
+    The band is `[threshold, below)`, so a lower tier is chosen on the pairs it alone adds
+    (see module). O(G n) for a grid of G points and n pairs.
+    """
     for threshold in GRID:
-        found = counts(scores, labels, threshold)
+        if below is not None and threshold >= below:
+            return None
+        found = counts(scores, labels, threshold, below)
         if found.pairs >= MIN_PAIRS and found.wilson_low >= floor:
             return threshold
     return None
@@ -273,17 +303,21 @@ def _proposal(
     labels: Sequence[bool],
     development: Sequence[int],
     held_out: Sequence[int],
+    below: float | None = None,
 ) -> Proposal:
+    """One tier's proposal on the band `[threshold, below)`; `below` is the tier above's cut."""
+
     def part(indices: Sequence[int]) -> tuple[list[float], list[bool]]:
         return [scores[i] for i in indices], [labels[i] for i in indices]
 
-    threshold = choose_threshold(*part(development), floor)
+    threshold = choose_threshold(*part(development), floor, below)
     if threshold is None:
         return Proposal(
             tier=tier,
             floor=floor,
             min_pairs=MIN_PAIRS,
             threshold=None,
+            below=below,
             development=None,
             held_out=None,
         )
@@ -292,9 +326,24 @@ def _proposal(
         floor=floor,
         min_pairs=MIN_PAIRS,
         threshold=threshold,
-        development=counts(*part(development), threshold),
-        held_out=counts(*part(held_out), threshold),
+        below=below,
+        development=counts(*part(development), threshold, below),
+        held_out=counts(*part(held_out), threshold, below),
     )
+
+
+def tier_proposals(
+    scores: Sequence[float],
+    labels: Sequence[bool],
+    development: Sequence[int],
+    held_out: Sequence[int],
+) -> tuple[Proposal, Proposal]:
+    """The copied tier on everything above its cut, then the reworded tier below that cut."""
+    copied = _proposal("copied", COPIED_FLOOR, scores, labels, development, held_out)
+    reworded = _proposal(
+        "reworded", REWORDED_FLOOR, scores, labels, development, held_out, copied.threshold
+    )
+    return copied, reworded
 
 
 def _table(scores: Sequence[float], labels: Sequence[bool]) -> tuple[ThresholdRow, ...]:
@@ -362,7 +411,7 @@ def calibrate(
     }
     weights = fit_logistic([signals(item.pair) for item in pairs], labels)
     return CalibrationReport(
-        kind="link-calibration-v1",
+        kind="link-calibration-v2",
         input_sha256=input_sha256,
         simulated_tests=settings,
         grouping=plan.grouping,
@@ -372,9 +421,11 @@ def calibrate(
         held_out_folds=held_out_folds,
         rule=(
             f"Development folds are the even-numbered ones. On development pairs only, the "
-            f"threshold is the smallest 0.01-grid value with at least {MIN_PAIRS} pairs at or "
-            f"above it and a Wilson 95% lower bound of precision of at least the tier's floor "
-            f"(copied {COPIED_FLOOR}, reworded {REWORDED_FLOOR}). Held-out folds then check it."
+            f"threshold is the smallest 0.01-grid value with at least {MIN_PAIRS} pairs in the "
+            f"tier's band and a Wilson 95% lower bound of their precision of at least the "
+            f"tier's floor (copied {COPIED_FLOOR}, reworded {REWORDED_FLOOR}). The copied band "
+            f"is every score at or above its threshold; the reworded band stops below the "
+            f"copied threshold, so copies never count toward it. Held-out folds then check it."
         ),
         features=FEATURES,
         scorers={
@@ -383,10 +434,7 @@ def calibrate(
         },
         tables={name: _table(values, labels) for name, values in scores.items()},
         proposals={
-            name: (
-                _proposal("copied", COPIED_FLOOR, values, labels, development, held_out),
-                _proposal("reworded", REWORDED_FLOOR, values, labels, development, held_out),
-            )
+            name: tier_proposals(values, labels, development, held_out)
             for name, values in scores.items()
         },
         combiner_weights_all_pairs={
@@ -436,7 +484,8 @@ def _print(report: CalibrationReport) -> None:
             held = tier.held_out
             text = "no threshold reaches the floor"
             if tier.threshold is not None and held is not None:
-                text = f"{tier.threshold:.2f}; held out {held.positives}/{held.pairs}"
+                band = "" if tier.below is None else f" to below {tier.below:.2f}"
+                text = f"{tier.threshold:.2f}{band}; held out {held.positives}/{held.pairs}"
             print(f"{name} {tier.tier} (floor {tier.floor}): {text}")
 
 

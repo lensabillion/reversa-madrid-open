@@ -65,6 +65,10 @@ _END_IN_PARLIAMENT_EVENT = "End of procedure in Parliament"
 # withdrawn ones because the Atlas status has no value of its own for it.
 _ENDED_WITHOUT_ACT = frozenset({"procedure lapsed or withdrawn", "procedure rejected"})
 _HASH_CHUNK_BYTES = 1 << 20
+_SURROGATES = re.compile("[\ud800-\udfff]")
+# A tabling date as the amendment dumps write it; the scan for the dump's end date
+# reads it from the raw line, without parsing JSON.
+_DUMP_DATE = re.compile(rb'"date": ?"(\d{4}-\d{2}-\d{2})')
 
 type Record = dict[str, object]
 
@@ -102,18 +106,26 @@ def _items(value: object) -> list[object]:
     return cast("list[object]", value) if isinstance(value, list) else []
 
 
+def _clean(text: str) -> str:
+    """Replace lone surrogates, which JSON escapes can carry and UTF-8 cannot encode.
+
+    Without this one bad `\\ud83d` in an amendment crashes writing the whole stage.
+    """
+    return _SURROGATES.sub("\ufffd", text)
+
+
 def _strings(value: object) -> list[str]:
     """A field Parltrack writes as one string or a list of them, always as a list."""
     if isinstance(value, str):
-        return [value]
-    return [item for item in _items(value) if isinstance(item, str)]
+        return [_clean(value)]
+    return [_clean(item) for item in _items(value) if isinstance(item, str)]
 
 
 def _text(value: object) -> str | None:
     """A non-blank string with outer whitespace removed; anything else is unknown."""
     if not isinstance(value, str):
         return None
-    return value.strip() or None
+    return _clean(value).strip() or None
 
 
 def _day(value: object) -> date | None:
@@ -160,6 +172,26 @@ def iter_dump(path: Path, containing: str | None = None) -> Iterator[Record]:
                 yield cast("Record", record)
     except (OSError, EOFError, zstd.ZstdError, ValueError) as error:
         raise ParltrackError(f"{path}: unreadable Parltrack dump: {error}") from error
+
+
+def latest_date(path: Path) -> date | None:
+    """The latest `"date"` any record of the dump states: how far the dump reaches.
+
+    A raw scan of every line, with no JSON parsed, so one pass costs about what
+    decompressing does (about 5 s for the amendment dump). The latest date of any
+    record is a bound for all of them; a typo far in the future would hide staleness,
+    never invent it. Linear in the dump's size; callers cache the answer per dump hash.
+    """
+    latest: bytes | None = None
+    try:
+        with zstd.open(path, "rb") as stream:
+            for line in stream:
+                for found in _DUMP_DATE.findall(line):
+                    if latest is None or found > latest:
+                        latest = found
+    except (OSError, EOFError, zstd.ZstdError) as error:
+        raise ParltrackError(f"{path}: unreadable Parltrack dump: {error}") from error
+    return None if latest is None else date.fromisoformat(latest.decode())
 
 
 def dump_source_document(path: Path, retrieved_at: datetime) -> SourceDocument:
@@ -468,6 +500,21 @@ def plenary_amendments(
 # --- Members ------------------------------------------------------------------------------
 
 
+class GroupSpell(FrozenModel):
+    """One Member's membership of one political group; None bounds are unknown."""
+
+    group: NonEmpty
+    start: date | None
+    end: date | None
+
+
+class Member(FrozenModel):
+    """A Member as an actor, with every group spell, to tell the group on a given day."""
+
+    actor: Actor
+    groups: tuple[GroupSpell, ...] = ()
+
+
 def _latest(spells: object, key: str) -> str | None:
     """The value of the spell that ends last (current spells end in year 9999).
 
@@ -481,10 +528,39 @@ def _latest(spells: object, key: str) -> str | None:
     return max(dated)[1] if dated else None
 
 
-def mep_actors(
+def _group_spells(spells: object) -> tuple[GroupSpell, ...]:
+    return tuple(
+        GroupSpell(group=group, start=_day(spell.get("start")), end=_day(spell.get("end")))
+        for spell in map(_mapping, _items(spells))
+        if (group := _text(spell.get("groupid"))) is not None
+    )
+
+
+def group_on(spells: Iterable[GroupSpell], day: date | None) -> str | None:
+    """The group of the spell covering `day`, or None when no spell or no day says.
+
+    Where spells overlap (a move dated the same day on both sides) the one that started
+    last wins. An undated amendment gets None, never the latest group: a Member who
+    changed group would otherwise be credited to the wrong one.
+    """
+    if day is None:
+        return None
+    covering = [
+        (spell.start or date.min, spell.group)
+        for spell in spells
+        if (spell.start is None or spell.start <= day) and (spell.end is None or day <= spell.end)
+    ]
+    return max(covering)[1] if covering else None
+
+
+def mep_members(
     meps_path: Path, mep_ids: Collection[int], skipped: Counter[str] | None = None
-) -> Iterator[Actor]:
-    """Actors for the given Members only, stopping once every one has been found."""
+) -> Iterator[Member]:
+    """The given Members only, stopping once every one has been found.
+
+    `Actor.political_group` is the latest group, for display; `groups` holds every
+    dated spell, so `group_on` can tell the group on the day an amendment was tabled.
+    """
     wanted = set(mep_ids)
     for record in iter_dump(meps_path):
         if not wanted:
@@ -498,14 +574,24 @@ def mep_actors(
             _count(skipped, SKIP_NO_NAME)
             continue
         try:
-            yield Actor(
-                actor_id=mep_actor_id(mep_id),
-                kind="mep",
-                name=name,
-                mep_id=mep_id,
-                country=_latest(record.get("Constituencies"), "country"),
-                political_group=_latest(record.get("Groups"), "groupid"),
-                resolution="mep_id",
+            yield Member(
+                actor=Actor(
+                    actor_id=mep_actor_id(mep_id),
+                    kind="mep",
+                    name=name,
+                    mep_id=mep_id,
+                    country=_latest(record.get("Constituencies"), "country"),
+                    political_group=_latest(record.get("Groups"), "groupid"),
+                    resolution="mep_id",
+                ),
+                groups=_group_spells(record.get("Groups")),
             )
         except ValidationError:
             _count(skipped, SKIP_INVALID)
+
+
+def mep_actors(
+    meps_path: Path, mep_ids: Collection[int], skipped: Counter[str] | None = None
+) -> Iterator[Actor]:
+    """Actors for the given Members only, stopping once every one has been found."""
+    return (member.actor for member in mep_members(meps_path, mep_ids, skipped))

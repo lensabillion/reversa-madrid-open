@@ -52,12 +52,24 @@ class Features:
 
 @dataclass(frozen=True, slots=True)
 class Example:
-    """A past ask whose outcome is known: `decided_at` is when that outcome was settled."""
+    """A past ask whose outcome is known: `decided_at` is when that outcome was settled.
+
+    Its features must have been observed before the outcome was decided, or the example
+    would teach (or test) the model with what the outcome itself revealed. Every example,
+    training or test, is checked when it is made.
+    """
 
     procedure_id: str
     features: Features
     decided_at: datetime
     won: bool
+
+    def __post_init__(self) -> None:
+        if self.features.observed_at >= self.decided_at:
+            raise ValueError(
+                f"Features observed {self.features.observed_at} are not before the outcome "
+                f"decided {self.decided_at}"
+            )
 
 
 @dataclass(frozen=True, slots=True)

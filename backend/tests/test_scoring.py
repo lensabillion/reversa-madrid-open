@@ -121,3 +121,18 @@ def test_accepts_exact_limits_and_freezes_validated_input() -> None:
                 "unknown": "c",
             }
         )
+
+
+def test_an_unguarded_score_reads_the_wording_and_still_reports_the_negation() -> None:
+    request = ScoreRequest(
+        amendment=TextChange(old="", new="This Regulation shall apply to military systems"),
+        submission=TextChange(old="", new="This Regulation shall not apply to military systems"),
+    )
+    guarded = score_pair(request)
+    unguarded = score_pair(request, guard_negation=False)
+    assert guarded.negation_conflict
+    assert unguarded.negation_conflict
+    assert guarded.score == 0.0
+    assert guarded.evidence == ()
+    assert unguarded.score > 0.75
+    assert unguarded.evidence
