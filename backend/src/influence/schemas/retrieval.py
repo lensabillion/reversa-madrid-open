@@ -46,3 +46,23 @@ class Shortlist(FrozenModel):
     score_type: Literal["bm25"] = "bm25"
     method: Literal["bm25-passages-v1"] = "bm25-passages-v1"
     limitations: tuple[str, ...]
+
+
+type ChangeKind = Literal["replace", "delete", "insert", "statement"]
+
+
+class PassageChange(FrozenModel):
+    """The change one submission passage asks for, with the exact words that say so.
+
+    `start` and `end` are half-open code-point offsets into the passage given to the reader,
+    so `text == passage[start:end]`. `old` is None when the passage does not say what the
+    original wording is (kind "statement"); that is different from "" (kind "insert"),
+    where the original is known to be empty.
+    """
+
+    kind: ChangeKind
+    old: str | None
+    new: str
+    start: int = Field(ge=0)
+    end: int = Field(ge=0)
+    text: str
