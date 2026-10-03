@@ -16,6 +16,11 @@ SOFTSCHEMA_VERSION := 0.8.1
 # Runs a command in backend/. --locked fails instead of rewriting uv.lock when it no
 # longer matches pyproject.toml.
 BACKEND := uv run --directory backend --locked
+# Backend commands run inside backend/, so a relative data root such as `mock-data` would
+# resolve to backend/mock-data and be silently empty. Anchor it at the repository root.
+ifdef INFLUENCE_DATA_ROOT
+export INFLUENCE_DATA_ROOT := $(abspath $(INFLUENCE_DATA_ROOT))
+endif
 # Runs npm inside frontend/, so frontend/.npmrc (cool-off, no install scripts) always applies.
 NPM := cd frontend && npm
 
