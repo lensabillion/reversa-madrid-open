@@ -503,6 +503,48 @@ amendment carried. Tested offline (`tests/test_forecasting.py`: scenario and pro
 paths, leakage refusal, every exclusion reason, law naming, the command end to end); not
 yet run on real laws or timed.
 
+## Batch Command (Plan Gate 9)
+
+`influence batch` (`make batch ARGS=...`) runs collect and the per-law steps over many
+laws, for the brief's "all of Europe from 2019". It adds no analysis of its own: each step
+is the service its own command calls, so a law's files are the same whichever command
+wrote them.
+
+```console
+make batch ARGS="--laws 'AI Act,DSA,2021/0106(COD)'"
+make batch ARGS='--since 2019 --with-amendments --limit 50'
+make batch ARGS="--laws 'AI Act' --steps atlas,coordinated,channels,lineage,directions --attachments"
+```
+
+- **Selection.** `--laws` takes comma-separated procedure numbers, CELEX, COM references,
+  common names or titles, resolved as `collect` resolves them; a name that resolves to
+  nothing is recorded as a failed law. `--since YEAR --with-amendments` scans the
+  committee and plenary amendment dumps once (about a minute) and selects every procedure
+  of the dossiers catalog with an amendment tabled on or after 1 January YEAR, most
+  amended first; `--limit N` keeps the first N.
+- **Steps.** Collect runs first, without attachments unless `--attachments` is given.
+  `--steps` picks from `atlas,coordinated,channels,lineage,directions` (default
+  `coordinated,channels,lineage,directions`, which read Parltrack and the bundle and take
+  seconds; `atlas` takes minutes a law and is opt-in). Steps run in that order, so
+  `directions` reads the atlas view built just before it.
+- **Resume.** A law with a published collect manifest is not collected again, and a step
+  whose output file names that manifest's `run_id` is skipped; `--refresh` collects again
+  and redoes every step. A law or step that fails is recorded with its error and the batch
+  goes on; the exit status is 1 unless every law completed.
+- **Output.** `data/laws/batch.json` is written atomically after every law, so an
+  interrupted batch keeps what it finished. It holds the selection, the steps, and per law
+  the query, procedure, title, status (`complete`, `partial`, `failed`), collect `run_id`,
+  error, seconds, amendments, each step's status (`done`, `reused`, `skipped`, `failed`)
+  with its seconds and error, and the collect coverage rows (layer, status, count). Its
+  `banner` counts laws selected, attempted, complete, partial and failed, the amendments
+  covered, how many laws lack each layer, how many each step failed on, the hardware, and
+  the start and finish times (`finished_at` is null until the last law is done).
+
+**Limits.** Collect scans the amendment dumps once per law (plan §5), so a batch over
+every procedure since 2019 takes hours; it has not yet been timed on real data. A law
+collected earlier is reused even when collected with other settings; use `--refresh`
+after a code or dump change. Tested offline (`tests/test_batch.py`).
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the

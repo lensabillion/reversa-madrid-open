@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -111,6 +111,11 @@ audit-sample:  ## Draw two blind reader sheets from a view: make audit-sample LA
 audit-score:  ## Score two filled sheets against the key: make audit-score DIR=data/audit/<slug>/<sample-id>
 	$(if $(DIR),,$(error DIR is required: make audit-score DIR=data/audit/<slug>/<sample-id>))
 	$(BACKEND) influence audit score "$(abspath $(DIR))"
+
+# Plan gate 9: many laws at once, resumable, with a coverage banner in data/laws/batch.json.
+batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 'AI Act,DSA'" or ARGS='--since 2019 --with-amendments'
+	$(if $(ARGS),,$(error ARGS is required: make batch ARGS='--since 2019 --with-amendments'))
+	$(BACKEND) influence batch $(ARGS)
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
