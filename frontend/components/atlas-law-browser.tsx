@@ -10,12 +10,16 @@ import {
   type AtlasLayerCoverage,
   type AtlasView,
   atlasLawsUrl,
+  atlasModes,
   atlasViewUrl,
   readAtlasLaws,
   readAtlasView,
 } from "../lib/atlas-api";
+import { atlasCoordinatedUrl, readAtlasCoordinated } from "../lib/atlas-coordinated";
 import { useResource } from "../lib/use-resource";
 import { AtlasAnalysis, type AtlasAnalysisProps, type AtlasRankingRow } from "./atlas-analysis";
+import { AtlasCoordinated } from "./atlas-coordinated";
+import { AtlasCoverageBadges, AtlasModes } from "./atlas-coverage";
 import type { AtlasLinkView } from "./atlas-explorer";
 import { AtlasWorkspace } from "./atlas-workspace";
 
@@ -159,6 +163,11 @@ function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void 
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   }, [view]);
+  // Asked only for a view the explorer accepts; the panel owns every state of this request.
+  const coordinated = useResource(
+    prepared.ok ? atlasCoordinatedUrl(view.slug) : null,
+    readAtlasCoordinated,
+  );
   if (!prepared.ok) {
     return (
       <StateMessage announce="alert" title={`The Atlas data for ${view.title} is invalid`}>
@@ -175,17 +184,47 @@ function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void 
     );
   }
   const { atlas } = prepared;
+  const published = atlas.links.filter(
+    (link) => link.evidence.assessment.status === "published",
+  ).length;
+  const candidates = atlas.links.length - published;
   return (
     <>
-      <p className="mx-auto max-w-[1536px] px-5 py-3 text-xs text-stone-500 sm:px-8">
-        <span className="font-medium text-stone-800">{view.title}</span> · {view.procedure_id} ·
-        Atlas run {view.run_id}, generated {view.generated_at}
-      </p>
+      <section
+        aria-label="Law overview"
+        className="border-b border-stone-200 bg-white px-5 py-6 sm:px-8"
+      >
+        <div className="mx-auto max-w-[1536px] space-y-4">
+          <div>
+            <h2 className="font-serif text-2xl leading-tight text-stone-900 sm:text-3xl">
+              {view.title}
+            </h2>
+            <p className="mt-1 text-xs text-stone-500">
+              {view.procedure_id} · Atlas run {view.run_id}, generated {view.generated_at}
+            </p>
+          </div>
+          <AtlasModes modes={atlasModes(view)} />
+          <AtlasCoverageBadges coverage={view.coverage} />
+          {published === 0 && (
+            <p className="max-w-4xl rounded-md border border-stone-300 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
+              This run published no link between a request and an amendment of this law, so its
+              graph is empty. That is not a finding that nobody shaped the law: the source layers
+              above show what was collected and what is missing.{" "}
+              {candidates === 0
+                ? "The run kept no unconfirmed candidates either."
+                : `${candidates.toLocaleString("en")} unconfirmed or contradicted ${candidates === 1 ? "candidate is" : "candidates are"} under Read the evidence, Audit candidates.`}{" "}
+              Coordinated amendments, shown first below, need no request to be collected.
+            </p>
+          )}
+        </div>
+      </section>
       <AtlasWorkspace
         snapshot={view.snapshot}
         links={atlas.links}
         coverageNotes={atlas.coverageNotes}
         dataNotice={atlas.dataNotice}
+        initialView={published === 0 ? "coordinated" : "graph"}
+        coordinated={<AtlasCoordinated procedureId={view.procedure_id} state={coordinated} />}
         analysis={
           <AtlasAnalysis
             sampleLabel={`${view.title}, ${view.procedure_id}: final-act outcomes of Atlas run ${view.run_id}`}

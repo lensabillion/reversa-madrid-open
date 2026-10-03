@@ -103,13 +103,14 @@ inside its own column. Model accuracy is unchanged by this display clarification
 ## Atlas Explorer Page
 
 `/atlas` shows the Atlas for the laws the pipeline has built; the header's **Influence
-Atlas** link opens it from the evidence workspace. It reads two backend endpoints, through
+Atlas** link opens it from the evidence workspace. It reads three backend endpoints, through
 the same `/api/v1/…` proxy:
 
 | Endpoint | Answer |
 | --- | --- |
 | `GET /api/v1/atlas` | `{"laws": [...]}`: slug, procedure, title, run and published-link count per law |
-| `GET /api/v1/atlas/{slug}` | One law's `atlas-view-1` view: coverage, `atlas-1` bundle, graph snapshot, rankings, limitations; 404 when the law has no run |
+| `GET /api/v1/atlas/{slug}` | One law's `atlas-view-1` view: coverage, `atlas-1` bundle, graph snapshot, rankings, limitations, and `modes` (absent in older files, read as none); 404 when the law has no run |
+| `GET /api/v1/atlas/{slug}/coordinated` | The law's clusters of near-identical amendments (`backend/src/influence/schemas/coordinated.py`); 404 when the law has no cluster file |
 
 The selected law lives in the URL (`/atlas?law=2021-0106-COD`), so a reload or a shared
 link reopens it. The view becomes `AtlasWorkspace` props: the snapshot as the graph,
@@ -124,6 +125,33 @@ backend's `detail`, with Retry). If the adapter rejects the bundle, for example 
 that does not match its source text, the page shows the message and nothing else from that
 run: it never renders partial or repaired evidence.
 
+Above the workspace, a **law overview** makes any law readable, including one whose run
+published no link:
+
+- **Mode labels** (plan §6, for example "Negotiation in progress") as chips under the title.
+- **Layer badges**: one per coverage layer, with its status, its count and, unless the layer
+  is complete, the pipeline's reason. A count the run did not make reads "not counted",
+  never 0.
+- With no published link, a sentence says that the graph is empty, that this is not a finding
+  that nobody shaped the law, and how many unconfirmed or contradicted candidates sit under
+  **Read the evidence → Audit candidates**. The workspace then opens on the coordinated
+  amendments instead of the empty graph.
+
+The workspace's fourth view, **Coordinated amendments**, lists near-identical wording tabled
+by Members of different groups: the headline "N of M clusters span political groups" with
+the compared, too-short and not-comparable counts, then each cluster in the API's order
+(25 at a time) with its groups, and per amendment the committee, date, groups, authors,
+target provision and the inserted wording quoted exactly (spans joined with " … ").
+**Compare side by side** lays one cluster's amendments in columns. The API's limitations
+are shown verbatim. The explorer counts and formats; it does not score, rank or reorder,
+and it never says who drafted the wording. Its states are loading, no clusters, no cluster
+file (unknown, not zero, with `make atlas LAW='<procedure>'`), and an error with Retry.
+`coordinatedView` checks every field of the response and rejects the whole file on the
+first fault, so a malformed answer shows an error instead of a partial list.
+
+- `components/atlas-coverage.tsx`: layer badges and mode labels
+- `components/atlas-coordinated.tsx`: the coordinated amendments panel and its states
+- `lib/atlas-coordinated.ts`: the route's types, boundary check and reader
 - `app/atlas/page.tsx`: the route; a Suspense boundary lets the shell prerender
 - `components/atlas-law-browser.tsx`: law selector, URL state, view-to-props mapping, states
 - `lib/atlas-api.ts`: endpoint types and readers; a non-2xx answer throws `AtlasApiError`
@@ -133,7 +161,13 @@ run: it never renders partial or repaired evidence.
 Chromium: the production build against the real backend serving a view that
 `services/pipeline.py` built from the backend's offline test world. The law opened, its
 graph and quoted phrase rendered, a law without a view showed the 404 detail, and Back
-returned to the law. Not verified: a real law's run.
+returned to the law. Not verified: a real law's run. The law overview and the coordinated
+amendments panel are covered by `tests/atlas-coverage.test.tsx`,
+`tests/atlas-coordinated.test.tsx` and `tests/atlas-page.test.tsx` with a mocked `fetch`.
+Checked once by hand in a browser with `next dev` against a stand-in API that served a
+synthetic view without links and the AI Act's real cluster file (269 clusters, 0.6 MB): the
+badges, modes, headline, side-by-side comparison and the no-cluster-file message rendered.
+Not verified: the real backend's two routes together in a browser.
 
 ## Atlas Components and Agent 3 Handoff
 
