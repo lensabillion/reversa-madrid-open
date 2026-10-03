@@ -46,7 +46,7 @@ from influence.schemas.lineage import (
     OriginMatch,
     TabledPhrase,
 )
-from influence.services.lineage import inserted_blocks, phrase_id_of
+from influence.services.lineage import Rarity, inserted_blocks, phrase_id_of
 from influence.services.prose_match import Word, words_of
 
 # The first words of a run that quotes another act: "the European Parliament and of the
@@ -150,8 +150,9 @@ def _runs(
     folded: Sequence[str],
     index: Mapping[tuple[str, ...], Sequence[tuple[int, int]]],
     first_words: frozenset[str],
+    rarity: Rarity,
 ) -> dict[int, tuple[int, int]]:
-    """For each phrase found in the document, its longest run as (first word, end word)."""
+    """For each phrase found in the document, its longest significant run as (first, end)."""
     hits: defaultdict[tuple[int, int], list[int]] = defaultdict(list)
     for start in range(len(folded) - NGRAM_WORDS + 1):
         if folded[start] not in first_words:
@@ -166,7 +167,7 @@ def _runs(
                 previous = start
                 continue
             end = previous + NGRAM_WORDS
-            if end - first >= MIN_ADOPTED_RUN_WORDS:
+            if end - first >= MIN_ADOPTED_RUN_WORDS and rarity.significant(folded[first:end]):
                 current = best.get(phrase_index)
                 if current is None or end - first > current[1] - current[0]:
                     best[phrase_index] = (first, end)
@@ -187,6 +188,7 @@ def find_origins(
     adoptions: Sequence[AmendmentAdoption],
     documents: Sequence[tuple[SourceDocument, DocumentText]],
     *,
+    rarity: Rarity,
     amendments: Mapping[str, Amendment] | None = None,
     submitters: Mapping[str, Actor] | None = None,
     proposal_texts: Iterable[str] = (),
@@ -194,7 +196,8 @@ def find_origins(
     """Every document that says an adopted phrase, with an exact quotation and the dates.
 
     For each (phrase, document) pair the longest shared run of at least
-    `MIN_ADOPTED_RUN_WORDS` words is reported once. `precedes` is True when the document is
+    `MIN_ADOPTED_RUN_WORDS` words that `rarity` finds significant (the law's own rarity, as in
+    adoption) is reported once. `precedes` is True when the document is
     dated before the earliest amendment carrying the phrase, False when not, and None when
     either date is unknown. `is_citation` marks a run that starts as a reference to another
     act, or that holds a window of the Commission's proposal (`proposal_texts`).
@@ -218,7 +221,7 @@ def find_origins(
         words = words_of(text.text)
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
-        for phrase_index, (first, end) in _runs(folded, index, first_words).items():
+        for phrase_index, (first, end) in _runs(folded, index, first_words, rarity).items():
             phrase = verbatim[phrase_index]
             carrying = carriers[phrase.phrase_id]
             dates = [d for d in (_tabled(a, amendments) for a in carrying) if d is not None]
@@ -270,6 +273,7 @@ def find_tabled_origins(
     amendments: Sequence[Amendment],
     documents: Sequence[tuple[SourceDocument, DocumentText]],
     *,
+    rarity: Rarity,
     adopted: Sequence[AdoptedPhrase] = (),
     submitters: Mapping[str, Actor] | None = None,
     proposal_texts: Iterable[str] = (),
@@ -279,8 +283,9 @@ def find_tabled_origins(
     The words an amendment inserted (`lineage.inserted_blocks`) are indexed by 8-word window,
     leaving out windows of the Commission's proposal, which are not the amendment's request.
     For each (amendment block, document) pair the longest shared run of at least
-    `MIN_ADOPTED_RUN_WORDS` words is kept. A run that lies wholly inside adopted wording is
-    left to `find_origins`, so a phrase is adopted or tabled, never both. Runs with the same
+    `MIN_ADOPTED_RUN_WORDS` words that `rarity` finds significant is kept. A run that lies
+    wholly inside adopted wording is left to `find_origins`, so a phrase is adopted or
+    tabled, never both. Runs with the same
     folded words are one `TabledPhrase` carried by every amendment that yielded it; each
     `OriginMatch` names the amendments that share the run with that document, and is dated
     against the earliest of them, as in `find_origins`.
@@ -313,7 +318,7 @@ def find_tabled_origins(
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
         shared: dict[str, tuple[set[str], int, int]] = {}
-        for target, (first, end) in _runs(folded, index, first_words).items():
+        for target, (first, end) in _runs(folded, index, first_words, rarity).items():
             run = tuple(folded[first:end])
             if all(window in adopted_windows for _, window in _windows(run)):
                 continue
