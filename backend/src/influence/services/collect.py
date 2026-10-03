@@ -5,7 +5,7 @@ The procedure catalog built from Parltrack's dossiers resolves what was typed; C
 the proposal and the final act; Parltrack gives the amendments and the MEPs who tabled
 them; Have Your Say, joined by COM reference only, gives the submissions, split into
 passages; the Transparency Register resolves who sent them. Nothing here names a law: a
-procedure number, CELEX, COM reference or title all take the same path.
+procedure number, CELEX, COM reference, common name or title all take the same path.
 
 Every stage saves through `StageStore`, keyed by its inputs and the source revision, so a
 rerun reuses finished work and a code change redoes it. Each stage also saves a partial
@@ -49,7 +49,7 @@ from influence.schemas.atlas import (
     mep_actor_id,
 )
 from influence.services.actors import ActorResolver, merge_actors, resolution_summary
-from influence.services.law_query import parse_query, resolve_title
+from influence.services.law_query import LAW_ALIASES, parse_query, resolve_title
 from influence.services.passages import document_passages
 
 LAYERS: tuple[Layer, ...] = (
@@ -69,19 +69,6 @@ PARLIAMENT_POSITION_GAP = (
     "text, and the EP API adopted-texts connector is not built"
 )
 NOT_BUILT_GAP = "No connector for this layer is built yet"
-# Common names the title search cannot reach, because the name shares no word with the
-# official title ("AI Act" against "Artificial Intelligence Act"). An alias is used only
-# when its procedure is in the catalog; a law missing from this table still resolves by
-# title, procedure number, CELEX or COM reference.
-ALIASES: Mapping[str, str] = {
-    "ai act": "2021/0106(COD)",
-    "aia": "2021/0106(COD)",
-    "dsa": "2020/0361(COD)",
-    "dma": "2020/0374(COD)",
-    "csddd": "2022/0051(COD)",
-    "cs3d": "2022/0051(COD)",
-    "ehds": "2022/0140(COD)",
-}
 _COM = re.compile(r"COM\((\d{4})\)(\d+)")
 _MEP_PREFIX = "actor:mep:"
 _HASH_CHUNK_BYTES = 1 << 20
@@ -206,13 +193,19 @@ def proposal_celex(com_reference: str) -> str | None:
 
 
 def resolve_law(
-    text: str, catalog: Sequence[ProcedureEntry], fetcher: CachedFetcher
+    text: str,
+    catalog: Sequence[ProcedureEntry],
+    fetcher: CachedFetcher,
+    aliases: Mapping[str, str] = LAW_ALIASES,
 ) -> ResolvedLaw:
     """Identify one procedure from what was typed, or say why that is not possible.
 
     The local catalog answers first; CELLAR is asked only for a CELEX or COM number the
-    catalog does not hold. A title is never sent anywhere: it is matched locally, and a
-    close race returns the choices instead of a guess. Linear in the catalog's size.
+    catalog does not hold. Text is a common name in `aliases` or else a title, matched
+    locally and never sent anywhere; a close race returns the choices instead of a guess.
+    Unlike a typed procedure number, a name whose procedure the dossiers dump lacks stops
+    the run: every listed law predates the dump, so its absence means a damaged dump or a
+    wrong entry, not a new law. Linear in the catalog's size.
     """
     try:
         query = parse_query(text)
@@ -223,8 +216,15 @@ def resolve_law(
         return ResolvedLaw(query.value, by_id.get(query.value))
     if query.kind == "title":
         resolution = resolve_title(
-            query.value, ((e.procedure_id, e.title) for e in catalog), ALIASES
+            query.value, ((e.procedure_id, e.title) for e in catalog), aliases
         )
+        if resolution.missing is not None:
+            raise CollectError(
+                f"{text!r} is the common name of {resolution.missing}, which the Parltrack "
+                "dossiers dump does not hold: the dump is incomplete or the alias is wrong. "
+                f"Download a current ep_dossiers dump, or type {resolution.missing} to "
+                "collect the law without its catalog record"
+            )
         if resolution.chosen is not None:
             return ResolvedLaw(
                 resolution.chosen.procedure_id, by_id[resolution.chosen.procedure_id]
@@ -720,6 +720,10 @@ def _coverage(
     return tuple(rows[layer] for layer in LAYERS)
 
 
+def _unwatched(_law: ResolvedLaw) -> None:
+    """Nobody watches the run: the result names the law when it is done."""
+
+
 def collect_law(
     query: str,
     *,
@@ -727,12 +731,15 @@ def collect_law(
     settings: CollectSettings,
     fetcher: CachedFetcher,
     clock: Callable[[], datetime],
+    on_resolved: Callable[[ResolvedLaw], None] = _unwatched,
 ) -> CollectResult:
     """Resolve the query to one procedure and write its bundle under `data/laws/<slug>/`.
 
-    Stops with `CollectError` when a required file is missing, the law cannot be
-    identified, or the law has neither amendments nor submissions: there would be nothing
-    to analyse, and an empty bundle must not look like a law nobody tried to influence.
+    `on_resolved` hears which law the query named before any stage runs, so a person can
+    stop a run that would take minutes on the wrong law. Stops with `CollectError` when a
+    required file is missing, the law cannot be identified, or the law has neither
+    amendments nor submissions: there would be nothing to analyse, and an empty bundle
+    must not look like a law nobody tried to influence.
     """
     absent = inputs.missing()
     if absent:
@@ -741,6 +748,7 @@ def collect_law(
     started_at = clock()
     catalog = load_catalog(inputs.dossiers, settings.data_root / "catalog")
     law = resolve_law(query, catalog, fetcher)
+    on_resolved(law)
     bundle = settings.data_root / "laws" / procedure_slug(law.procedure_id)
     run = _Run(StageStore(bundle), fetcher, inputs, settings, law, started_at)
     procedure, revision = law.procedure_id, settings.code_revision
