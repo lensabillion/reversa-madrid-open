@@ -151,8 +151,10 @@ The API reads the same data root as the command (`INFLUENCE_DATA_ROOT`, default 
 repository's `data/`; `create_app(atlas_data_root=...)` in tests).
 
 **Limits, stated in every view.** Ask extraction is a stand-in: every passage is one
-ask, so outcome counts count passages, not distinct requests. Link thresholds are part
-4's placeholders and unaudited. Outcomes are traced only for asks with a published or
+ask, so outcome counts count passages, not distinct requests. Only copied-tier links are
+published, at part 4's thresholds calibrated on LobbyPlag (one 2013 law), and their precision
+on new laws is unaudited; the sentence is built from `assessment.py`'s revision and tiers.
+Outcomes are traced only for asks with a published or
 unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
 timed.
 

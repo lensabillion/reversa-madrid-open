@@ -118,14 +118,24 @@ recorded, and no command, route or page joined collection to the explorer. Fixed
 - `influence atlas <law>` (`make atlas LAW=...`) collects, runs parts 3 to 7 through
   `services/pipeline.py` and writes `data/laws/<slug>/atlas.json`; `GET /api/v1/atlas`
   and `GET /api/v1/atlas/{slug}` serve it ([backend README](../backend/README.md#atlas-command-and-view-api-parts-3-to-8)).
-- The explorer page at `/atlas` that renders it is in progress (frontend, same change).
+- The explorer page at `/atlas` lists the laws with a view and opens one by `?law=<slug>`
+  (the URL `make atlas` prints): graph, evidence, coverage, the view's limitations and
+  outcome counts, with explicit loading, empty, not-found and error states
+  ([frontend README](../frontend/README.md#atlas-explorer-page)).
 
 Verified offline (`measured`): on the test world with one genuinely matching pair, the
 command publishes one `copied` link with exact quotes, the graph has its `ECHOED_BY`
-edge, and the API serves the view; `make check-backend` passes with 673 tests and 100%
-branch coverage. **Not verified:** a real law, timings, and link precision. Ask
-extraction is a stand-in (one ask per passage, `passage-v0`) until part 3's extractor
-exists, so outcome counts count passages.
+edge, and the API serves the view; `make check-backend` passes with 732 tests and 100%
+branch coverage. In headless Chromium, the built frontend and the real backend serving that
+view showed the law, its graph and the quoted phrase; a law without a view showed the
+backend's 404 detail, and Back returned to the law. **Not verified:** a real law,
+timings, and link precision. Ask extraction is a stand-in (one ask per passage,
+`passage-v0`) until part 3's extractor exists, so outcome counts count passages. Part 4
+now publishes only `copied`-tier links (`rules-2`, PRs #40 and #43); the view's
+limitations sentence is built from those constants. Part 3's candidate search is still
+the delta query at 5 per amendment, which PR #41 measured at 0.82 recall@5 on LobbyPlag,
+against 0.98 for the union of the delta and whole-text queries at about 6.5 candidates;
+adopting it is open.
 
 ## Architecture Assessment
 
