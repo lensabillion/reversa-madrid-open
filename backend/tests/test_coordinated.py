@@ -378,7 +378,7 @@ def test_the_command_collects_lists_the_clusters_and_writes_them(
     output = capsys.readouterr().out
     path = tmp_path / "laws" / SLUG / coordinated.VIEW_FILE
     assert status == 0
-    assert output.startswith("Collected 2021/0106(COD) Artificial Intelligence Act in ")
+    assert "\nCollected 2021/0106(COD) Artificial Intelligence Act in " in output
     assert (
         "Coordinated amendments: 1 of 1 clusters span political groups "
         "(4 amendments: 2 compared, 2 too short, 0 not comparable)\n"
