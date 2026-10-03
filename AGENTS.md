@@ -98,6 +98,7 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
 | `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
+| `make collect LAW=<query> [ATTACHMENTS=<n>]` | Atlas part 1: resolves a law by name, procedure, CELEX or COM number and writes its texts, amendments, consultation feedback and actors under `data/laws/<procedure>/` with a run manifest. Needs the Parltrack dumps and the register export under `data/raw/` ([backend README](backend/README.md#collect-command)) and network |
 | `make submit PAIRS=<file> OUT=<dir>` | From the first brief: scores a JSON Lines pairs file into `OUT/pairs.csv` and `OUT/pairs.evidence.jsonl`. The Atlas brief has no CSV deliverable; the command stays until part 4 (verify links) replaces it |
 
 Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.

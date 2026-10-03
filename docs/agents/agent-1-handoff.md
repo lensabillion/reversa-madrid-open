@@ -7,6 +7,22 @@ branch `feat/collect-law` (draft PR
 otherwise. Tags: `measured` (we ran it), `reported` (a sub-agent's report, not rechecked
 by the lead), `not verified`.
 
+## Update, 15:30 CEST: Collect Service and Command
+
+PRs #25 and #26 are merged. The collect service and `influence collect` (steps 3 and 4,
+CLI half, of [Next Steps](#next-steps-in-order)) are on `feat/collect-command`, PR
+[#36](https://github.com/lensabillion/reversa-madrid-open/pull/36); measured results are
+in [implementation status](../implementation-status.md#collect-one-law--3-october-2026).
+Steps 1 and 6 are done with them: Have Your Say measured on publications 14488 (304
+items, 259 with attachments, 177 well-formed Register IDs of 187 typed) and 25429
+(`HysUnavailable`, a labelled gap); the alias table is in `services/collect.py`.
+
+What remains, in order: the open points of step 2 (none was decided; the service keeps
+the connectors' behaviour); thin atlas routers and `influence atlas <query>` (rest of
+step 4); an uncached timing from an empty `data/cache` (rest of step 5); steps 7 to 9; a
+scripted download of the dumps and register; Parliament's position text. The sections
+below are the 14:40 state and are kept as written.
+
 ## Start Here
 
 1. `git fetch && git checkout feat/collect-law`.

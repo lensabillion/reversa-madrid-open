@@ -108,6 +108,64 @@ plan step 4 (`rev-e5xh`). Rehearse the command on 60 public LobbyPlag pairs with
 /absolute/path/to/lobbyplag`; the [recorded run](validation/submission-rehearsal-2026-10-02.json)
 took 0.16 seconds per complete command on an Apple M5, including interpreter start-up.
 
+## Collect Command
+
+`influence collect` is part 1 of the Atlas architecture: it turns what a person types into
+one law's normalised public record on disk. The query may be a common name (`AI Act`), a
+procedure number (`2021/0106(COD)`, the identifier of one EU legislative file), a CELEX
+number (`32024R1689`, the identifier of one legal text) or a COM number (`COM(2021) 206`,
+the Commission's proposal). From the repository root:
+
+```sh
+make collect LAW="2021/0106(COD)"            # every consultation attachment
+make collect LAW="AI Act" ATTACHMENTS=30     # only the first 30, for a fast first run
+# equivalent: uv run --directory backend --locked influence collect "AI Act" --attachment-limit 30
+```
+
+It reads two kinds of input. The Parltrack dumps and the Transparency Register export are
+large files read from disk; download them once (a scripted download does not exist yet):
+
+```sh
+mkdir -p data/raw/parltrack data/raw/registry
+for name in ep_dossiers ep_meps ep_amendments ep_plenary_amendments; do
+  curl -fL -o "data/raw/parltrack/$name.json.zst" "https://parltrack.org/dumps/$name.json.zst"
+done
+curl -fL -o data/raw/registry/register.xml   https://ec.europa.eu/transparencyregister/public/files/ODP/download/XML/latest
+```
+
+Law texts (CELLAR) and consultation feedback with its attachments (Have Your Say) are
+fetched over HTTP through the rate-limited cache under `data/cache/`, so an interrupted
+run resumes where it stopped.
+
+The run has five stages. Each writes JSON Lines files under
+`data/laws/<procedure>/stages/<stage>/<input hash>/` with a receipt, and is reused on the
+next run when its inputs and the code revision are unchanged and it ended without errors:
+
+| Stage | Sources | Files |
+| --- | --- | --- |
+| `law_texts` | CELLAR | `documents`, `texts`, `articles` |
+| `amendments` | Parltrack dumps | `documents`, `amendments` |
+| `asks` | Have Your Say, Transparency Register | `documents`, `texts`, `passages`, `submitters` |
+| `actors` | the two stages above, Parltrack Members | `actors` |
+| `metadata` | everything above | `law` |
+
+`data/laws/<procedure>/manifest.json` is published last, only after every stage file has
+been read back and validated against its record contract in `schemas/atlas.py`. It lists
+the stages with their counts and times, and the law's coverage: one row per layer with a
+status (`complete`, `partial`, `missing`, `not_collected`, `not_applicable`), a count and
+a reason. A gap is always a labelled row, never an empty file.
+
+The command prints the law, the coverage table and the stages, and exits 0. It exits 1
+and publishes no manifest when the query does not name exactly one procedure (the
+candidates are listed) or when the law has neither amendments nor asks. Every other gap,
+such as a consultation the portal does not serve, is a coverage row and the run goes on.
+
+Feedback is read from every publication of the law's Have Your Say initiative (roadmap,
+consultation and proposal feedback), so the `asks` count is the sum over publications;
+the `asks` stage also records `publication_<id>_feedback`, `_with_register_id` and
+`_with_attachments` for each one. Measured results are in
+[implementation status](../docs/implementation-status.md#collect-one-law--3-october-2026).
+
 ## HTTP Contract
 
 | Method and path | Result |

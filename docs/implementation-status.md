@@ -1,6 +1,6 @@
 # Implementation Status and Handoff
 
-Updated October 3, 2026, 11:55 CEST. Update this file when a capability or its
+Updated October 3, 2026, 15:30 CEST. Update this file when a capability or its
 verification changes. Issue ownership and PR state live in tbd; implementation contracts
 live in the [backend README](../backend/README.md). The
 [Influence Atlas brief](brief/influence-atlas-challenge-brief.pdf) defines the
@@ -82,6 +82,47 @@ build. Backend audit found no known vulnerabilities or adverse statuses in 31 pa
 frontend audit found 0 vulnerabilities. These services are not wired into a real-data
 pipeline, API or live explorer yet. Any-law latency, real links and public report
 findings remain unverified. Tracking: `rev-i006` and `rev-5yy6`.
+
+## Collect One Law — 3 October 2026
+
+Agent 1's collect service (`services/collect.py`) and the `influence collect <query>`
+command (`make collect LAW=<query>`) join the PR #26 connectors: PR
+[#36](https://github.com/lensabillion/reversa-madrid-open/pull/36), beads `rev-pjk2` and
+`rev-k9rm`. A query (common name, procedure, CELEX or COM number) resolves to one
+procedure; five resumable stages write the law's texts, amendments, consultation
+feedback with passages, and actors under `data/laws/<procedure>/`; every layer gets a
+coverage row; the manifest is published only after every stage file validates. The
+[backend README](../backend/README.md#collect-command) documents the command.
+
+Plan gate 1 against real sources (`measured`, 3 October, Windows 11 laptop, Intel Core
+Ultra 7 258V, 32 GB, through WSL; revision `collect-3`):
+
+| Law | Proposal / final provisions | Committee / plenary amendments | Feedback items | Attachments read | Passages | Actors | Run | Rerun, all stages reused |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AI Act `2021/0106(COD)`, every attachment | 376 / 712 | 4,852 / 808 | 437 | 352 of 352 | 29,559 | 583 | 165.4 s | 6.6 s (on `collect-2`) |
+| EHDS `2022/0140(COD)`, first 30 attachments (`collect-2`) | 422 / 518 | 2,458 / 557 | 1,600 | 30 of 215 | 5,537 | 607 | 99.7 s | 5.1 s |
+| Data Act `2022/0047(COD)`, first 30 attachments (`collect-2`) | 240 / 354 | 2,412 / 25 | 703 | 30 of 306 | 2,887 | 613 | 79.0 s | 3.1 s |
+
+- The AI Act counts match the research. Its 437 feedback items are two publications of
+  one initiative: 304 on the proposal (publication 14488; 259 with attachments) and 133
+  on the inception impact assessment (13340). Publication 25429 (the White Paper
+  consultation) is not served by the API and is a labelled gap.
+- 187 of the 304 typed something in the register-number field; 177 of those hold one
+  well-formed Register ID, which is what the run counts. The other 10 are not IDs
+  ("No", "0", national numbers), except possibly one written with spaces
+  (`535 183 0264 - 31`), which the parser does not accept.
+- EHDS and the Data Act ran with no code change. The Data Act was not used in development.
+- The run times are **not** uncached times: the Parltrack dumps and the register were on
+  disk, and how much of each law's HTTP traffic was already in `data/cache` from earlier
+  sessions was not checked. The AI Act run above re-ran every stage with its HTTP
+  responses cached. The any-law time from an empty cache is still unmeasured.
+- Parliament's position text is `not_collected` for every law (CELLAR links only the
+  legislative resolution); meetings and votes have no connector.
+- `make collect` was not run on this laptop (`make` is not installed); the command it
+  wraps was.
+- Backend gate with this work: Ruff, strict basedpyright, 633 tests, 100% branch
+  coverage (3,999 statements, 1,010 branches). Frontend gates, `check-docs`,
+  `check-scripts` and the audits were not run locally.
 
 ## Architecture Assessment
 
@@ -189,8 +230,9 @@ and analysis consumer work.
   coverage), the CELLAR law-text connector, and the Have Your Say connector with passage
   splitting (its real-data check is not reported yet). The backend gate passes at 14:35:
   486 tests, 100% branch coverage (`measured`).
-- Not started: the collect service, `influence collect <query>`, the run on real sources
-  for the AI Act and its timings. No real-data link, score or graph is produced by a
+- Since then: the collect service and `influence collect <query>` exist and were run on
+  real sources (see [Collect One Law](#collect-one-law--3-october-2026)). Still not
+  started: the thin atlas routers and `influence atlas <query>`. No real-data link, score or graph is produced by a
   collect service yet; Agent 3's graph consumer is verified on synthetic inputs.
 
 ## Continuing in Another Chat

@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend
 
@@ -70,6 +70,12 @@ submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
 	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
 	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
+
+# Part 1 of the Atlas: one law's public record under data/laws/. ATTACHMENTS is passed only
+# when set, so the command's own default (every attachment) stays the one copy.
+collect:  ## Collect one law's public record: make collect LAW="2021/0106(COD)" [ATTACHMENTS=30]
+	$(if $(LAW),,$(error LAW is required: make collect LAW="2021/0106(COD)"))
+	$(BACKEND) influence collect "$(LAW)" $(if $(ATTACHMENTS),--attachment-limit $(ATTACHMENTS))
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci
