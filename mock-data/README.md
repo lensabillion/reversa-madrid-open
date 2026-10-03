@@ -12,7 +12,7 @@ make dev-frontend                                # http://localhost:3000/lineage
 | File | Law | Produced by | Run |
 | --- | --- | --- | --- |
 | `laws/2021-0106-COD/lineage.json` | AI Act, 2021/0106(COD) | `make lineage LAW='AI Act' ARGS='--jev --jev-max-usd 1'` on `main` at `ceb0023` | 589 lexical (word-for-word) and 37 semantic (Jev) origins; Jev judged 3,829 pairs for 0.22 USD |
-| `laws/2020-0340-COD/lineage.json` | Data Governance Act, 2020/0340(COD) | `make lineage LAW='2020/0340(COD)' ARGS='--jev'` on this branch at `010ee1d` (10 min 11 s, collect 553 s) | 72 lexical and 10 semantic (Jev) origins; Jev judged 1,014 of 1,043 pairs for 0.07 USD |
+| `laws/2020-0340-COD/lineage.json` | Data Governance Act, 2020/0340(COD) | `make lineage LAW='2020/0340(COD)' ARGS='--jev'` on this branch at `06a8711` (rerun with word totals; texts cached, 3 min 18 s) | 72 lexical and 10 semantic (Jev) origins; 15,714 proposal words, 26,755 final-act words |
 
 Generated, not edited: every link, count and ranking comes from the pipeline. The file is
 a snapshot, not a source of truth; rerun the command to refresh it. All content is public
