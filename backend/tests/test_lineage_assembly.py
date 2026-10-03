@@ -161,8 +161,11 @@ def test_the_command_prints_what_is_known_and_says_what_is_not(
 ) -> None:
     coordinated_world(tmp_path, monkeypatch)
 
-    def fixed(_collected: Collected, *, generated_at: datetime) -> LineageView:
+    def fixed(
+        _collected: Collected, *, generated_at: datetime, judge: object = None
+    ) -> LineageView:
         assert generated_at.tzinfo is not None
+        assert judge is None  # no --jev
         return view
 
     monkeypatch.setattr(cli, "build_lineage", fixed)
