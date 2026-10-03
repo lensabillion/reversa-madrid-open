@@ -184,6 +184,7 @@ function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void 
       <AtlasWorkspace
         snapshot={view.snapshot}
         links={atlas.links}
+        coverage={view.coverage}
         coverageNotes={atlas.coverageNotes}
         dataNotice={atlas.dataNotice}
         analysis={

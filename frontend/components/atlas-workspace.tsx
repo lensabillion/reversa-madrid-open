@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
+import type { AtlasLayerCoverage } from "../lib/atlas-api";
+import { AtlasSourceLayers } from "./atlas-coverage";
 import { AtlasExplorer, type AtlasLinkView } from "./atlas-explorer";
 import { AtlasGraph, type AtlasGraphSnapshot } from "./atlas-graph";
 
@@ -8,12 +10,14 @@ import { AtlasGraph, type AtlasGraphSnapshot } from "./atlas-graph";
 export function AtlasWorkspace({
   snapshot,
   links,
+  coverage,
   coverageNotes,
   dataNotice,
   analysis,
 }: {
   snapshot: AtlasGraphSnapshot;
   links: readonly AtlasLinkView[];
+  coverage: readonly AtlasLayerCoverage[];
   coverageNotes: readonly string[];
   dataNotice: string;
   analysis: ReactNode;
@@ -88,13 +92,16 @@ export function AtlasWorkspace({
           ))}
         </nav>
         {view === "graph" && (
-          <AtlasGraph
-            snapshot={snapshot}
-            onSelectLink={(linkId) => {
-              setSelectedLink(linkId);
-              setView("evidence");
-            }}
-          />
+          <>
+            <AtlasSourceLayers coverage={coverage} links={links} />
+            <AtlasGraph
+              snapshot={snapshot}
+              onSelectLink={(linkId) => {
+                setSelectedLink(linkId);
+                setView("evidence");
+              }}
+            />
+          </>
         )}
         {view === "evidence" && selectedUnavailable && (
           <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-5 text-sm">
