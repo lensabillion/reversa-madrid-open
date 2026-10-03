@@ -3,9 +3,9 @@ type: is
 id: is-01m3z9e72y2h66snf8c7fpppem
 title: "Plan step 1: submission command that scores supplied pairs and writes a validated pairs.csv"
 kind: feature
-status: in_progress
+status: closed
 priority: 0
-version: 4
+version: 5
 delegate: claude-code@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,8 +13,12 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T21:48:31.197Z
-updated_at: 2026-10-03T08:14:47.488Z
+updated_at: 2026-10-03T08:48:03.096Z
 started_at: 2026-10-02T21:51:38.238Z
+closed_at: 2026-10-03T08:48:03.095Z
+close_reason: "PR #19 merged 2026-10-03 08:41Z as b4b5444: make submit writes a validated pairs.csv and evidence JSONL; 60-pair LobbyPlag rehearsal 0.16 s on Apple M5. All nine CI checks passed. Note: the organizers replaced the Challenge 03 brief on 2026-10-03 (Influence Atlas), which has no pairs.csv deliverable."
+resolution: null
+duplicate_of: null
 ---
 Architecture parts 1-4 wired into one command (see .agents/skills/influence-architecture). Read a normalized pairs input (JSON Lines; the organizers' format gets an adapter once D5 is answered), score each pair with the existing comparison service, write pairs.csv (pair_id,influence_score) atomically after validating exactly the input IDs, uniqueness and finite scores in [0,1], and save each score's evidence. Rehearse on 60 LobbyPlag pairs against a timer. Part of rev-fkut (R11).
 

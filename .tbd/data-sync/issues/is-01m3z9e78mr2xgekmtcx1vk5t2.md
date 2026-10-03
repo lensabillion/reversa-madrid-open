@@ -3,9 +3,9 @@ type: is
 id: is-01m3z9e78mr2xgekmtcx1vk5t2
 title: "Plan step 2: practice harness on main (precision in top 20, recall, AUC on simulated 30+30 tests)"
 kind: feature
-status: in_progress
+status: closed
 priority: 0
-version: 3
+version: 4
 delegate: claude-code@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,8 +13,12 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T21:48:31.379Z
-updated_at: 2026-10-03T08:21:25.037Z
+updated_at: 2026-10-03T08:48:02.924Z
 started_at: 2026-10-02T21:53:43.811Z
+closed_at: 2026-10-03T08:48:02.923Z
+close_reason: "PR #20 merged 2026-10-03 08:35Z as 4185f3b: practice harness on main. Lexical P@20 0.980, recall 0.814, AUC 0.863 over 2,000 simulated 30+30 tests; per-fold AUC 0.655-0.987; 161 backend tests, 100% coverage. All nine CI checks passed."
+resolution: null
+duplicate_of: null
 ---
 Architecture practice loop. Labelled LobbyPlag pairs with provenance (verified = positive; crowd-rejected = weak negative, R1; no synthetic same-article negatives, R2), folds that keep each lobby organization and each amendment out of its own training data (R4), paired 30+30 draws with random tie-breaking and a printed seed, reported for main's lexical scorer and LobbyPlag's stored match. Every later scorer change reports before and after here. Covers rev-ol2g, rev-aekp, rev-p2rd.
 
