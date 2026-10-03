@@ -17,7 +17,7 @@ from influence.repositories.lobbyplag import (
     DemoRepository,
     EntityNotFoundError,
 )
-from influence.routers import atlas, comparison, demo, documents, health, scoring
+from influence.routers import atlas, comparison, demo, documents, health, lineage, scoring
 from influence.services.demo import DemoService
 
 # Installed metadata makes pyproject.toml the single source for the API version.
@@ -29,8 +29,8 @@ LOGGER = logging.getLogger(__name__)
 def create_app(data_dir: Path | None = None, atlas_data_root: Path | None = None) -> FastAPI:
     """Build an app whose dataset is loaded once, on its first data request.
 
-    `atlas_data_root` holds the law bundles `influence atlas` writes; it defaults to
-    `INFLUENCE_DATA_ROOT` or the repository's `data/`, as the command does.
+    `atlas_data_root` holds the law bundles `influence atlas` and `influence lineage` write;
+    it defaults to `INFLUENCE_DATA_ROOT` or the repository's `data/`, as the commands do.
     """
     app = FastAPI(title="Influence Graph API", version=VERSION)
     app.add_middleware(
@@ -63,6 +63,7 @@ def create_app(data_dir: Path | None = None, atlas_data_root: Path | None = None
     app.include_router(documents.router)
     app.include_router(comparison.router)
     app.include_router(atlas.router)
+    app.include_router(lineage.router)
 
     @app.exception_handler(DatasetUnavailableError)
     async def unavailable(_request: Request, _error: DatasetUnavailableError) -> JSONResponse:

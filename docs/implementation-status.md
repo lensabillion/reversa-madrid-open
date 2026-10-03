@@ -186,9 +186,15 @@ Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with at
   explorer renders it unchanged (6 verbatim links on the AI Act, checked in a browser).
 - `services/jev.py` and its offline tests come from `feat/jev-gate-three` (PR #63) unchanged.
 
-- **After merging main** (8-word runs holding the law's rare words, `5ff514c`): on the AI Act
-  512 amendments adopt wording, `lineage_view.py` writes 110 verbatim links (109 published),
-  and the Jev dry run has 2,550 pairs, 2,430 distinct requests, 11.95 MB, about 0.13 USD.
+- **On main after `7459f15`** (8-word runs holding the law's rare words; adopted wording
+  counted once): on the AI Act 838 amendments carry 631 adopted phrases. Before this fix,
+  `lineage_view.py` reported 110 verbatim links, over half of them the name "the High-Level
+  Expert Group on Artificial Intelligence", and the outcomes tab called adopted wording "not
+  reflected". It now leaves out phrases that 3+ submitters repeat (7 phrases) and writes 96
+  links (68 published) from 93 origin matches, with each published link's final-act outcome
+  quoting the adopted phrase (27 partial). Still shown: "been published in the Official
+  Journal of the European Union" (5 links) and the Commission's addressee formula (4 links).
+  The Jev dry run has 4,180 pairs, 3,943 distinct requests, 19.4 MB, about 0.20 USD.
 - **Practice set** (`backend/benchmarks/lineage_practice.py`, LobbyPlag 272 pairs, same folds
   and draws as the harness; `evaluation/lineage-practice.json`): the verbatim rule (8+ words,
   3+ rare) selects 97 pairs, 92 right (precision 0.949, Wilson 95% 0.885–0.978), recall
@@ -200,6 +206,27 @@ Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with at
 
 Next: run `lineage_jev.py --execute`, rebuild the view, read a sample of the reworded links,
 and fix the citation filter for the institutional formula.
+
+## Explorer Reads the Lineage View — 3 October 2026
+
+The owner asked to connect the frontend to lineage instead of the Atlas view (bead
+`rev-658l`). `influence lineage <law>` (`make lineage LAW=...`,
+`services/lineage_assembly.py`) writes `data/laws/<slug>/lineage.json`; this change serves
+it and shows it:
+
+- `GET /api/v1/lineage` and `GET /api/v1/lineage/{slug}` (`services/lineage_views.py`,
+  `routers/lineage.py`) read the written views
+  ([backend README](../backend/README.md#lineage-view-api-the-explorers-view)); the command
+  now also prints the explorer URL.
+- The page `/lineage` lists the laws with a lineage view and shows each adopted or tabled
+  phrase beside its final-act quotation, the amendments that carry it and the consultation
+  documents that say it, with the date order, plus credit by political group and Member as
+  "N of M amendments adopted" ([frontend README](../frontend/README.md#lineage-explorer-page)).
+  The evidence workspace's header now links to `/lineage`; `/atlas` still works by URL.
+
+Verified offline only, on the backend's test world (see the PR for commands and output).
+Not verified: a real law's view in the page, and the precision of the claims (the review
+gate in `practice/lineage_review.py` has not been run).
 
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
@@ -304,6 +331,7 @@ Open decisions are not settled until the project owner agrees.
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
 | Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
 | Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |
+| The explorer reads the lineage view (`/lineage`), not the Atlas view | Asked by the owner 2026-10-03; decided when the owner merges the PR (bead `rev-658l`) | Lineage starts from the final law, so every shown claim is wording that reached the law; `/atlas` and `make atlas` stay until a separate change removes them |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |

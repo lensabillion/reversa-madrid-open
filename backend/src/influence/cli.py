@@ -324,6 +324,7 @@ def _list_lineage(result: CollectResult) -> int:
                 f"adopted, {credit.phrases} phrase(s) ({credit.joint_phrases} joint)"
             )
     print(f"lineage: {path.absolute()}")
+    print(f"explorer: http://localhost:3000/lineage?law={view.slug}")
     return 0
 
 

@@ -294,6 +294,23 @@ with the models fetched, `make evaluate-dense` (commands in the module docstring
 change also touches every other fold-based result (`practice-results.json`,
 `calculation-*.json`): rerun `python -m influence.practice` and `benchmarks/calculation_plan.py`.
 
+## Lineage View API (the Explorer's View)
+
+`influence lineage <law>` writes `lineage.json` (see "Lineage Command (Outcome First)" below)
+and prints the explorer URL, `http://localhost:3000/lineage?law=<slug>`. The API reads the
+written views back (`services/lineage_views.py`, `routers/lineage.py`), from the same data
+root as the command (`INFLUENCE_DATA_ROOT`, default the repository's `data/`):
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /api/v1/lineage` | `{"laws": [{slug, procedure_id, title, run_id, status, adopted_phrases, amendments_adopting, documents_with_origin}]}` for every law with a `lineage.json`; a count is null when the view could not compute it |
+| `GET /api/v1/lineage/{slug}` | The `LineageView`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+
+`tests/fixtures/lineage/view.json` is the offline test world's view, regenerated with
+`uv run --directory backend --locked python tests/test_lineage_views.py`; the frontend
+tests read it, so its TypeScript types are checked against real backend JSON
+(`tests/test_lineage_views.py` fails when the committed file drifts).
+
 ## Coordinated Amendments Command (Part 3)
 
 `influence coordinated <law>` (`make coordinated LAW='2021/0106(COD)'`) collects the law

@@ -164,8 +164,8 @@ export default function EvidenceWorkspace() {
           >
             Compare texts
           </button>
-          <Link href="/atlas" className={`${buttonStyle} text-stone-500`}>
-            Influence Atlas
+          <Link href="/lineage" className={`${buttonStyle} text-stone-500`}>
+            Lineage explorer
           </Link>
         </nav>
       </header>

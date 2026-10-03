@@ -46,12 +46,12 @@ async function readLawView(url: string, signal: AbortSignal): Promise<LawViewRes
   }
 }
 
-function sentence(text: string): string {
+export function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
 /** One plain sentence for a layer that is not complete; `null` for a complete layer. */
-function coverageNote(row: AtlasLayerCoverage): string | null {
+export function coverageNote(row: AtlasLayerCoverage): string | null {
   let state: string;
   switch (row.status) {
     case "complete":
@@ -136,7 +136,7 @@ function prepareLawAtlas(view: AtlasView): LawAtlas {
 type Prepared = { ok: true; atlas: LawAtlas } | { ok: false; error: string };
 
 /** A full-width message in place of the workspace; `announce` sets its live-region role. */
-function StateMessage({
+export function StateMessage({
   announce,
   title,
   children,
@@ -158,7 +158,7 @@ function StateMessage({
   );
 }
 
-const retryStyle =
+export const retryStyle =
   "text-teal-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-teal-700";
 
 function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void }) {

@@ -117,7 +117,7 @@ def test_the_command_collects_traces_and_writes_the_lineage(
     path = tmp_path / "laws" / SLUG / lineage_assembly.VIEW_FILE
     assert status == 0
     assert "\nLineage: " in output
-    assert output.endswith(f"lineage: {path}\n")
+    assert output.endswith(f"lineage: {path}\nexplorer: http://localhost:3000/lineage?law={SLUG}\n")
     view = LineageView.model_validate_json(path.read_bytes())
     assert view.procedure_id == AI_ACT
 
