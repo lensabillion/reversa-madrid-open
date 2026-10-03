@@ -32,6 +32,7 @@ from influence.schemas.atlas import (
     DocumentText,
     LawRecord,
     LinkAssessment,
+    LinkTier,
     Outcome,
     Passage,
     RunManifest,
@@ -54,9 +55,18 @@ from influence.services.assessment import (
 )
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
+from influence.services.calculation import (
+    EntailmentEvidence,
+    JevEvidence,
+    PublicationEvidence,
+    SemanticEvidence,
+    calculate_links,
+)
+from influence.services.calibration import FittedCombiner
 from influence.services.outcomes import trace_outcomes
 from influence.services.prose_match import rarity_weights
 from influence.services.retrieval import PassageIndex
+from influence.services.signals import SignalCorpus
 
 ASK_METHOD = "passage-v0"
 CANDIDATES_PER_AMENDMENT = 5
@@ -298,8 +308,37 @@ def _rankings(
     )
 
 
+@dataclass(frozen=True)
+class FittedVerification:
+    """One explicit fitted verifier for the existing atlas path; never loads models or keys.
+
+    The caller supplies content-bound model evidence for the complete retrieved pool.
+    Publication still requires the calculation service's frozen approval and audit policy.
+    Missing required features fail explicitly; runtime does not substitute lexical scores.
+    This service-level option has no CLI artifact loader; callers supply the records directly.
+    """
+
+    corpus: SignalCorpus
+    combiner: FittedCombiner
+    publication: Mapping[LinkTier, PublicationEvidence]
+    semantics: Mapping[str, SemanticEvidence] | None = None
+    semantic_model: tuple[str, str] | None = None
+    entailment: Mapping[str, EntailmentEvidence] | None = None
+    entailment_model: tuple[str, str] | None = None
+    entailment_decision: str | None = None
+    jev: Mapping[str, JevEvidence] | None = None
+    jev_model: tuple[str, str] | None = None
+    jev_prompt_revision: str | None = None
+    approved_model_digests: frozenset[str] = frozenset()
+    proposal_texts: Mapping[str, str] | None = None
+
+
 def build_view(
-    collected: Collected, *, generated_at: datetime, publish_prose: bool = False
+    collected: Collected,
+    *,
+    generated_at: datetime,
+    publish_prose: bool = False,
+    verification: FittedVerification | None = None,
 ) -> AtlasView:
     """Run parts 3 to 7 and keep every record the shown links reach, and only those.
 
@@ -313,16 +352,49 @@ def build_view(
     texts = {text.document_id: text.text for text in collected.document_texts}
     unsearchable: list[str] = []
     unsearchable_asks: dict[str, str] = {}
-    links = assess_candidates(
-        find_candidates(
-            collected.amendments, asks, unsearchable, unsearchable_asks=unsearchable_asks
-        ),
-        amendments,
-        asks_by_id,
-        texts,
-        (article.text for article in collected.articles),
-        publish_prose,
+    candidates = find_candidates(
+        collected.amendments, asks, unsearchable, unsearchable_asks=unsearchable_asks
     )
+    if verification is None:
+        links = assess_candidates(
+            candidates,
+            amendments,
+            asks_by_id,
+            texts,
+            (article.text for article in collected.articles),
+            publish_prose,
+        )
+        limitations = LIMITATIONS
+    else:
+        if publish_prose:
+            raise PipelineError("Fitted verification cannot use a blanket prose override")
+        links = calculate_links(
+            candidates,
+            amendments=amendments,
+            asks=asks_by_id,
+            source_texts=texts,
+            corpus=verification.corpus,
+            combiner=verification.combiner,
+            publication=verification.publication,
+            semantics=verification.semantics,
+            semantic_model=verification.semantic_model,
+            entailment=verification.entailment,
+            entailment_model=verification.entailment_model,
+            entailment_decision=verification.entailment_decision,
+            jev=verification.jev,
+            jev_model=verification.jev_model,
+            jev_prompt_revision=verification.jev_prompt_revision,
+            approved_model_digests=verification.approved_model_digests,
+            proposal_texts=verification.proposal_texts,
+        )
+        limitations = (
+            LIMITATIONS[0],
+            "Links use the explicitly configured fitted signal model; publication requires "
+            "matching frozen model approval and tier audit evidence. Available signals: "
+            + ", ".join(verification.combiner.feature_names)
+            + ".",
+            LIMITATIONS[2],
+        )
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)
 
@@ -385,7 +457,7 @@ def build_view(
         snapshot=snapshot,
         rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
         limitations=(
-            *LIMITATIONS,
+            *limitations,
             *(
                 (
                     f"{len(unsearchable)} amendment(s) were too long or empty to search "
