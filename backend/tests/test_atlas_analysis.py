@@ -9,7 +9,12 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from influence.schemas.atlas import LayerCoverage
-from influence.services.atlas_analysis import OutcomeAnalysis, OutcomeCounts, aggregate_outcomes
+from influence.services.atlas_analysis import (
+    MIN_ASSESSED_ASKS,
+    OutcomeAnalysis,
+    OutcomeCounts,
+    aggregate_outcomes,
+)
 
 
 def analyse(
@@ -283,3 +288,43 @@ def test_complete_ask_inventory_count_mismatch_is_visible_with_or_without_rows()
         }
     )
     assert not analyse(replace(partial_inventory, laws=(consistent,))).rows[-1].incomplete
+
+
+def test_rows_below_the_assessed_minimum_never_lead_and_the_inventory_check_can_be_off() -> None:
+    """Regression: "2 of 2" outranked an actor with enough assessed asks (plan, part 7)."""
+    fixture = build_fixture()
+    (watch_ask,) = (ask for ask in fixture.asks if ask.actor_id == WATCH)
+    (watch_final,) = (outcome for outcome in fixture.outcomes if outcome.ask_id == watch_ask.ask_id)
+    extra_asks = tuple(
+        watch_ask.model_copy(update={"ask_id": f"ask:a-watch-{n}"}) for n in range(1, 3)
+    )
+    extra_outcomes = tuple(
+        watch_final.model_copy(update={"ask_id": ask.ask_id, "outcome_id": f"outcome:{ask.ask_id}"})
+        for ask in extra_asks
+    )
+    result = analyse(
+        replace(
+            fixture,
+            asks=(*fixture.asks, *extra_asks),
+            outcomes=(*fixture.outcomes, *extra_outcomes),
+        )
+    )
+    finals = [row for row in result.rows if row.counts.stage == "final_act"]
+    assert (finals[0].actor_id, finals[0].counts.assessed_asks) == (WATCH, MIN_ASSESSED_ASKS)
+    assert finals[0].counts.full_win_rate == 0
+    assert (finals[1].actor_id, finals[1].counts.full_win_rate) == (MAKERS, 1.0)
+    assert f"fewer than {MIN_ASSESSED_ASKS} assessed asks" in result.ranking_basis
+
+    law = fixture.laws[0].model_copy(
+        update={"coverage": (LayerCoverage(layer="asks", status="complete", count=99),)}
+    )
+    mismatched = replace(fixture, laws=(law, *fixture.laws[1:]))
+    assert any("ask inventory mismatch" in gap for gap in analyse(mismatched).coverage_gaps)
+    unchecked = aggregate_outcomes(
+        laws=mismatched.laws,
+        actors=mismatched.actors,
+        asks=mismatched.asks,
+        outcomes=mismatched.outcomes,
+        ask_inventory=False,
+    )
+    assert not any("ask inventory mismatch" in gap for gap in unchecked.coverage_gaps)

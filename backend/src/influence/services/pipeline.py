@@ -8,16 +8,19 @@ counts (`services/atlas_analysis.py`). Nothing is scored, ranked or judged here.
 
 The outcome counts take every ask, not only the shown ones, so their denominators are
 complete: an ask without a traced outcome counts as unknown, never as a loss and never left
-out. Asks without a link are not traced to the final act on their own wording, because that
-costs one alignment pass over every final provision per ask: about 130 ms per ask against
-712 provisions, measured on 3 October 2026, which is over an hour for the AI Act's 29,000
-passages.
+out. The rankings count outcomes traced through published links only (plan section 7): the
+view keeps the outcomes traced through unconfirmed links for the audit view, but an ask
+whose only links are unconfirmed is unknown in the rankings. Asks without a link are not
+traced to the final act on their own wording, because that costs one alignment pass over
+every final provision per ask: about 130 ms per ask against 712 provisions, measured on
+3 October 2026, which is over an hour for the AI Act's 29,000 passages.
 
 One stand-in remains until part 3's ask extraction exists: every consultation passage is
 treated as one ask (`ASK_METHOD`). That is enough to find and quote links, but it makes
 outcome counts count passages, not distinct requests, and the view says so.
 """
 
+from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -50,6 +53,7 @@ from influence.schemas.atlas_view import (
     AtlasLawList,
     AtlasLawSummary,
     AtlasView,
+    InvalidAtlasView,
     RankingRow,
 )
 from influence.schemas.retrieval import SourcePassage
@@ -59,7 +63,7 @@ from influence.services.assessment import (
     ask_limit_reason,
     assess_link,
 )
-from influence.services.atlas_analysis import aggregate_outcomes
+from influence.services.atlas_analysis import MIN_ASSESSED_ASKS, aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.outcomes import trace_outcomes
 from influence.services.prose_match import rarity_weights
@@ -72,17 +76,35 @@ VIEW_FILE = "atlas.json"
 # contradicted ones. `insufficient_evidence` verdicts stay out of the view.
 SHOWN_STATUSES = frozenset({"published", "unconfirmed", "contradicted"})
 # A link the ask could have caused, so the ask's outcome is traced through its amendment.
+# Unconfirmed links are traced for the audit view only; the rankings use RANKED_STATUSES.
 TRACED_STATUSES = frozenset({"published", "unconfirmed"})
+RANKED_STATUSES = frozenset({"published"})
+# Recall at 5 of the changed-words query on LobbyPlag's 172 verified pairs
+# (`evaluation/retrieval-recall.json`), and of its union with a whole-text query
+# (`evaluation/fused-retrieval.json`), which this pipeline does not run.
+DELTA_RECALL_AT_5 = 0.82
+UNION_RECALL_AT_5 = 0.965
 LIMITATIONS = (
     "Ask extraction v0: each consultation passage is treated as one ask, so outcome counts "
     "count passages, not distinct requests.",
     # Built from part 4's own constants, so the sentence follows its revision and tiers.
     f"Links come from lexical rules ({METHOD_REVISION}); only "
-    f"{' and '.join(sorted(DEFAULT_PUBLISHABLE))}-tier links are published, at thresholds "
-    "calibrated on LobbyPlag's labelled pairs from one 2013 law; their precision on this law "
-    "has not been audited yet.",
-    "Outcomes are traced only for asks with a published or unconfirmed link; every other "
-    "ask counts as unknown in the rankings, not as a loss.",
+    f"{' and '.join(sorted(DEFAULT_PUBLISHABLE))}-tier links are published, at provisional "
+    "thresholds proposed from LobbyPlag's labelled pairs from one 2013 law and not yet "
+    "frozen: the held-out Wilson lower bound of the copied threshold's precision (0.86) is "
+    "below the 0.90 floor, and precision on this law has not been audited yet.",
+    f"Retrieval keeps the top {CANDIDATES_PER_AMENDMENT} BM25 candidates per amendment, "
+    "searched with the amendment's changed words only; on LobbyPlag that query finds "
+    f"{DELTA_RECALL_AT_5:.0%} of verified pairs in its top {CANDIDATES_PER_AMENDMENT} "
+    f"(adding a whole-text query would find {UNION_RECALL_AT_5:.1%} but is not run), so "
+    "some true links are never assessed.",
+    "Rankings count only outcomes traced through published links. Outcomes traced through "
+    "unconfirmed links are kept for the audit view and never counted: an ask whose only "
+    "links are unconfirmed, like an ask with no link, counts as unknown, not as a loss.",
+    "One link is kept per amendment, actor, document and quoted ask span, so an instruction "
+    "in the sentence two overlapping passages share is not shown twice. For counting, asks "
+    "of one actor that request the same normalised text (a feedback text and its "
+    "attachment, for example) count as one ask.",
     "Ask extraction v0 records no direction, so an ask to keep the proposal's text unchanged "
     "is not recognised and is never judged as a defence of the status quo.",
 )
@@ -170,8 +192,9 @@ def find_candidates(
     """The top BM25 asks for each amendment's changed words.
 
     An amendment the scorer's bounds refuse (over 800 tokens a side, as a long recital can
-    be, or no text) has no candidates; its ID is appended to `unsearchable` so the view can
-    say so, instead of one long amendment stopping a whole law.
+    be, or no text), or whose change leaves no word to search (case or punctuation only),
+    has no candidates; its ID is appended to `unsearchable` so the view can say so, instead
+    of one long amendment stopping a whole law.
 
     Unsupported asks are excluded before indexing so they cannot consume the shortlist.
     Their IDs/reasons are recorded in unsearchable_asks, never their truncated replacements.
@@ -208,6 +231,11 @@ def find_candidates(
                 k=CANDIDATES_PER_AMENDMENT,
             )
         except ValueError:
+            if unsearchable is not None:
+                unsearchable.append(amendment.amendment_id)
+            continue
+        if not shortlist.query_terms:
+            # A change of case or punctuation only leaves no word to search for.
             if unsearchable is not None:
                 unsearchable.append(amendment.amendment_id)
             continue
@@ -304,21 +332,141 @@ def trace(
     return tuple(outcomes)
 
 
+def _strength(link: LinkAssessment) -> tuple[bool, bool, float, str]:
+    return (
+        link.status != "published",
+        link.status != "unconfirmed",
+        -link.support_score,
+        link.link_id,
+    )
+
+
+def deduplicate_links(
+    links: Iterable[LinkAssessment], asks: Mapping[str, Ask]
+) -> tuple[LinkAssessment, ...]:
+    """One link per amendment, actor, document and quoted ask span: the strongest, in order.
+
+    Consultation passages overlap by one sentence (`services/passages.py`), so an
+    instruction in the shared sentence is quoted at the same absolute offsets from two asks
+    and would be shown, and counted, twice. A link that quotes no ask span is kept as it is.
+    O(L log L) in the links.
+    """
+    links = tuple(links)
+    kept: dict[tuple[object, ...], str] = {}
+    for link in sorted(links, key=_strength):
+        ask = asks[link.ask_id]
+        quoted = tuple((span.record_id, span.start, span.end) for span in link.ask_spans)
+        key = (link.amendment_id, ask.actor_id, ask.joint_actor_ids, ask.document_id, quoted)
+        kept.setdefault(key if quoted else (link.link_id,), link.link_id)
+    chosen = set(kept.values())
+    return tuple(link for link in links if link.link_id in chosen)
+
+
+def ranked_outcomes(
+    links: Iterable[LinkAssessment], outcomes: Iterable[Outcome]
+) -> tuple[Outcome, ...]:
+    """The outcomes the rankings may count: those of asks with a published link.
+
+    `outcomes` are the view's, traced through published and unconfirmed links. A published
+    link is always ask-first (`LinkAssessment` refuses any other) and `origin_links` takes
+    published links first, so an ask with one was traced through a published link and its
+    outcomes are kept unchanged; an ask with only unconfirmed links loses its outcomes and
+    counts as unknown. Linear in the links and outcomes.
+    """
+    ranked = {link.ask_id for link in links if link.status in RANKED_STATUSES}
+    return tuple(outcome for outcome in outcomes if outcome.ask_id in ranked)
+
+
+def _normalised(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
+def counted_asks(
+    asks: Sequence[Ask], links: Iterable[LinkAssessment], outcomes: Sequence[Outcome]
+) -> tuple[tuple[Ask, ...], tuple[Outcome, ...]]:
+    """One ask per actor (with its co-signers) and normalised requested text, for counting.
+
+    The requested text is what the ask's published origin link quotes, or else the ask's
+    own passage, so a feedback text and its attachment that ask for the same wording count
+    once (plan section 7). The ask kept is the first by ID that has a ranked outcome, so a
+    repeat never hides an assessed outcome; the others' outcomes are not counted. Linear in
+    the asks and outcomes apart from sorting each group.
+    """
+    origins = origin_links(link for link in links if link.status in RANKED_STATUSES)
+    traced = {outcome.ask_id for outcome in outcomes}
+    groups: dict[tuple[str, tuple[str, ...], str], list[Ask]] = defaultdict(list)
+    for ask in asks:
+        origin = origins.get(ask.ask_id)
+        quoted = (
+            " ".join(span.text for span in origin.ask_spans)
+            if origin is not None and origin.ask_spans
+            else ask.span.text
+        )
+        groups[(ask.actor_id, tuple(sorted(ask.joint_actor_ids)), _normalised(quoted))].append(ask)
+    kept: set[str] = set()
+    for members in groups.values():
+        ordered = sorted(members, key=lambda ask: ask.ask_id)
+        kept.add(next((a.ask_id for a in ordered if a.ask_id in traced), ordered[0].ask_id))
+    return (
+        tuple(ask for ask in asks if ask.ask_id in kept),
+        tuple(outcome for outcome in outcomes if outcome.ask_id in kept),
+    )
+
+
 def _rankings(
-    law: LawRecord, actors: Sequence[Actor], asks: Sequence[Ask], outcomes: Sequence[Outcome]
+    law: LawRecord,
+    actors: Sequence[Actor],
+    asks: Sequence[Ask],
+    links: Sequence[LinkAssessment],
+    outcomes: Sequence[Outcome],
 ) -> tuple[tuple[RankingRow, ...], tuple[str, ...]]:
     """Final-act rows over every ask, and the sentences that qualify them.
 
-    The sentences say how many asks the rows count and how many of those are unknown, and
-    repeat each final-act coverage gap the analysis found, so a reader of the rankings sees
-    why the counts may be incomplete.
+    `outcomes` must be traced through published links only (`ranked_outcomes`). The
+    sentences say how many asks the rows count and how many of those are unknown, how many
+    repeats and unconfirmed-only asks were set aside, and repeat each final-act coverage gap
+    the analysis found, so a reader of the rankings sees why the counts may be incomplete.
     """
-    analysis = aggregate_outcomes(laws=(law,), actors=actors, asks=asks, outcomes=outcomes)
+    counted, counted_outcomes = counted_asks(asks, links, outcomes)
+    ranked = {link.ask_id for link in links if link.status in RANKED_STATUSES}
+    unconfirmed_only = {
+        link.ask_id
+        for link in links
+        if link.status in TRACED_STATUSES and link.ask_id not in ranked
+    }
+    # The asks layer counts feedback items, but passage-v0 asks are passages: comparing the
+    # two would report a mismatch on every law, so the check waits for real ask extraction.
+    analysis = aggregate_outcomes(
+        laws=(law,),
+        actors=actors,
+        asks=counted,
+        outcomes=counted_outcomes,
+        ask_inventory=False,
+    )
     (total,) = (counts for counts in analysis.totals if counts.stage == "final_act")
     prefix = "final_act: "
+    repeats = len(asks) - len(counted)
     notes = (
         f"Final-act outcome counts cover all {total.observed_asks} ask(s): "
         f"{total.assessed_asks} assessed and {total.unknown} unknown.",
+        *(
+            (
+                f"{repeats} ask(s) repeat another ask of the same actor with the same "
+                "requested text and are counted once.",
+            )
+            if repeats
+            else ()
+        ),
+        *(
+            (
+                f"{len(unconfirmed_only)} ask(s) have only unconfirmed links and count as "
+                "unknown in the rankings until a link is published.",
+            )
+            if unconfirmed_only
+            else ()
+        ),
+        f"Actors with fewer than {MIN_ASSESSED_ASKS} assessed asks are listed after the "
+        "rest, whatever their rate, so a '1 of 1' cannot lead the ranking.",
         *(
             f"Final-act counts may be incomplete: {gap.removeprefix(prefix)}"
             for gap in analysis.coverage_gaps
@@ -350,8 +498,17 @@ def build_view(
     """Run parts 3 to 7 and keep every record the shown links reach, and only those.
 
     The graph and the bundle are built from the same records, so the frontend adapter
-    re-checks exactly what the graph shows.
+    re-checks exactly what the graph shows. Records that do not fit together (a record
+    that fails validation, conflicting outcomes) raise PipelineError, so the command can
+    keep the collected bundle and say why instead of stopping on a traceback.
     """
+    try:
+        return _view(collected, generated_at=generated_at, publish_prose=publish_prose)
+    except ValueError as error:
+        raise PipelineError(f"The view cannot be built from this run: {error}") from error
+
+
+def _view(collected: Collected, *, generated_at: datetime, publish_prose: bool) -> AtlasView:
     law = collected.law
     asks = asks_from_passages(collected.passages)
     amendments = {amendment.amendment_id: amendment for amendment in collected.amendments}
@@ -369,7 +526,7 @@ def build_view(
         (article.text for article in collected.articles),
         publish_prose,
     )
-    shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
+    shown = deduplicate_links((link for link in links if link.status in SHOWN_STATUSES), asks_by_id)
     outcomes = trace(asks, amendments, shown, collected.articles)
 
     ask_ids = {link.ask_id for link in shown}
@@ -401,8 +558,15 @@ def build_view(
         outcomes=outcomes,
     )
     # Every ask and every actor, not the shown subset: counting only shown asks would leave
-    # out the asks nobody matched and overstate each actor's win rate.
-    rankings, ranking_notes = _rankings(law, collected.actors, asks, outcomes)
+    # out the asks nobody matched and overstate each actor's win rate. Only outcomes traced
+    # through published links are counted.
+    rankings, ranking_notes = _rankings(
+        law,
+        collected.actors,
+        asks,
+        shown,
+        ranked_outcomes(shown, outcomes),
+    )
     run_id = collected.manifest.run_id
     try:
         snapshot = build_graph(
@@ -438,8 +602,8 @@ def build_view(
             *ranking_notes,
             *(
                 (
-                    f"{len(unsearchable)} amendment(s) were too long or empty to search "
-                    "and have no candidates.",
+                    f"{len(unsearchable)} amendment(s) were too long or empty to search, or "
+                    "changed only case or punctuation, and have no candidates.",
                 )
                 if unsearchable
                 else ()
@@ -479,14 +643,41 @@ def read_view(data_root: Path, slug: str) -> AtlasView | None:
     return _load_view(path) if path.is_file() else None
 
 
+def remove_stale_view(bundle: Path, run_id: str) -> bool:
+    """Remove the bundle's view unless it was built from `run_id`; True when one was removed.
+
+    Called when building a view fails after a collect run: the old view would otherwise
+    keep being served, and read by `directions`, beside the newer run's records. A view
+    that cannot be read is removed too; a view of this same run is kept.
+    """
+    path = bundle / VIEW_FILE
+    if not path.is_file():
+        return False
+    try:
+        current = _load_view(path).run_id == run_id
+    except PipelineError:
+        current = False
+    if current:
+        return False
+    path.unlink()
+    return True
+
+
 def list_views(data_root: Path) -> AtlasLawList:
-    """Every law with a written view, newest procedure first."""
-    views = (
-        _load_view(path)
-        for path in sorted((data_root / "laws").glob(f"*/{VIEW_FILE}"), reverse=True)
-    )
-    return AtlasLawList(
-        laws=tuple(
+    """Every law with a valid written view, newest procedure first.
+
+    A view that cannot be read is listed under `invalid` with its reason instead of
+    failing the whole list, so one broken law does not hide every other.
+    """
+    laws: list[AtlasLawSummary] = []
+    invalid: list[InvalidAtlasView] = []
+    for path in sorted((data_root / "laws").glob(f"*/{VIEW_FILE}"), reverse=True):
+        try:
+            view = _load_view(path)
+        except PipelineError as error:
+            invalid.append(InvalidAtlasView(slug=path.parent.name, reason=str(error)))
+            continue
+        laws.append(
             AtlasLawSummary(
                 slug=view.slug,
                 procedure_id=view.procedure_id,
@@ -494,6 +685,5 @@ def list_views(data_root: Path) -> AtlasLawList:
                 run_id=view.run_id,
                 published_links=sum(link.status == "published" for link in view.bundle.links),
             )
-            for view in views
         )
-    )
+    return AtlasLawList(laws=tuple(laws), invalid=tuple(invalid))

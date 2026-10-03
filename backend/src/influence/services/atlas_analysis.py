@@ -26,6 +26,9 @@ _REQUIRED: dict[OutcomeStage, tuple[Layer, ...]] = {
     "parliament_position": ("asks", "actors", "parliament_position"),
     "final_act": ("asks", "actors", "final_act"),
 }
+# Plan section 4, part 7: a row needs this many assessed asks before its rate is compared,
+# so "1 of 1" cannot lead. Rows below it are sorted after every row that meets it.
+MIN_ASSESSED_ASKS = 3
 
 
 @dataclass(frozen=True)
@@ -81,7 +84,10 @@ class OutcomeAnalysis:
     coverage_gaps: tuple[str, ...]
     incomplete: bool
     scope: str = "Descriptive outcomes within observed coverage; no causal attribution."
-    ranking_basis: str = "Raw observed full-win rate; no smoothing or causal score."
+    ranking_basis: str = (
+        "Raw observed full-win rate; no smoothing or causal score. Rows with fewer than "
+        f"{MIN_ASSESSED_ASKS} assessed asks are sorted after the rest."
+    )
 
 
 def _unique[T](records: Sequence[T], key: Callable[[T], str]) -> dict[str, T]:
@@ -133,6 +139,7 @@ def aggregate_outcomes(
     outcomes: Sequence[Outcome],
     topic: str | None = None,
     year: int | None = None,
+    ask_inventory: bool = True,
 ) -> OutcomeAnalysis:
     """Count every canonical ask once, including unmatched asks and missing outcomes.
 
@@ -140,8 +147,12 @@ def aggregate_outcomes(
     not an inferred submission or completion date. Equal classifications from multiple
     amendments count once with all support IDs retained. Conflicting classifications or
     duplicate IDs with different records fail explicitly, including outside the filter.
-    Within each stage, raw full-win rates descend (unknown last), then assessed counts
-    descend, then actor IDs break ties. Small samples are not smoothed or causal scores.
+    Within each stage, rows with at least MIN_ASSESSED_ASKS assessed asks come first; then
+    raw full-win rates descend (unknown last), then assessed counts descend, then actor IDs
+    break ties. `ask_inventory` compares a complete asks layer's count with the canonical
+    asks supplied; turn it off when that layer counts something else (submissions, while
+    each passage stands in for an ask), or every law reports a mismatch. Small samples are
+    not smoothed or causal scores.
 
     For one-law runs and cached batches: O(N + J log J + E log E), where N is input
     records, J is actor/ask memberships and E is retained evidence. Three stages are
@@ -190,7 +201,8 @@ def aggregate_outcomes(
             f"{procedure_id}: ask inventory mismatch: coverage reports {layer.count}, "
             f"supplied {ask_counts[procedure_id]} canonical asks"
             for layer in law.coverage
-            if layer.layer == "asks"
+            if ask_inventory
+            and layer.layer == "asks"
             and layer.status == "complete"
             and layer.count is not None
             and layer.count != ask_counts[procedure_id]
@@ -237,6 +249,7 @@ def aggregate_outcomes(
     rows.sort(
         key=lambda row: (
             _STAGES.index(row.counts.stage),
+            row.counts.assessed_asks < MIN_ASSESSED_ASKS,
             row.counts.full_win_rate is None,
             -(row.counts.full_win_rate or 0),
             -row.counts.assessed_asks,

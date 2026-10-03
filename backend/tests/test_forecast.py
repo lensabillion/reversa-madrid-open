@@ -80,12 +80,26 @@ def test_an_outcome_decided_on_or_after_the_cutoff_cannot_train() -> None:
         fit(_day(1), history)
     knew_late = Example(
         procedure_id="p",
-        features=Features(topic="t0", amendment_count=1, observed_at=_day(9)),
-        decided_at=_day(1),
+        features=Features(topic="t0", amendment_count=1, observed_at=_day(6)),
+        decided_at=_day(7),
         won=True,
     )
     with pytest.raises(LeakageError):
         check_no_leakage(_day(5), Features("t0", 1, _day(0)), [knew_late])
+
+
+@pytest.mark.parametrize("observed", [1, 9])
+def test_an_example_whose_features_were_not_observed_before_its_outcome_is_refused(
+    observed: int,
+) -> None:
+    """Regression: features observed on or after the decision could train or test a model."""
+    with pytest.raises(ValueError, match="not before the outcome"):
+        Example(
+            procedure_id="p",
+            features=Features(topic="t0", amendment_count=1, observed_at=_day(observed)),
+            decided_at=_day(1),
+            won=True,
+        )
 
 
 @given(
