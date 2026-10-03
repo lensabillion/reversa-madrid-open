@@ -1,14 +1,16 @@
 # Implementation Status and Handoff
 
-Updated October 3, 2026, 11:00 CEST. Update this file when a capability or its
+Updated October 3, 2026, 11:55 CEST. Update this file when a capability or its
 verification changes. Issue ownership and PR state live in tbd; implementation contracts
 live in the [backend README](../backend/README.md). The
 [Influence Atlas brief](brief/influence-atlas-challenge-brief.pdf) defines the
 competition. The [Atlas explainer](explainer/influence-atlas-primer.md) explains it from
 first principles: what changed, the architecture, the data, the models and the plan. The
-[technical design](design/influence-atlas-design.md) (`rev-f090`) gives the record
-contracts and acceptance tests for the same eight parts. `attic/` is not an
-implementation source.
+[technical design](design/influence-atlas-design.md) gives the record contracts and
+acceptance tests for the same eight parts. The [consolidated execution plan](plan.md)
+(`rev-f090`) settles where those documents and the uploaded
+[technical plan](brief/PLAN.md) disagree, and orders the work as acceptance gates.
+`attic/` is not an implementation source.
 
 ## Objective and Deliverables
 
@@ -54,8 +56,8 @@ EUR-Lex folders hold only GDPR samples: the consultation papers and final texts 
 
 ## Architecture Assessment
 
-The proposed Atlas architecture is eight parts plus a practice loop
-([explainer §6](explainer/influence-atlas-primer.md#6-the-architecture)): collect,
+The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
+practice loop ([explainer §6](explainer/influence-atlas-primer.md#6-the-architecture)): collect,
 resolve actors, find candidates, verify links, trace outcomes, atlas graph, analyse,
 publish. It differs from the first design in four ways: we search for candidate pairs
 ourselves (part 3); the judge is tuned for the precision of what we show rather than for
@@ -63,7 +65,12 @@ a 50/50 test (part 4); the final law is traced for every link (part 5); and acto
 rankings, explanations, the forecast and the report are new (parts 2, 7, 8).
 The technical design adds typed records (source document, procedure, actor, ask,
 amendment, article version, public position, evidence link, outcome, forecast, run
-manifest) and a seven-step delivery sequence with completion tests.
+manifest) and a seven-step delivery sequence with completion tests. The
+[consolidated plan](plan.md) compares both with the uploaded technical plan: it keeps that
+plan's law resolver, law bundle, degradation modes and audit, and replaces its scraping
+routes, hand-set weights and thresholds, fuzzy quote check, short-edit filter,
+fractional credit and leave-one-law-out forecast validation, giving the reason for each
+([plan §3](plan.md#3-where-they-differ-and-the-choice)).
 
 The implemented dependency direction stays: HTTP routers → typed contracts and services
 → repositories or extraction and scoring functions, so batch commands call the same
@@ -82,9 +89,10 @@ Open decisions are not settled until the project owner agrees.
 | --- | --- | --- |
 | Compete in Challenge 03 | Decided 2026-10-02 for the first brief; the owner asked on 2026-10-03 to re-plan for the Atlas brief | [Research](research/research-2026-10-02-reversa-challenges.md); [Atlas explainer §1](explainer/influence-atlas-primer.md#1-what-changed-this-morning) |
 | The Influence Atlas brief replaces the first Challenge 03 brief | Reported by the owner 2026-10-03 | The new brief's rules ("We hand out nothing"), schedule (demos 19:30, no 19:00 inputs) and scoring leave no hidden test |
-| Architecture: eight parts plus a practice loop (Atlas) | **Proposed** 2026-10-03; decided when the owner merges the PR that adds it | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |
-| Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | **Proposed** 2026-10-03, with the architecture | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
-| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | **Proposed** 2026-10-03, with the architecture | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| Architecture: eight parts plus a practice loop (Atlas) | Decided 2026-10-03: the owner merged PR [#21](https://github.com/lensabillion/reversa-madrid-open/pull/21) at 11:33 | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |
+| Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
+| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) |
+| Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | **Proposed** 2026-10-03; decided when the owner merges the PR that adds it | [docs/plan.md](plan.md), §3 for each choice and its reason; bead `rev-f090` | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
@@ -101,7 +109,8 @@ Open decisions are not settled until the project owner agrees.
 
 The beads below are children of the epic `rev-i2dl` and depend on each other in this
 order (`tbd ready` shows what is unblocked). Points are the brief's criteria each one
-carries.
+carries. [Plan §7](plan.md#7-acceptance-gates-in-order) gives each step its completion
+test and target time.
 
 1. `rev-pjk2` Part 1 · Collect one law from its procedure number; start the downloads
    for the flagship laws now, in the background (every criterion depends on it).
@@ -127,11 +136,13 @@ those beads report measurements.
 ## Continuing in Another Chat
 
 Run `tbd prime`, `tbd sync --pull`, and read the relevant bead before claiming it.
-Read `AGENTS.md`, the Atlas brief, the Atlas explainer, the technical design, this file
-and the backend README. Check Git and PR state before editing; keep one concern per PR
-and leave beads open until merge. The first brief's work is merged on `main` (PRs
-#10–#20). Two sessions re-planned concurrently on 3 October in one checkout (`rev-sz6q`
-for the explainer, skill, state and beads; `rev-f090` for the technical design); check
-`git status` before editing shared files. Load data and start services using README
+Read `AGENTS.md`, the Atlas brief, the Atlas explainer, the technical design, the
+consolidated plan, this file and the backend README. Check Git and PR state before
+editing; keep one concern per PR and leave beads open until merge. The first brief's work
+is merged on `main` (PRs #10–#20), and the Atlas re-plan in #21. Two sessions re-planned concurrently on 3 October in
+one checkout (`rev-sz6q` for the explainer, skill, state and beads; `rev-f090` for the
+technical design and plan); check `git status` before editing shared files. The first
+`docs/plan.md` was written only in a local checkout and never pushed, so a cloud session
+rebuilt it from the bead's notes: commit and push before a session ends. Load data and start services using README
 commands; never depend on a previous chat's running server, temporary log or browser
 state.

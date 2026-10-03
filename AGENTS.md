@@ -71,6 +71,8 @@ These come from the project owner and override any default habit.
 | `frontend/` | Next.js web app (npm project) |
 | `scripts/` | Repository checks used by `make` targets and CI |
 | `docs/implementation-status.md` | Current state, decisions and next work; read first |
+| `docs/plan.md` | The consolidated execution plan: tools, thresholds and acceptance gates in order |
+| `docs/design/` | The technical design: record contracts and completion tests per part |
 | `docs/brief/` | The organizers' briefs: the current Influence Atlas brief and the superseded first brief |
 | `docs/research/` | Research documents and softschema catalogs |
 | `docs/explainer/` | The team explainer, in Markdown so GitHub renders it |
