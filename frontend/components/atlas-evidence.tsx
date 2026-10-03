@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import type { TextSpan } from "../lib/api";
+import { sourceContext } from "../lib/source-context";
 import { HighlightedText } from "./highlighted-text";
 
 /** Display-only props: the GraphSnapshot adapter supplies source excerpts and verdicts. */
@@ -56,6 +60,61 @@ function publicUrl(value: string): string | null {
   }
 }
 
+const count = new Intl.NumberFormat("en-US");
+
+/**
+ * Bounded windows around every cited span, so a long submission does not push its
+ * highlight tens of thousands of pixels below the other three columns. The full source
+ * stays one click away; offsets are never changed, only the visible slice.
+ */
+function SourceText({
+  characters,
+  text,
+  spans,
+}: {
+  characters: readonly string[];
+  text: string;
+  spans: readonly TextSpan[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const segments = sourceContext(characters, spans);
+  const omits = segments.some((segment) => segment.kind === "gap");
+  return (
+    <>
+      {omits && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="mb-3 block cursor-pointer font-sans text-xs font-medium text-teal-800 underline underline-offset-4"
+        >
+          {expanded
+            ? "Show cited passages only"
+            : `Show full source text (${count.format(characters.length)} characters)`}
+        </button>
+      )}
+      {expanded || !omits ? (
+        <HighlightedText text={text} spans={spans} />
+      ) : (
+        segments.map((segment) =>
+          segment.kind === "window" ? (
+            <span key={`window-${segment.start}`} className="block">
+              <HighlightedText text={segment.text} spans={segment.spans} />
+            </span>
+          ) : (
+            <span
+              key={`gap-${segment.start}`}
+              className="my-2 block font-sans text-xs italic text-stone-500"
+            >
+              … {count.format(segment.end - segment.start)} characters omitted …
+            </span>
+          ),
+        )
+      )}
+    </>
+  );
+}
+
 function Excerpt({
   title,
   excerpt,
@@ -87,7 +146,11 @@ function Excerpt({
           lang={excerpt.language}
           className="whitespace-pre-wrap break-words font-serif text-base leading-8 text-stone-800"
         >
-          <HighlightedText text={excerpt.text} spans={valid ? excerpt.spans : []} />
+          <SourceText
+            characters={characters}
+            text={excerpt.text}
+            spans={valid ? excerpt.spans : []}
+          />
         </div>
       ) : (
         <p className="text-sm italic leading-6 text-stone-500">{empty}</p>
