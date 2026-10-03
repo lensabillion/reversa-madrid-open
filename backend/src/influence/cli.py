@@ -34,6 +34,7 @@ from influence.services.collect import (
     CollectInputs,
     CollectResult,
     CollectSettings,
+    ResolvedLaw,
     collect_law,
     source_revision,
 )
@@ -131,6 +132,15 @@ def _submit(pairs: Path, out: Path, expected_pairs: int) -> int:
     print(f"pairs.csv: {run.files.pairs_csv.absolute()}")
     print(f"evidence:  {run.files.evidence.absolute()}")
     return 0
+
+
+def _print_resolved(query: str, law: ResolvedLaw) -> None:
+    """Printed before the stages run, so a wrong law can be stopped before it takes minutes."""
+    if law.entry is None:
+        found = "which the Parltrack dossiers dump does not hold"
+    else:
+        found = f"titled {law.entry.title!r} in the Parltrack dossiers dump"
+    print(f"Resolved {query!r} to {law.procedure_id}, {found}", flush=True)
 
 
 def _print_collected(result: CollectResult, elapsed: float) -> None:
@@ -231,6 +241,7 @@ def _collect(
             settings=settings,
             fetcher=fetcher,
             clock=lambda: datetime.now(UTC),
+            on_resolved=lambda law: _print_resolved(query, law),
         )
     except AmbiguousLawError as error:
         print(f"error: {query!r} names more than one procedure:", file=sys.stderr)
@@ -286,11 +297,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             name,
             help=summary,
             description=(
-                "Resolve a law (procedure number, CELEX, COM reference or title) and "
-                f"{summary.split(' ', 1)[1]}."
+                "Resolve a law (procedure number, CELEX, COM reference, common name or "
+                f"title), then {summary}."
             ),
         )
-        command.add_argument("query", nargs="+", help="for example 2021/0106(COD)")
+        command.add_argument(
+            "query", nargs="+", help="for example 2021/0106(COD), 32024R1689 or 'AI Act'"
+        )
         command.add_argument(
             "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
         )

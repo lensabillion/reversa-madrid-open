@@ -356,6 +356,8 @@ def test_skipping_attachments_is_a_labelled_partial_layer(tmp_path: Path) -> Non
         "Artificial Intelligence Act",
         "AI Act",
         "aia",
+        "the AI-Act",
+        "Reglement sur l'IA",
         "32024R1689",
         "COM(2021) 206",
         "2021/106 (cod)",
@@ -400,7 +402,7 @@ def test_unclear_or_unknown_queries_stop_with_the_reason(tmp_path: Path) -> None
     catalog = collect.load_catalog(world.inputs.dossiers, tmp_path / "catalog")
 
     with pytest.raises(AmbiguousLawError) as title_race:
-        collect.resolve_law("Data Act", catalog, world.fetcher)
+        collect.resolve_law("Data", catalog, world.fetcher)
     assert title_race.value.choices == (
         ("2022/0047(COD)", "Data Act"),
         ("2023/0001(COD)", "Data Act"),
@@ -419,6 +421,60 @@ def test_unclear_or_unknown_queries_stop_with_the_reason(tmp_path: Path) -> None
         collect.resolve_law("   ", catalog, world.fetcher)
     with pytest.raises(CollectError, match="CELLAR could not resolve 39999L0001"):
         collect.resolve_law("39999L0001", catalog, world.fetcher)
+
+
+def test_names_that_disagree_return_the_choices_instead_of_a_guess(tmp_path: Path) -> None:
+    world = make_world(tmp_path)
+    catalog = collect.load_catalog(world.inputs.dossiers, tmp_path / "catalog")
+    one_name_two_laws = {"AI Act": AI_ACT, "AI-Act": ONGOING}
+
+    with pytest.raises(AmbiguousLawError) as two_aliases:
+        collect.resolve_law("the AI act", catalog, world.fetcher, one_name_two_laws)
+    # "Data Act" is listed for 2022/0047(COD), and 2023/0001(COD) is titled exactly that.
+    with pytest.raises(AmbiguousLawError) as alias_and_title:
+        collect.resolve_law("the Data Act", catalog, world.fetcher)
+
+    assert two_aliases.value.choices == (
+        (AI_ACT, "Artificial Intelligence Act"),
+        (ONGOING, "Toy Safety"),
+    )
+    assert alias_and_title.value.choices == (
+        ("2022/0047(COD)", "Data Act"),
+        ("2023/0001(COD)", "Data Act"),
+    )
+
+
+def test_a_common_name_whose_procedure_the_dump_lacks_stops_before_any_request(
+    tmp_path: Path,
+) -> None:
+    world = make_world(tmp_path)
+
+    with pytest.raises(
+        CollectError,
+        match=r"'DSA' is the common name of 2020/0361\(COD\), which the Parltrack dossiers "
+        r"dump does not hold: .* type 2020/0361\(COD\) to collect",
+    ):
+        world.collect("DSA")
+
+    assert world.scripted.calls == []
+    assert world.store("2020/0361(COD)").current() is None
+
+
+def test_the_resolved_law_is_reported_before_any_stage_runs(tmp_path: Path) -> None:
+    world = make_world(tmp_path)
+    heard: list[tuple[str, int]] = []
+
+    collect.collect_law(
+        "AI Act",
+        inputs=world.inputs,
+        settings=CollectSettings(data_root=tmp_path, code_revision="src-test"),
+        fetcher=world.fetcher,
+        clock=lambda: NOW,
+        on_resolved=lambda law: heard.append((law.procedure_id, len(world.scripted.calls))),
+    )
+
+    assert heard == [(AI_ACT, 0)]
+    assert world.scripted.calls
 
 
 def test_a_com_reference_maps_to_its_proposal_celex() -> None:
@@ -681,13 +737,54 @@ def test_the_command_prints_the_coverage_table_and_the_manifest(
     status = cli.main(["collect", "2021/0106(COD)", "--data-root", str(tmp_path)])
 
     output = capsys.readouterr().out
+    lines = output.splitlines()
     assert status == 0
     assert logging.getLogger("pypdf").level == logging.ERROR
-    assert output.startswith("Collected 2021/0106(COD) Artificial Intelligence Act in ")
-    rows = {line.split()[0]: line.split(maxsplit=2)[1:] for line in output.splitlines()[1:12]}
+    assert lines[1].startswith("Collected 2021/0106(COD) Artificial Intelligence Act in ")
+    rows = {line.split()[0]: line.split(maxsplit=2)[1:] for line in lines[2:13]}
     assert rows["committee_amendments"] == ["complete", "1"]
     assert rows["meetings"] == ["not_collected", collect.NOT_BUILT_GAP]
     assert f"manifest: {world.store().root / 'manifest.json'}" in output
+
+
+@pytest.mark.parametrize(
+    ("query", "script", "procedure", "found"),
+    [
+        (
+            ["the", "AI-Act"],
+            None,
+            AI_ACT,
+            "titled 'Artificial Intelligence Act' in the Parltrack dossiers dump",
+        ),
+        (
+            [NEWER_THAN_DUMP],
+            [("procedure/2025_59>", sparql({"prop": "52025PC0101"}))],
+            NEWER_THAN_DUMP,
+            "which the Parltrack dossiers dump does not hold",
+        ),
+    ],
+)
+def test_the_command_names_the_law_it_resolved_before_collecting_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    query: list[str],
+    script: Script | None,
+    procedure: str,
+    found: str,
+) -> None:
+    world = make_world(tmp_path, script)
+    scripted_cli(monkeypatch, world)
+
+    status = cli.main(["collect", *query, "--data-root", str(tmp_path)])
+
+    first, collected = capsys.readouterr().out.splitlines()[:2]
+    manifest = world.store(procedure).current()
+    assert status == 0
+    assert first == f"Resolved {' '.join(query)!r} to {procedure}, {found}"
+    assert collected.startswith(f"Collected {procedure} ")
+    assert manifest is not None
+    assert manifest.query == " ".join(query)
 
 
 def test_the_command_lists_the_choices_for_an_unclear_title(
