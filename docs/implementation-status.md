@@ -107,6 +107,21 @@ run with attachments. `parliament_position`, `meetings` and `votes` stay
 `not_collected`; without the Have Your Say index, the consultation is found by a
 labelled title search.
 
+**Common names.** `make collect` and `make atlas` accept a law's common name. PR #49 added
+the first alias table: seven names (AI Act, AIA, DSA, DMA, CSDDD, CS3D, EHDS), each
+resolved against the real Parltrack catalog. Branch `feat/law-aliases` extends it into
+`LAW_ALIASES` in `services/law_query.py`: 84 names for 28 procedures, in English, German,
+French and Spanish ("GDPR", "KI-Verordnung", "Ley de IA", "Lieferkettengesetz"). Names
+compare without case, accents, punctuation, spacing or a surrounding "the". A name is
+tried after the procedure, CELEX and COM shapes and before the title search; it stands
+for its procedure number, which must be in the dossiers dump, and the command prints the
+dossier's title before any stage runs. Two names spelt alike for different procedures,
+or a name that is exactly another procedure's title, return the choices. The 77 added
+names were checked against public EUR-Lex or Legislative Observatory pages or this
+repository's research tables (`verified` against those pages, 3 October); no live CELLAR
+check was run and no real dossiers dump was available, so that each added procedure is in
+the dump is `assumed` until a real run prints its title.
+
 Setup (bead `rev-6c1o`): `make setup` streams the four Parltrack dumps and the register
 export into `data/raw/` (atomic, with a `<name>.source.json` provenance record each) and
 builds `data/catalog/hys-index.jsonl`, so a fresh checkout needs no hand downloads.
@@ -188,6 +203,7 @@ Open decisions are not settled until the project owner agrees.
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
 | Parsed tables are JSON Lines, not Parquet | Decided 2026-10-03 | The playbook asks for Parquet; pyarrow is a new dependency the 14-day cool-off and `no-build` policy have not cleared, and JSON Lines is equally safe against delimiters in legal text. The typed row models in `backend/src/influence/extraction/tables.py` are the contract, so the container can change without touching a parser |
+| Common-name aliases live in code (`LAW_ALIASES` in `backend/src/influence/services/law_query.py`, started by PR #49 in `collect.py`), not in `data/catalog/aliases.jsonl` as plan §5 proposed | **Proposed** 2026-10-03 with branch `feat/law-aliases`; decided when the owner merges it | `data/` is never committed, so a data file would need its own build script before anyone could rerun it; a reviewed table under `backend/src` is versioned with the code that reads it and checked by a test |
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |

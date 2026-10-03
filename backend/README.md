@@ -130,7 +130,7 @@ own:
 
 | Step | Connector | Writes |
 | --- | --- | --- |
-| Resolve the query | `services/law_query.py` over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a title is unclear |
+| Resolve the query | `services/law_query.py` (shapes, the common-name table `LAW_ALIASES`, title ranking) over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a name or title is unclear |
 | `texts` | `repositories/cellar.py`: identifiers by SPARQL, acts as XHTML, split into provisions | `documents`, `document_texts`, `articles` |
 | `amendments` | `repositories/parltrack.py`: committee and plenary dumps, then the MEPs who tabled them | `documents` (the dumps), `amendments`, `actors` |
 | `asks` | `repositories/hys.py` joined by COM reference only; `services/passages.py`; `services/actors.py` over `repositories/register.py` | `documents`, `document_texts`, `passages`, `actors` |
@@ -143,6 +143,40 @@ make collect LAW='2021/0106(COD)'
 make collect LAW='AI Act' ARGS=--no-attachments   # faster; the asks layer is then partial
 # equivalent: uv run --directory backend --locked influence collect "2021/0106(COD)"
 ```
+
+**Resolving the query.** What was typed is tried in this order, and the first that fits
+decides:
+
+1. A procedure number (`2021/0106(COD)`), CELEX number (`32024R1689`) or COM reference
+   (`COM(2021) 206`), recognised by shape.
+2. A common name from `LAW_ALIASES` in `services/law_query.py`: 84 names for 28
+   procedures, in English, German, French and Spanish, such as `AI Act`, `KI-Verordnung`,
+   `Ley de IA`, `DSA`, `GDPR`, `RGPD` and `CSDDD`. Case, accents, punctuation, spacing and
+   a surrounding "the" do not matter (`the ai act`, `AI-Act` and `Reglement sur l'IA` all
+   match), but the whole name must match: `AI` or `AI Acts` do not. The name stands for
+   its procedure number, and that procedure must be in the dossiers dump; if it is not,
+   the command stops and says so, because every listed law predates the dump. Two names
+   spelt alike for different procedures, or a name that is exactly another procedure's
+   title, print the choices instead of picking one.
+3. A title search over the catalog's titles. A close race prints the top three choices.
+
+The command prints the procedure it resolved and that dossier's title before any stage
+runs, for example
+`Resolved 'AI Act' to 2021/0106(COD), titled 'Artificial Intelligence Act' in the
+Parltrack dossiers dump`, so a wrong law can be stopped before it takes minutes.
+
+PR #49 started the table with seven names (`ai act`, `aia`, `dsa`, `dma`, `csddd`,
+`cs3d`, `ehds`), each resolved against the real Parltrack catalog. The others were checked
+against a public EUR-Lex or Legislative Observatory page or this repository's research
+tables, not against the real catalog or CELLAR. To add a name, check its procedure number
+on EUR-Lex or the Legislative Observatory first: a wrong entry analyses the wrong law under
+a name the reader trusts. A test checks that every procedure number has the form
+`2021/0106(COD)`, that no two names are spelt alike, and that every name reaches its own
+procedure. The table is in code rather than in `data/catalog/aliases.jsonl`, as
+`docs/plan.md` §5 proposed, because `data/` is never committed. Resolving a name against a
+synthetic catalog the size of the real one (23,886 titles) took 146 ms when every title
+was ASCII and 328 ms when most held an accent, against 169 to 182 ms for a title search
+(`measured`, median of seven runs, 4-core Xeon at 2.8 GHz, 3 October 2026).
 
 **Inputs.** Five files must exist under the data root (`INFLUENCE_DATA_ROOT`, default the
 repository's `data/`, or `--data-root`); the command stops before any request, naming the
@@ -177,13 +211,14 @@ register and index it read. A code edit therefore redoes the stages. `--refresh`
 every stage and refetches answers the HTTP cache holds.
 
 **Stops.** Exit 1, with no manifest published, when a required file is missing or
-unreadable, the query names no procedure or several (the choices are printed), or the
-law has neither amendments nor consultation submissions. An optional source that fails
+unreadable, the query names no procedure or several (the choices are printed), a common
+name's procedure is not in the dossiers dump, or the law has neither amendments nor
+consultation submissions. An optional source that fails
 (CELLAR, a publication the API does not serve, an attachment) becomes a labelled
 coverage gap instead.
 
 **Not verified.** The command is tested offline on a small world written in the real
-formats (`tests/test_collect.py`, 41 tests). It has not been run on real sources from the
+formats (`tests/test_collect.py`, 50 tests). It has not been run on real sources from the
 cloud session that wrote it, whose network policy blocks the EU hosts, so its real-data
 counts and timings are not measured yet.
 
