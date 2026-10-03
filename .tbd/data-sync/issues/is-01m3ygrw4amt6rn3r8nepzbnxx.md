@@ -3,9 +3,9 @@ type: is
 id: is-01m3ygrw4amt6rn3r8nepzbnxx
 title: Propose the architecture and tool choices, and agree them with the user
 kind: task
-status: in_progress
+status: closed
 priority: 1
-version: 6
+version: 7
 delegate: codex@lensas-macbook-air.local
 labels: []
 dependencies:
@@ -15,8 +15,12 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T14:37:26.025Z
-updated_at: 2026-10-02T19:00:11.690Z
+updated_at: 2026-10-03T08:48:16.837Z
 started_at: 2026-10-02T18:26:08.218Z
+closed_at: 2026-10-03T08:48:16.837Z
+close_reason: The seven-part architecture was agreed on 2026-10-02 (Decisions table). The organizers replaced the brief on 2026-10-03; re-planning continues in rev-sz6q.
+resolution: null
+duplicate_of: null
 ---
 No build code until the user agrees the architecture and tools.
 
