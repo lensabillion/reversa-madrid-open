@@ -248,7 +248,7 @@ test("a long list is paged, and an undated or citing submission is labelled as s
   fireEvent.click(screen.getByRole("button", { name: `Tabled, not adopted (${total})` }));
   expect(screen.getAllByRole("article")).toHaveLength(PHRASES_PER_PAGE);
   expect(screen.getByText("Order unknown")).toBeDefined();
-  expect(screen.getByText("Citation, not a request")).toBeDefined();
+  expect(screen.getByText("Quote of a legal title, not a request")).toBeDefined();
   expect(screen.getByText("Said after the first amendment")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Show more (3 left)" }));
   expect(screen.getAllByRole("article")).toHaveLength(total);
@@ -451,4 +451,32 @@ test("clicking a graph node follows its paths and lists their evidence", async (
   expect(within(section).getAllByRole("article")).toHaveLength(1);
   fireEvent.click(within(section).getByRole("button", { name: "Back to the overview" }));
   expect(within(section).queryByRole("article")).toBeNull();
+});
+
+test("the Method tab walks the four steps with this law's own counts", async () => {
+  serve(view);
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  render(<LineagePage />);
+
+  await openTab("Method");
+  const method = await screen.findByRole("region", { name: "How this analysis works" });
+  expect(
+    within(method)
+      .getAllByRole("heading", { level: 4 })
+      .map((h) => h.textContent),
+  ).toEqual([
+    "Compare the two texts",
+    "Find the amendment",
+    "Find who said it first",
+    "Rank and check",
+    "Where the data comes from",
+  ]);
+  expect(within(method).getByText("103 new words")).toBeDefined();
+  expect(within(method).getByText("1 phrases from 1 amendments")).toBeDefined();
+  expect(within(method).getByText("1 of 5 documents")).toBeDefined();
+  expect(within(method).getByText("What this does not prove")).toBeDefined();
+  const sources = within(method).getByRole("region", { name: "Where the data comes from" });
+  expect(within(sources).getByText("8 proposal provisions")).toBeDefined();
+  expect(within(sources).getByText("2 committee amendments")).toBeDefined();
+  expect(within(sources).getByRole("link", { name: /Have Your Say/ })).toBeDefined();
 });
