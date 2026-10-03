@@ -22,7 +22,7 @@ NPM := cd frontend && npm
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
 	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
-	check-frontend-build audit-frontend fix-frontend dev-frontend
+	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag
 
 # Audits come last: they need network access, and the local gates fail faster.
 check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
@@ -74,6 +74,10 @@ submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
 	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
 	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
+
+# The snapshot is pinned to a commit and verified against recorded SHA-256 digests.
+fetch-lobbyplag:  ## Download and verify LobbyPlag's data into data/lobbyplag/ (needs network).
+	$(BACKEND) python ../scripts/fetch_lobbyplag.py
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci

@@ -96,6 +96,7 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make audit-frontend` | `npm audit` of `frontend/package-lock.json`; moderate severity or higher fails (needs network) |
 | `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |
 | `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
+| `make fetch-lobbyplag` | Downloads LobbyPlag's practice data, pinned to a commit and verified by SHA-256, into `data/lobbyplag/` (needs network) |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
 | `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
 | `make collect LAW='<query>'` | Atlas part 1: resolves a procedure number, CELEX, COM reference or title and writes that law's texts, amendments, submissions, passages and actors, with typed coverage and a run manifest, under `data/laws/<procedure>/`. `ARGS=--no-attachments` skips attachments; `ARGS=--refresh` redoes every stage. See the backend README, "Collect Command" |
