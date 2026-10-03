@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated directions \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -83,6 +83,12 @@ collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' 
 coordinated:  ## List near-identical amendments tabled across political groups: make coordinated LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make coordinated LAW='2021/0106(COD)'))
 	$(BACKEND) influence coordinated "$(LAW)" $(ARGS)
+
+# Atlas part 7, TOWARDS: rule-based directions of the amendments and, through the atlas
+# view's published links, of each actor's asks.
+directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
+	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
+	$(BACKEND) influence directions "$(LAW)" $(ARGS)
 
 submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
