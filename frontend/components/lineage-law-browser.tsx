@@ -27,6 +27,7 @@ import {
   filterPhrases,
   type LineageChannels,
   lineageChannels,
+  lineageFunnel,
   linkPool,
   type OrganisationRanking,
   type PhraseFilter,
@@ -35,7 +36,14 @@ import {
 } from "../lib/lineage-insights";
 import { useResource } from "../lib/use-resource";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
-import { Channels, FiveQuestions, LinkCheck, questionsFor, WhoShaped } from "./lineage-insights";
+import {
+  Channels,
+  FiveQuestions,
+  LineageFunnel,
+  LinkCheck,
+  questionsFor,
+  WhoShaped,
+} from "./lineage-insights";
 import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
@@ -68,16 +76,6 @@ function plural(value: number, one: string, many: string): string {
 }
 
 /** A count the view could not compute is `null`: it reads "unknown", never zero. */
-function known(value: number | null): string {
-  return value === null ? "unknown" : count.format(value);
-}
-
-function ofTotal(part: number | null, whole: number | null): string {
-  return part === null || whole === null
-    ? "unknown"
-    : `${count.format(part)} of ${count.format(whole)}`;
-}
-
 function day(value: string | null): string {
   return value === null ? "date unknown" : value.slice(0, 10);
 }
@@ -478,15 +476,6 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-sm border border-stone-200 bg-white px-4 py-3">
-      <dt className="text-xs text-stone-500">{label}</dt>
-      <dd className="mt-1 text-2xl tabular-nums text-stone-900">{value}</dd>
-    </div>
-  );
-}
-
 type Prepared =
   | {
       ok: true;
@@ -528,12 +517,12 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
     );
   }
   const { lineage, organisations, channels, pool } = prepared;
-  const { counts } = view;
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
   });
   const sections = [
+    ["#lineage-summary", "Summary"],
     ["#lineage-questions", "Five questions"],
     ["#lineage-who", "Who"],
     ["#lineage-how", "How"],
@@ -571,21 +560,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           counts that could not be computed read "unknown".
         </p>
       )}
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Adopted phrases" value={known(counts.adopted_phrases)} />
-        <Stat
-          label="Amendments with adopted wording"
-          value={ofTotal(counts.amendments_adopting, counts.amendments)}
-        />
-        <Stat
-          label="New final-act words traced to an amendment"
-          value={ofTotal(counts.linked_units, counts.changed_units)}
-        />
-        <Stat
-          label="Consultation documents that said it first"
-          value={ofTotal(counts.documents_with_origin, counts.documents_read)}
-        />
-      </dl>
+      <LineageFunnel steps={lineageFunnel(view, organisations)} />
       <FiveQuestions questions={questionsFor(view, lineage, organisations, channels)} />
       <WhoShaped ranking={organisations} />
       <Credits tables={lineage.credits} />

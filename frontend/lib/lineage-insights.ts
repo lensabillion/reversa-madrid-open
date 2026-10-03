@@ -360,3 +360,54 @@ export function drawLinks(
   }
   return items.slice(0, taken);
 }
+
+/** One step of the summary funnel: `part` of `whole`, or a lone count when `whole` is null. */
+export interface FunnelStep {
+  id: "proposal" | "final" | "traced" | "amendments" | "documents";
+  part: number | null;
+  /** `null` when the step has no total to compare with (the two texts' provision counts). */
+  whole: number | null;
+  /** Extra counts the step's sentence quotes, `null` when not counted. */
+  detail: number | null;
+}
+
+function provisions(view: LineageView, layer: "proposal" | "final_act"): number | null {
+  const row = view.coverage.find((item) => item.layer === layer);
+  return row === undefined || row.status !== "complete" ? null : row.count;
+}
+
+/**
+ * The law's lineage as five steps a newcomer reads top to bottom: the proposal's provisions,
+ * the final act's provisions and its new words, the new words traced to amendments (in how
+ * many adopted phrases), the amendments that carry them, and the consultation documents that
+ * said that wording first (from how many named organisations). Only counts already in the
+ * view; nothing is estimated.
+ */
+export function lineageFunnel(
+  view: LineageView,
+  ranking: OrganisationRanking,
+): readonly FunnelStep[] {
+  const { counts } = view;
+  return [
+    { id: "proposal", part: provisions(view, "proposal"), whole: null, detail: null },
+    { id: "final", part: provisions(view, "final_act"), whole: null, detail: counts.changed_units },
+    {
+      id: "traced",
+      part: counts.linked_units,
+      whole: counts.changed_units,
+      detail: counts.adopted_phrases,
+    },
+    {
+      id: "amendments",
+      part: counts.amendments_adopting,
+      whole: counts.amendments,
+      detail: null,
+    },
+    {
+      id: "documents",
+      part: counts.documents_with_origin,
+      whole: counts.documents_read,
+      detail: ranking.rows.filter((row) => row.adoptedFirst > 0).length,
+    },
+  ];
+}
