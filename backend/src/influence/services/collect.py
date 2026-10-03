@@ -70,7 +70,7 @@ from influence.services.passages import document_passages
 
 # Bump when this module's logic changes what a stage writes: it is part of every stage's
 # input hash (through the code revision the caller builds from it), so old stages rerun.
-COLLECT_REVISION = "collect-2"
+COLLECT_REVISION = "collect-3"
 
 DOSSIERS_DUMP = "ep_dossiers"
 COMMITTEE_DUMP = "ep_amendments"
@@ -540,12 +540,15 @@ def _asks(
     gaps = list(consultation.gaps)
     errors = list(consultation.errors)
     items: dict[int, tuple[hys.FeedbackItem, str]] = {}
+    # An item is counted under the first publication that served it.
+    origin: dict[int, int] = {}
     unavailable = 0
     for publication_id in consultation.publication_ids:
         try:
             for position, item in enumerate(hys.iter_feedback(run.fetcher, publication_id)):
                 url = hys.feedback_url(publication_id, position // hys.PAGE_SIZE)
                 items.setdefault(item.feedback_id, (item, url))
+                origin.setdefault(item.feedback_id, publication_id)
         except hys.HysUnavailable as error:
             unavailable += 1
             gaps.append(str(error))
@@ -616,6 +619,13 @@ def _asks(
             )
         )
     without_text = sum(1 for item, _ in items.values() if not item.text.strip())
+    # Per publication, so a run can be checked against the portal's own totals.
+    served = Counter[str]()
+    for item, _ in items.values():
+        prefix = f"publication_{origin[item.feedback_id]}"
+        served[f"{prefix}_feedback"] += 1
+        served[f"{prefix}_with_register_id"] += bool(item.register_id)
+        served[f"{prefix}_with_attachments"] += bool(item.attachments)
     reasons = [*gaps, *errors]
     if without_text:
         # The portal serves some submissions with no text at all (most of the DSA's).
@@ -638,6 +648,8 @@ def _asks(
         "feedback_without_text": without_text,
         "feedback_with_register_id": sum(1 for item, _ in items.values() if item.register_id),
         "feedback_from_citizens": sum(1 for item, _ in items.values() if item.is_citizen),
+        "feedback_with_attachments": sum(1 for item, _ in items.values() if item.attachments),
+        **served,
         "attachments_listed": len(pending),
         "attachments_read": len(chosen) - failed,
         "attachments_failed_download": failed,
