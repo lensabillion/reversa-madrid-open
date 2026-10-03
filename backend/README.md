@@ -230,9 +230,9 @@ pipeline adds no logic of its own; it calls each part's code in order:
 
 | Step | Code | Writes into the view |
 | --- | --- | --- |
-| Asks | `asks_from_passages`: one ask per consultation passage, `extraction_method="passage-v0"` | asks the shown links reach |
+| Asks | `asks_from_passages`: one ask per consultation passage, `extraction_method="passage-v0"`; `direction` read from the passage's quoted instructions (`assessment.requested_direction`), unknown for prose | asks the shown links reach |
 | Candidates | `services/retrieval.py` BM25, top 5 passages per amendment's changed words | (not shown) |
-| Verdicts | `services/assessment.py` on every candidate | links that are `published`, `unconfirmed` or `contradicted` |
+| Verdicts | `services/assessment.py` on every candidate, with 8-word quotations of the proposal masked out of prose (`services/masking.py`, `QuotedLaw`, indexed once per law) | links that are `published`, `unconfirmed` or `contradicted` |
 | Outcomes | `services/outcomes.py` for each ask's strongest published or unconfirmed link | outcomes |
 | Graph | `services/atlas_graph.py` from the same records as the bundle | `snapshot` |
 | Counts | `services/atlas_analysis.py`, final-act rows in its order | `rankings` |
@@ -253,7 +253,9 @@ ask, so outcome counts count passages, not distinct requests. Only copied-tier l
 published, at part 4's thresholds calibrated on LobbyPlag (one 2013 law), and their precision
 on new laws is unaudited; the sentence is built from `assessment.py`'s revision and tiers.
 Outcomes are traced only for asks with a published or
-unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
+unconfirmed link. Only quoted instructions carry a direction, so part 4's same-direction and
+opposite-direction checks do not run on prose asks, and each prose link says so; when the
+proposal's text is missing, the view says its quotations were not masked. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
 timed.
 
 ## Coordinated Amendments Command (Part 3)
