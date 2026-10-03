@@ -100,12 +100,45 @@ Its full `make check` also passes 106 backend and 38 frontend tests, build and a
 Browser inspection confirmed the three explanatory captions and Amazon's filename/page
 inside its own column. Model accuracy is unchanged by this display clarification.
 
+## Atlas Explorer Page
+
+`/atlas` shows the Atlas for the laws the pipeline has built; the header's **Influence
+Atlas** link opens it from the evidence workspace. It reads two backend endpoints, through
+the same `/api/v1/…` proxy:
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /api/v1/atlas` | `{"laws": [...]}`: slug, procedure, title, run and published-link count per law |
+| `GET /api/v1/atlas/{slug}` | One law's `atlas-view-1` view: coverage, `atlas-1` bundle, graph snapshot, rankings, limitations; 404 when the law has no run |
+
+The selected law lives in the URL (`/atlas?law=2021-0106-COD`), so a reload or a shared
+link reopens it. The view becomes `AtlasWorkspace` props: the snapshot as the graph,
+`atlasLinkViews(bundle)` as the evidence, one sentence per coverage layer that is not
+complete, and the limitations plus the ask method as the data notice. Rankings keep the
+backend's order; their rows link no sources yet, and every report section shows its
+labelled gap, because no report has been generated.
+
+Every state is explicit: loading, no laws built yet (with the `make atlas LAW='…'` command),
+no run for the requested law (the backend's 404 detail), and request failures (the
+backend's `detail`, with Retry). If the adapter rejects the bundle, for example a quote
+that does not match its source text, the page shows the message and nothing else from that
+run: it never renders partial or repaired evidence.
+
+- `app/atlas/page.tsx`: the route; a Suspense boundary lets the shell prerender
+- `components/atlas-law-browser.tsx`: law selector, URL state, view-to-props mapping, states
+- `lib/atlas-api.ts`: endpoint types and readers; a non-2xx answer throws `AtlasApiError`
+
+`tests/atlas-page.test.tsx` feeds the page the committed `atlas-1` fixtures through a mocked
+`fetch`, with a stand-in for Next.js's search-params hook. Not verified: the page against
+the real backend endpoints (built in parallel), a real law's run, and a browser session.
+
 ## Atlas Components and Agent 3 Handoff
 
 `AtlasWorkspace` opens on an explanation and a graph: who requested a change, which
 amendment matched it, and what appeared in the final law. Separate views provide the
-source evidence and descriptive outcome counts. The production application route still
-uses the earlier evidence workspace; Agent 1's API/route integration remains pending.
+source evidence and descriptive outcome counts. The home route still uses the earlier
+evidence workspace; `/atlas` renders `AtlasWorkspace` from the backend (see
+[Atlas Explorer Page](#atlas-explorer-page)).
 The local `/atlas-preview` route is an uncommitted, explicitly synthetic rehearsal.
 
 - `AtlasGraph` draws supplied snapshot nodes and edges, with selectable connections and

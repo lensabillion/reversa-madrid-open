@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { AmendmentDetail, AmendmentPage, DatasetOverview } from "../lib/api";
 import { useResource } from "../lib/use-resource";
@@ -163,6 +164,9 @@ export default function EvidenceWorkspace() {
           >
             Compare texts
           </button>
+          <Link href="/atlas" className={`${buttonStyle} text-stone-500`}>
+            Influence Atlas
+          </Link>
         </nav>
       </header>
       <div hidden={mode !== "compare"}>
