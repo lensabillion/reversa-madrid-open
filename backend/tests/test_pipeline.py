@@ -89,6 +89,24 @@ def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path
     assert view.generated_at == LATER
 
 
+def test_an_amendment_too_long_to_compare_is_left_out_and_counted(tmp_path: Path) -> None:
+    usual = collected(matching_world(tmp_path))
+    long_one = usual.amendments[0].model_copy(
+        update={"amendment_id": "am:2021-0106-COD:ENVI:PE7-999", "new_text": "word " * 801}
+    )
+    assert not pipeline.comparable(long_one)
+
+    view = pipeline.build_view(
+        replace(usual, amendments=(*usual.amendments, long_one)), generated_at=LATER
+    )
+
+    total = len(usual.amendments) + 1
+    assert view.limitations[:-1] == pipeline.LIMITATIONS
+    assert view.limitations[-1].startswith(f"1 of {total} amendments were not analysed")
+    assert long_one.amendment_id not in {link.amendment_id for link in view.bundle.links}
+    assert [link.status for link in view.bundle.links].count("published") == 1
+
+
 def test_every_shown_record_is_reachable_and_every_quote_matches_its_source(
     tmp_path: Path,
 ) -> None:

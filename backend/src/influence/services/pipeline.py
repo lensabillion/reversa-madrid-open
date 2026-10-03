@@ -45,6 +45,7 @@ from influence.schemas.atlas_view import (
     RankingRow,
 )
 from influence.schemas.retrieval import SourcePassage
+from influence.schemas.scoring import MAX_TEXT_LENGTH, MAX_TOKENS, TextChange
 from influence.services.assessment import assess_link
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
@@ -138,6 +139,19 @@ def asks_from_passages(passages: Iterable[Passage]) -> tuple[Ask, ...]:
         )
         for passage in passages
     )
+
+
+def comparable(amendment: Amendment) -> bool:
+    """Whether the comparison's size limits admit this amendment's wording.
+
+    The token diff behind retrieval, assessment and outcomes is quadratic and bounded by
+    `TextChange`; a few real amendments replace a whole long recital or annex and exceed it.
+    """
+    try:
+        TextChange(old=amendment.old_text or "", new=amendment.new_text)
+    except ValidationError:
+        return False
+    return True
 
 
 def find_candidates(amendments: Iterable[Amendment], asks: Sequence[Ask]) -> tuple[Candidate, ...]:
@@ -264,9 +278,19 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
     amendments = {amendment.amendment_id: amendment for amendment in collected.amendments}
     asks_by_id = {ask.ask_id: ask for ask in asks}
     texts = {text.document_id: text.text for text in collected.document_texts}
-    links = assess_candidates(
-        find_candidates(collected.amendments, asks), amendments, asks_by_id, texts
-    )
+    # An amendment the comparison cannot hold is left out and counted, never a crash and
+    # never a silent skip: the view's limitations say how many.
+    analysed = tuple(amendment for amendment in collected.amendments if comparable(amendment))
+    left_out = len(collected.amendments) - len(analysed)
+    limitations = LIMITATIONS
+    if left_out:
+        limitations = (
+            *LIMITATIONS,
+            f"{left_out} of {len(collected.amendments)} amendments were not analysed: their "
+            f"text is empty or exceeds the comparison limit of {MAX_TOKENS} tokens or "
+            f"{MAX_TEXT_LENGTH} characters.",
+        )
+    links = assess_candidates(find_candidates(analysed, asks), amendments, asks_by_id, texts)
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)
 
@@ -328,7 +352,7 @@ def build_view(collected: Collected, *, generated_at: datetime) -> AtlasView:
         bundle=bundle,
         snapshot=snapshot,
         rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
-        limitations=LIMITATIONS,
+        limitations=limitations,
     )
 
 
