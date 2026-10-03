@@ -30,7 +30,7 @@ _LIMITATIONS = (
 )
 
 
-def _changes(change: TextChange) -> tuple[ChangeSpan, ...]:
+def changed_spans(change: TextChange) -> tuple[ChangeSpan, ...]:
     """Token diff is worst-case O(n*m), bounded to 800 tokens per side at validation."""
     old = tuple(TOKEN_PATTERN.finditer(change.old))
     new = tuple(TOKEN_PATTERN.finditer(change.new))
@@ -96,8 +96,8 @@ def score_pair(request: ScoreRequest) -> ScoreResult:
     Symmetric scoring does not imply symmetric old/new diff alignment. Worst-case time
     is O(n*m) for each diff (800 tokens/side); feature matching is O(n+m) expected time.
     """
-    amendment_changes = _changes(request.amendment)
-    submission_changes = _changes(request.submission)
+    amendment_changes = changed_spans(request.amendment)
+    submission_changes = changed_spans(request.submission)
     amendment = _features(amendment_changes)
     submission = _features(submission_changes)
     negation_conflict = _negations(amendment) != _negations(submission)

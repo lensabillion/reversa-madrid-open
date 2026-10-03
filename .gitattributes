@@ -1,0 +1,4 @@
+# Fixtures and golden files are compared byte for byte against what the code writes (LF),
+# so a Windows checkout with core.autocrlf must not rewrite them.
+backend/tests/fixtures/** text eol=lf
+backend/tests/golden/** text eol=lf

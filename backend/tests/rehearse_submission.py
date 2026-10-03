@@ -101,13 +101,15 @@ def validate_outputs(out_dir: Path, pair_ids: list[str]) -> tuple[list[float], l
     leftovers = sorted(path.name for path in out_dir.iterdir())
     if leftovers != [PAIRS_CSV, EVIDENCE_JSONL]:
         raise RuntimeError(f"Unexpected files in the output directory: {leftovers}")
-    header, *rows = csv.reader(io.StringIO((out_dir / PAIRS_CSV).read_text(), newline=""))
+    header, *rows = csv.reader(
+        io.StringIO((out_dir / PAIRS_CSV).read_text(encoding="utf-8"), newline="")
+    )
     if tuple(header) != CSV_HEADER or [row[0] for row in rows] != pair_ids:
         raise RuntimeError("pairs.csv header or pair_ids differ from the input")
     scores = [float(row[1]) for row in rows]
     if not all(0.0 <= score <= 1.0 for score in scores):
         raise RuntimeError("pairs.csv holds a score outside [0, 1]")
-    lines = (out_dir / EVIDENCE_JSONL).read_text().removesuffix("\n").split("\n")
+    lines = (out_dir / EVIDENCE_JSONL).read_text(encoding="utf-8").removesuffix("\n").split("\n")
     evidence = [PairEvidence.model_validate_json(line) for line in lines]
     if [(item.pair_id, item.influence_score) for item in evidence] != list(
         zip(pair_ids, scores, strict=True)
