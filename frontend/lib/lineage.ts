@@ -15,6 +15,8 @@ export interface LineageAmendmentRow {
   committee: string | null;
   /** Each author's name, with the political group in brackets when it is known. */
   authors: readonly string[];
+  /** The distinct known political groups of its authors, for filtering by group. */
+  groups: readonly string[];
   tabledOn: string | null;
   /** Words of the amendment's new text inside adopted wording, of all its words; `null` for tabled wording. */
   adoptedWords: number | null;
@@ -98,6 +100,7 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     stage: adoption.stage,
     committee: adoption.committee,
     authors: authorLabels(adoption),
+    groups: [...new Set(adoption.author_groups.filter((group) => group !== null))],
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
     newWords: adoption.new_words,
@@ -125,6 +128,7 @@ function tabledRow(amendmentId: string): LineageAmendmentRow {
     stage: null,
     committee: null,
     authors: [],
+    groups: [],
     tabledOn: null,
     adoptedWords: null,
     newWords: null,

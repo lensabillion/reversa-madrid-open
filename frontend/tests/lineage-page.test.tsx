@@ -100,7 +100,20 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(within(card).getByText("Acme Unknown Lobby")).toBeDefined();
   expect(within(card).getByText("Said before the amendments")).toBeDefined();
   expect(within(card).getAllByRole("blockquote")).toHaveLength(2);
-  expect(screen.getByRole("heading", { name: "Who tabled the adopted wording" })).toBeDefined();
+  expect(
+    screen.getByRole("heading", { name: "Who gets their way: Members and political groups" }),
+  ).toBeDefined();
+  const organisations = screen.getByRole("heading", { name: "Who gets their way: organisations" });
+  const orgSection = organisations.closest("section");
+  if (orgSection === null) {
+    throw new Error("Organisation section missing");
+  }
+  expect(within(orgSection).getByRole("row", { name: /Acme Unknown Lobby/ })).toBeDefined();
+  const questions = screen.getByRole("heading", { name: "The five questions, for this law" });
+  expect(questions.closest("section")?.textContent).toContain(
+    "Organisations whose wording reached the law first: Acme Unknown Lobby (1).",
+  );
+  expect(questions.closest("section")?.textContent).toContain("No forecast is computed.");
   expect(screen.getByText("Political groups (verbatim)")).toBeDefined();
   expect(within(card).getByText(/joint: credited to several holders/)).toBeDefined();
   expect(within(card).getByText(/18 of 18 words in the final act/)).toBeDefined();
@@ -117,7 +130,7 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   ]);
 });
 
-test("the tabled tab and the earlier-request filter change which phrases are shown", async () => {
+test("the tabled tab, the evidence filter and the search change which phrases are shown", async () => {
   window.history.replaceState(null, "", `/lineage?law=${slug}`);
   serve(view);
   render(<LineagePage />);
@@ -127,8 +140,50 @@ test("the tabled tab and the earlier-request filter change which phrases are sho
   expect(screen.getByText("No phrase matches this selection.")).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Adopted (1)" }));
   expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
-  fireEvent.click(screen.getByRole("checkbox", { name: "Only wording a submission said first" }));
+  const evidence = screen.getByRole("combobox", { name: "Evidence" });
+  fireEvent.change(evidence, { target: { value: "first" } });
   expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
+  fireEvent.change(evidence, { target: { value: "reworded" } });
+  expect(screen.getByText("No phrase matches this selection.")).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+  const search = screen.getByRole("searchbox", {
+    name: "Search words, organisations, Members or amendments",
+  });
+  fireEvent.change(search, { target: { value: "ACME logs" } });
+  expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
+  expect(screen.getByText("1 of 1 phrases shown, strongest evidence first")).toBeDefined();
+  fireEvent.change(search, { target: { value: "acme biometric" } });
+  expect(screen.getByText("No phrase matches this selection.")).toBeDefined();
+  fireEvent.change(search, { target: { value: "" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "Political group" }), {
+    target: { value: "S&D" },
+  });
+  expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
+});
+
+test("drawing three links shows the drawn link with its seed", async () => {
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  serve(view);
+  vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
+    if (array instanceof Uint32Array) {
+      array[0] = 42;
+    }
+    return array;
+  });
+  render(<LineagePage />);
+
+  const heading = await screen.findByRole("heading", { name: "Check three links at random" });
+  const section = heading.closest("section");
+  if (section === null) {
+    throw new Error("Link check section missing");
+  }
+  expect(within(section).queryByRole("article")).toBeNull();
+  fireEvent.click(within(section).getByRole("button", { name: "Draw 3 links" }));
+  expect(within(section).getByText(/Seed 42/)).toBeDefined();
+  const drawn = within(section).getAllByRole("article");
+  expect(drawn).toHaveLength(1);
+  expect(within(drawn[0] as HTMLElement).getByText("Acme Unknown Lobby")).toBeDefined();
+  expect(within(section).getByRole("button", { name: "Draw again" })).toBeDefined();
 });
 
 test("a long list is paged, and an undated or citing submission is labelled as such", async () => {
