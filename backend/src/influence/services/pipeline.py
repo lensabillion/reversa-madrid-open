@@ -45,7 +45,7 @@ from influence.schemas.atlas_view import (
     RankingRow,
 )
 from influence.schemas.retrieval import SourcePassage
-from influence.services.assessment import assess_link
+from influence.services.assessment import DEFAULT_PUBLISHABLE, METHOD_REVISION, assess_link
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.outcomes import trace_outcomes
@@ -62,7 +62,10 @@ TRACED_STATUSES = frozenset({"published", "unconfirmed"})
 LIMITATIONS = (
     "Ask extraction v0: each consultation passage is treated as one ask, so outcome counts "
     "count passages, not distinct requests.",
-    "Links come from lexical rules (rules-1) with placeholder thresholds; their precision "
+    # Built from part 4's own constants, so the sentence follows its revision and tiers.
+    f"Links come from lexical rules ({METHOD_REVISION}); only "
+    f"{' and '.join(sorted(DEFAULT_PUBLISHABLE))}-tier links are published, at thresholds "
+    "calibrated on LobbyPlag's labelled pairs from one 2013 law; their precision on this law "
     "has not been audited yet.",
     "Outcomes are traced only for asks with a published or unconfirmed link.",
 )
