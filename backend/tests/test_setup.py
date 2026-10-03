@@ -243,25 +243,44 @@ def test_an_answer_that_is_not_2xx_is_an_error_and_writes_no_file(tmp_path: Path
     assert names(tmp_path / "raw" / "registry") == []
 
 
-def test_a_failed_initiative_writes_no_index_and_a_rerun_asks_only_for_the_rest(
+def test_a_failed_initiative_is_listed_beside_the_index_and_retried_by_the_next_run(
     tmp_path: Path,
 ) -> None:
+    index = CollectInputs.under(tmp_path).hys_index
+    failed = hys.failures_path(index)
     broken = ScriptedSource(crawl_responses())
-    with pytest.raises(SetupError, match=r"hys-index\.jsonl was not built .*404.*is cached"):
-        run(tmp_path, broken, {"hys"})
-    assert not CollectInputs.under(tmp_path).hys_index.exists()
+
+    files = run(tmp_path, broken, {"hys"})
+
+    # One failing initiative no longer costs the other ones: both are indexed.
+    assert [(item.path, item.action) for item in files] == [(index, "built"), (failed, "built")]
+    assert [entry.initiative_id for entry in hys.read_index(index)] == [12527, 12417]
+    (failure,) = hys.read_failures(failed)
+    assert failure.initiative_id == 404
+    assert "unscripted" in failure.error
 
     repaired = ScriptedSource(initiatives())
     files = run(tmp_path, repaired, {"hys"})
 
-    assert [item.action for item in files] == ["built"]
-    # The first list page and initiative 12527 come from the cache; the crawl stopped
-    # at 404, so the second page and 12417 were never asked before.
-    assert repaired.calls == [
-        hys.initiative_url(404),
-        hys.search_url(page=1),
-        hys.initiative_url(12417),
-    ]
+    # Every answer received is cached, so only the failed initiative is asked again.
+    assert repaired.calls == [hys.initiative_url(404)]
+    assert [(item.path, item.action) for item in files] == [(index, "built")]
+    assert not failed.exists()
+    assert sorted(entry.initiative_id for entry in hys.read_index(index)) == [404, 12417, 12527]
+
+    again = ScriptedSource({})
+    assert [item.action for item in run(tmp_path, again, {"hys"})] == ["kept"]
+    assert again.calls == []
+
+
+def test_a_failed_list_page_writes_no_index(tmp_path: Path) -> None:
+    responses = {**initiatives()}
+    del responses[hys.search_url(page=1)]
+    with pytest.raises(SetupError, match=r"hys-index\.jsonl was not built .*is cached"):
+        run(tmp_path, ScriptedSource(responses), {"hys"})
+    index = CollectInputs.under(tmp_path).hys_index
+    assert not index.exists()
+    assert not hys.failures_path(index).exists()
 
 
 # --- The command ----------------------------------------------------------------------------

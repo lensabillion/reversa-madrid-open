@@ -36,7 +36,10 @@ def _pdf_pages(content: bytes) -> tuple[ExtractedPage, ...]:
         xform_maximum_invocations_per_extraction=100,
         jbig2dec_binary=None,
     ):
-        reader = PdfReader(BytesIO(content), strict=True)
+        # Not strict: real submissions are often saved incrementally or edited, leaving an
+        # xref offset a few bytes off that pypdf repairs. Strict parsing rejected them
+        # though their text reads intact; the limits above still bound the work.
+        reader = PdfReader(BytesIO(content), strict=False)
         if reader.is_encrypted:
             raise DocumentExtractionError("encrypted_pdf", "Encrypted PDFs are not supported.")
         if len(reader.pages) > MAX_PAGES:

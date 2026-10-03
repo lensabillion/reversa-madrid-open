@@ -208,13 +208,25 @@ def parse_hys_datetime(value: object) -> datetime | None:
 
 
 def normalise_com_reference(value: str | None) -> str | None:
-    """`COM(YYYY)N` without zero padding or suffixes; None when no COM number is present."""
-    if value is None:
-        return None
-    match = _COM_REFERENCE.search(value)
-    if match is None:
-        return None
-    return f"COM({match.group(1)}){int(match.group(2))}"
+    """`COM(YYYY)N` without zero padding or suffixes; None when no COM number is present.
+
+    The first reference only: use `com_references_in` where a text can name several.
+    """
+    found = com_references_in(value)
+    return found[0] if found else None
+
+
+def com_references_in(value: str | None) -> tuple[str, ...]:
+    """Every COM reference in a text, normalised, in order, each once.
+
+    A legislative package publishes one proposal page for several laws
+    (`COM(2020)825 and COM(2020)842`): keeping only the first loses the others' asks.
+    """
+    found = (
+        f"COM({match.group(1)}){int(match.group(2))}"
+        for match in _COM_REFERENCE.finditer(value or "")
+    )
+    return tuple(dict.fromkeys(found))
 
 
 def _get_json(fetcher: CachedFetcher, url: str, *, refresh: bool = False) -> dict[str, object]:
@@ -259,7 +271,7 @@ def fetch_initiative(
         _publication(raw) for raw in _objects(data.get("publications"), "publications")
     )
     references = dict.fromkeys(
-        item.com_reference for item in publications if item.com_reference is not None
+        reference for item in publications for reference in com_references_in(item.reference)
     )
     return IndexEntry(
         initiative_id=initiative_id,
@@ -342,6 +354,36 @@ def read_index(path: Path) -> Iterator[IndexEntry]:
         raise HysError(f"Cannot read the Have Your Say index at {path}") from error
 
 
+class IndexFailure(FrozenModel):
+    """An initiative the index crawl could not read, so the index does not hold it."""
+
+    initiative_id: int
+    error: str
+
+
+def failures_path(index: Path) -> Path:
+    """Where the initiatives an index crawl could not read are listed, beside the index."""
+    return index.with_name(f"{index.stem}.failed.jsonl")
+
+
+def write_failures(path: Path, failures: Iterable[IndexFailure]) -> int:
+    """JSON Lines, written atomically; returns the number of failures."""
+    lines = [failure.model_dump_json() for failure in failures]
+    write_bytes_atomic(path, "".join(f"{line}\n" for line in lines).encode("utf-8"))
+    return len(lines)
+
+
+def read_failures(path: Path) -> tuple[IndexFailure, ...]:
+    """The listed failures; none when the file is absent (the crawl read every one)."""
+    if not path.is_file():
+        return ()
+    try:
+        lines = path.read_text(encoding="utf-8").split("\n")
+        return tuple(IndexFailure.model_validate_json(line) for line in lines if line.strip())
+    except (OSError, ValidationError) as error:
+        raise HysError(f"Cannot read the list of failed initiatives at {path}") from error
+
+
 def _wanted_reference(com_reference: str) -> str:
     wanted = normalise_com_reference(com_reference)
     if wanted is None:
@@ -349,10 +391,21 @@ def _wanted_reference(com_reference: str) -> str:
     return wanted
 
 
+def carries(entry: IndexEntry, wanted: str) -> bool:
+    """Whether the initiative names the normalised COM reference on any publication.
+
+    Publications are read again so an index built before every reference of a package
+    was kept still finds the second and later laws of the package.
+    """
+    return wanted in entry.com_references or any(
+        wanted in com_references_in(publication.reference) for publication in entry.publications
+    )
+
+
 def find_initiatives(index: Iterable[IndexEntry], com_reference: str) -> tuple[IndexEntry, ...]:
     """Exact match on the normalised COM reference; a near match is not a match."""
     wanted = _wanted_reference(com_reference)
-    return tuple(entry for entry in index if wanted in entry.com_references)
+    return tuple(entry for entry in index if carries(entry, wanted))
 
 
 def find_by_title(fetcher: CachedFetcher, words: str, com_reference: str) -> tuple[IndexEntry, ...]:
@@ -364,7 +417,7 @@ def find_by_title(fetcher: CachedFetcher, words: str, com_reference: str) -> tup
     wanted = _wanted_reference(com_reference)
     ids, _, _ = _search_page(fetcher, search_url(page=0, size=TITLE_SEARCH_SIZE, text=words))
     entries = (fetch_initiative(fetcher, initiative_id) for initiative_id in dict.fromkeys(ids))
-    return tuple(entry for entry in entries if wanted in entry.com_references)
+    return tuple(entry for entry in entries if carries(entry, wanted))
 
 
 # --- Feedback ---------------------------------------------------------------------------
@@ -419,17 +472,19 @@ def parse_feedback(raw: dict[str, object], publication_id: int) -> FeedbackItem:
     )
 
 
-def iter_feedback(fetcher: CachedFetcher, publication_id: int) -> Iterator[FeedbackItem]:
+def iter_feedback(
+    fetcher: CachedFetcher, publication_id: int, *, refresh: bool = False
+) -> Iterator[FeedbackItem]:
     """Every feedback of one publication, page by page until the source says `last`.
 
-    Pages are cached, so a consultation that is still open must be re-read with a fresh
-    cache to see later submissions.
+    Pages are cached, so a consultation that is still open must be re-read with
+    `refresh` to see later submissions.
     """
     page = 0
     while True:
         url = feedback_url(publication_id, page)
         try:
-            response = fetcher.get(url)
+            response = fetcher.get(url, refresh=refresh)
         except FetchError as error:
             if error.status == 400:
                 raise HysUnavailable(
@@ -480,6 +535,7 @@ def fetch_attachment(
     item: FeedbackItem,
     *,
     procedure_id: str | None,
+    refresh: bool = False,
 ) -> tuple[SourceDocument, DocumentText | None]:
     """Download one attachment and extract its text within the document service's limits.
 
@@ -490,7 +546,7 @@ def fetch_attachment(
     """
     url = download_url(attachment.document_id)
     try:
-        response = fetcher.get(url)
+        response = fetcher.get(url, refresh=refresh)
     except FetchError as error:
         raise HysError(f"Attachment {attachment.document_id} not downloaded: {error}") from error
     identifier = document_id("hys_attachment", attachment.document_id)
@@ -511,7 +567,8 @@ def fetch_attachment(
         procedure_id=procedure_id,
         source_kind="hys_attachment",
         url=url,
-        title=attachment.file_name,
+        # A private citizen's file name often holds their name: never published.
+        title=None if item.is_citizen else attachment.file_name,
         published_at=item.submitted_at,
         retrieved_at=response.metadata.fetched_at,
         sha256=hashlib.sha256(response.body).hexdigest(),

@@ -9,13 +9,18 @@ rate limit) and published atomically: an interrupted or failed run leaves the pr
 file, or none, never a truncated file that collect would trust. Beside each downloaded
 file goes its `SourceDocument` (`<name>.source.json`): URL, retrieval time and SHA-256,
 the record collect itself writes for a dump. The index is built by `hys.crawl_index`,
-whose responses are cached, so an interrupted crawl resumes where it stopped.
+whose responses are cached, so an interrupted crawl resumes where it stopped. An
+initiative that fails is listed in `hys-index.failed.jsonl` beside the index instead of
+costing the other four thousand; collect names that list in its coverage, and the next
+setup run crawls again (from the cache) to retry them.
 
 A file already present is kept unless `refresh` is asked, so a rerun after a failure
 fetches only what is missing. Collect keys its `amendments` stage by the hashes of three
-dumps and its `asks` stage by those of the export and the index, so refreshing one of
-those redoes the stage that reads it. The dossiers dump is in no stage key: a refreshed
-one rebuilds the procedure catalog, but a law's saved stages are reused.
+dumps and its `asks` stage by those of the export, the index and its failure list, so
+refreshing one of those redoes the stage that reads it. A refreshed dossiers dump
+rebuilds the procedure catalog; the law's catalog entry is part of the `texts`,
+`amendments` and `law` stage keys, so a law whose entry changed is rebuilt and one whose
+entry did not keeps its saved stages.
 """
 
 from collections.abc import Callable, Collection, Iterator
@@ -87,7 +92,7 @@ def setup_data(
             fetcher, REGISTER_EXPORT_URL, inputs.register, _export_record, refresh=refresh
         )
     if "hys" in groups:
-        yield _index(fetcher, inputs.hys_index, refresh=refresh, progress=progress)
+        yield from _index(fetcher, inputs.hys_index, refresh=refresh, progress=progress)
 
 
 def _kept(path: Path) -> SetupFile:
@@ -131,22 +136,42 @@ def _export_record(path: Path, response: ResponseMetadata) -> SourceDocument:
 
 def _index(
     fetcher: CachedFetcher, path: Path, *, refresh: bool, progress: hys.Progress | None
-) -> SetupFile:
-    """Crawl every initiative and write the index only when no initiative failed.
+) -> Iterator[SetupFile]:
+    """Crawl every initiative; write the index, and the list of initiatives that failed.
 
-    A partial index would make collect report "no feedback" for a law whose initiative
-    was skipped, so a failure writes nothing. Every response already received is cached,
-    so a first build that stopped resumes on the next run. A refresh that stopped asks
-    for every page again when rerun: it cannot tell a fresh entry from a stale one.
+    One failing initiative no longer blocks the other four thousand: it is listed in
+    `hys.failures_path(path)`, which collect reads so a law whose initiative may be
+    among them reports `not_collected` rather than "no feedback". An index with a
+    failure list is crawled again on the next run (answered from the cache, except the
+    failed requests), so the failures are retried without `refresh`. A failed list page
+    still stops the crawl and writes nothing, because it hides an unknown number of
+    initiatives.
     """
-    if path.is_file() and not refresh:
-        return _kept(path)
+    failed_path = hys.failures_path(path)
+    if path.is_file() and not refresh and not failed_path.is_file():
+        yield _kept(path)
+        return
+    failures: list[hys.IndexFailure] = []
+
+    def failed(initiative_id: int, error: hys.HysError) -> None:
+        failures.append(hys.IndexFailure(initiative_id=initiative_id, error=str(error)))
+
     try:
-        entries = list(hys.crawl_index(fetcher, refresh=refresh, progress=progress))
+        entries = list(
+            hys.crawl_index(fetcher, refresh=refresh, progress=progress, on_error=failed)
+        )
     except hys.HysError as error:
         raise SetupError(
             f"{path.name} was not built and is unchanged: {error}. Every response received "
             "so far is cached; a crawl without refresh reads them instead of asking again"
         ) from error
+    # The list goes first and is removed last, so an interruption between the two writes
+    # never leaves an incomplete index that looks complete.
+    if failures:
+        hys.write_failures(failed_path, failures)
     hys.write_index(path, entries)
-    return SetupFile(path, path.stat().st_size, file_sha256(path), "built")
+    if not failures:
+        failed_path.unlink(missing_ok=True)
+    yield SetupFile(path, path.stat().st_size, file_sha256(path), "built")
+    if failures:
+        yield SetupFile(failed_path, failed_path.stat().st_size, file_sha256(failed_path), "built")

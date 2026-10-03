@@ -171,6 +171,26 @@ def test_a_name_differing_in_scope_words_only_proposes() -> None:
     assert actor.candidate_ids == ("actor:tr:302540016347-29",)
 
 
+def test_names_differing_in_scope_words_never_share_an_identity() -> None:
+    # Both in the register: "Fair Trials" matches both by normalised name (ambiguous),
+    # but the two mentions must stay two actors, not merge under "fair-trials".
+    resolver = ActorResolver.build(
+        [
+            RegisterEntry(register_id="111111111111-11", name="Fair Trials"),
+            RegisterEntry(register_id="222222222222-22", name="Fair Trials Europe"),
+        ]
+    )
+    plain = resolve("Fair Trials", resolver=resolver)
+    scoped = resolve("Fair Trials Europe", resolver=resolver)
+
+    assert plain.actor_id == "actor:name:hys_feedback.fair-trials"
+    assert scoped.actor_id == "actor:name:hys_feedback.fair-trials-europe"
+    assert len(merge_actors([plain, scoped])) == 2
+    # Unregistered names too, and legal suffixes still do not split an identity.
+    assert resolve("Acme EU").actor_id != resolve("Acme").actor_id
+    assert resolve("Acme EU GmbH").actor_id == resolve("Acme EU").actor_id
+
+
 def test_name_shared_by_several_entries_is_ambiguous() -> None:
     actor = resolve("Greenpeace")
 
