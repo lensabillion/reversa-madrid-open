@@ -40,8 +40,10 @@ probabilities. Changing an input clears its old result.
 
 ## Run
 
-Install the pinned toolchains described in [AGENTS.md](../AGENTS.md), download the public
-data using the backend guide, then run these in separate terminals from the repository root:
+Install the pinned toolchains described in [AGENTS.md](../AGENTS.md), then run these in
+separate terminals from the repository root. `make dev-backend` serves the committed
+pipeline snapshot in `mock-data/`, so no download is needed; `make dev-backend DEV_DATA=data`
+serves the laws you collected with the backend guide instead:
 
 ```sh
 make dev-backend

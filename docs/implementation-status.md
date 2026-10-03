@@ -243,7 +243,7 @@ cloud container, Have Your Say index not built, so title search): collect 560.6 
 9 m 34 s; 631 adopted phrases from 838 of 5,660 amendments; 10,454 of 73,606 new final-act
 words traced; 195 of 788 documents said wording first; 153 named organisations. Its
 `lineage.json` is committed as `mock-data/laws/2021-0106-COD/lineage.json`
-(`INFLUENCE_DATA_ROOT=mock-data make dev-backend` serves it). Not verified: the run with
+(`make dev-backend` serves `mock-data/` by default; `DEV_DATA=data` serves `data/`). Not verified: the run with
 `--jev` (semantic origins), and any audit of the shown links. Observed, not explained: all
 530 dated non-citation matches have the submission first (0 amendment-first).
 

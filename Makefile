@@ -61,8 +61,12 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 	$(BACKEND) ruff check --fix
 	$(BACKEND) ruff format
 
-dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
-	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+# The dev API serves the committed pipeline snapshot in mock-data/ unless DEV_DATA names
+# another root (DEV_DATA=data for your own runs). The path is made absolute because
+# $(BACKEND) runs inside backend/, where a relative root would not resolve.
+DEV_DATA ?= mock-data
+dev-backend:  ## Serve the API at http://127.0.0.1:8000 from mock-data/ (DEV_DATA=data for your runs).
+	INFLUENCE_DATA_ROOT=$(abspath $(DEV_DATA)) $(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
 
 # The any-law command: collect, then parts 3 to 7, into data/laws/<procedure>/atlas.json.
 atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
