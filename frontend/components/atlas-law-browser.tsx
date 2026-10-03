@@ -305,12 +305,20 @@ export function AtlasLawBrowser() {
           <span className="hidden h-5 w-px bg-stone-300 sm:block" />
           <span className="hidden text-sm text-stone-500 sm:block">Atlas explorer</span>
         </div>
-        <Link
-          href="/"
-          className="rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-        >
-          Evidence workspace
-        </Link>
+        <nav aria-label="Other views" className="flex gap-1">
+          <Link
+            href="/lineage"
+            className="rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          >
+            Lineage explorer
+          </Link>
+          <Link
+            href="/workspace"
+            className="rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          >
+            Evidence workspace
+          </Link>
+        </nav>
       </header>
       <nav
         aria-label="Collected laws"

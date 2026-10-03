@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CoverageSummary } from "./atlas-coverage";
 import { AtlasEvidence, type AtlasEvidenceProps } from "./atlas-evidence";
 
 /** A display projection, not the shared pipeline/API schema; the adapter supplies assessed records. */
@@ -57,19 +58,7 @@ export function AtlasExplorer({
           Explore actors' requests, proposed amendments and observed legal outcomes in the loaded
           snapshot.
         </p>
-        {coverageNotes.length > 0 && (
-          <aside
-            aria-label="Source coverage"
-            className="mt-5 border-l-2 border-amber-400 pl-4 text-sm leading-6 text-stone-600"
-          >
-            <h2 className="font-medium text-stone-800">Source coverage</h2>
-            <ul className="mt-1 list-disc pl-5">
-              {coverageNotes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </aside>
-        )}
+        <CoverageSummary notes={coverageNotes} seeAlso="details on the Graph tab" />
       </header>
       <div className="mb-6 grid gap-4 sm:grid-cols-[minmax(0,2fr)_1fr_1fr]">
         <label className="space-y-2 text-xs text-stone-600">

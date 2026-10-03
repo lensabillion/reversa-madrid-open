@@ -498,7 +498,10 @@ export function LineageLawBrowser() {
           <span className="hidden text-sm text-stone-500 sm:block">Lineage explorer</span>
         </div>
         <nav aria-label="Other views" className="flex gap-1">
-          <Link href="/" className={navStyle}>
+          <Link href="/atlas" className={navStyle}>
+            Atlas explorer
+          </Link>
+          <Link href="/workspace" className={navStyle}>
             Evidence workspace
           </Link>
         </nav>
