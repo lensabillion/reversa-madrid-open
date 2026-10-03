@@ -289,9 +289,7 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
       <p className="text-xs text-stone-500">
         {count.format(ranking.rows.length)} organisations · {count.format(ranking.unnamedDocuments)}{" "}
         matching documents without an organisation name (citizens or unnamed attachments) ·{" "}
-        {count.format(ranking.citations)} matches left out as citations of other acts ·{" "}
-        {count.format(ranking.notFirst)} matches dated after the amendment or undated, which cannot
-        show influence
+        {count.format(ranking.citations)} matches left out as citations of other acts
       </p>
       {matching.length > ORGANISATIONS_SHOWN && (
         <button type="button" onClick={() => setAll((value) => !value)} className={retryStyle}>
@@ -525,12 +523,7 @@ export function Channels({ channels }: { channels: LineageChannels }) {
           final act.
         </p>
       </div>
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Submission said it before the amendment"
-          value={share(timing.askFirst, timing.askFirst + timing.amendmentFirst)}
-          note={`${count.format(timing.askFirst)} of ${count.format(timing.askFirst + timing.amendmentFirst)} dated matches; ${count.format(timing.unknownDate)} undated`}
-        />
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Tile
           label="Cross-group coalitions"
           value={share(channels.crossGroup, channels.withGroup)}
