@@ -1,3 +1,16 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
+import {
+  type AtlasFindingsResult,
+  atlasFindingsUrl,
+  evidenceLine,
+  type AtlasFinding as LawFinding,
+  plainFinding,
+  readAtlasFindings,
+} from "../lib/atlas-findings";
+import { useResource } from "../lib/use-resource";
+
 /** Presentation citations; a usable URL does not itself validate a pipeline finding. */
 export interface AtlasAnalysisSource {
   title: string;
@@ -72,6 +85,101 @@ function Sources({ sources }: { sources: readonly AtlasAnalysisSource[] }) {
   );
 }
 
+type Section = (typeof reportSections)[number];
+
+/** The findings endpoint's answer for the law named in the URL. */
+interface FindingsState {
+  data: AtlasFindingsResult | null;
+  error: string | null;
+}
+
+function ComputedFinding({ finding }: { finding: LawFinding }) {
+  return (
+    <div className="mt-3 space-y-2 text-sm leading-6">
+      {finding.headline !== null && (
+        <p className="break-words font-medium">{plainFinding(finding.headline)}</p>
+      )}
+      {finding.evidence.length > 0 && (
+        <p className="break-words text-xs text-stone-600">
+          Evidence: {evidenceLine(finding.evidence)}
+        </p>
+      )}
+      {finding.details.length > 0 && (
+        <details className="text-xs text-stone-700">
+          <summary className="cursor-pointer text-teal-800">
+            {finding.details.length} more line{finding.details.length === 1 ? "" : "s"}
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {finding.details.map((line) => (
+              <li key={line} className="break-words">
+                {plainFinding(line)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {finding.notes.length > 0 && (
+        <ul className="space-y-1 text-xs text-amber-900">
+          {finding.notes.map((note) => (
+            <li key={note}>{plainFinding(note)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** One question's card body from the findings endpoint, or why it has none. */
+function EndpointFinding({ section, state }: { section: Section; state: FindingsState | null }) {
+  if (state === null) {
+    return (
+      <p className="mt-3 text-sm leading-6 text-stone-500">
+        {section === "NEXT"
+          ? "Forecast unavailable: no source-backed forecast supplied."
+          : "Evidence gap: no source-backed finding supplied."}
+      </p>
+    );
+  }
+  if (state.error !== null) {
+    return <p className="mt-3 text-sm leading-6 text-amber-900">Finding could not be loaded.</p>;
+  }
+  if (state.data === null) {
+    return <p className="mt-3 text-sm leading-6 text-stone-500">Loading finding…</p>;
+  }
+  if (!state.data.found) {
+    return (
+      <p className="mt-3 text-sm leading-6 text-amber-900">
+        Not collected: {plainFinding(state.data.detail)}
+      </p>
+    );
+  }
+  const finding = state.data.findings.findings.find((item) => item.question === section);
+  if (finding === undefined) {
+    return (
+      <p className="mt-3 text-sm leading-6 text-amber-900">
+        Evidence gap: the backend sent no {section} finding.
+      </p>
+    );
+  }
+  return (
+    <>
+      {finding.status === "computed" ? (
+        <ComputedFinding finding={finding} />
+      ) : (
+        <p className="mt-3 break-words text-sm leading-6 text-amber-900">
+          Not run yet:{" "}
+          <code className="rounded-sm bg-amber-50 px-1 text-xs">
+            {finding.command ?? "no command recorded"}
+          </code>
+        </p>
+      )}
+      <p className="mt-2 text-xs leading-5 text-stone-500">
+        Limitation: {plainFinding(finding.limitation)}
+      </p>
+    </>
+  );
+}
+
 /** Presents observed outcomes and a cited report without estimating influence or forecasts. */
 export function AtlasAnalysis({
   sampleLabel,
@@ -79,6 +187,14 @@ export function AtlasAnalysis({
   rankings,
   findings,
 }: AtlasAnalysisProps) {
+  // The law browser names the open law in the URL; the findings follow it, as the view does.
+  const slug = useSearchParams().get("law") || null;
+  const findingsResource = useResource(
+    slug === null ? null : atlasFindingsUrl(slug),
+    readAtlasFindings,
+  );
+  const state: FindingsState | null =
+    slug === null ? null : { data: findingsResource.data, error: findingsResource.error };
   return (
     <article aria-label="Atlas analysis" className="min-w-0 space-y-8 text-stone-800">
       <header>
@@ -161,6 +277,23 @@ export function AtlasAnalysis({
           </div>
         )}
       </section>
+      {state !== null && state.error !== null && (
+        <div role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-4 text-sm">
+          <p>The report's findings could not be loaded: {state.error}</p>
+          <button
+            type="button"
+            onClick={findingsResource.retry}
+            className="mt-2 rounded-sm border border-amber-400 px-3 py-1 text-xs"
+          >
+            Retry findings
+          </button>
+        </div>
+      )}
+      {findingsResource.loading && (
+        <p role="status" className="text-sm text-stone-500">
+          Loading the report's findings…
+        </p>
+      )}
       <div className="grid gap-5 md:grid-cols-2">
         {reportSections.map((section) => (
           <section
@@ -170,11 +303,7 @@ export function AtlasAnalysis({
           >
             <h3 className="text-xs font-semibold tracking-wider text-teal-800">{section}</h3>
             {findings[section].length === 0 ? (
-              <p className="mt-3 text-sm leading-6 text-stone-500">
-                {section === "NEXT"
-                  ? "Forecast unavailable: no source-backed forecast supplied."
-                  : "Evidence gap: no source-backed finding supplied."}
-              </p>
+              <EndpointFinding section={section} state={state} />
             ) : (
               findings[section].map((finding) => (
                 <div key={finding.id} className="mt-4 space-y-3 text-sm leading-6">

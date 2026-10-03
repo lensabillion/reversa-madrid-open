@@ -18,7 +18,7 @@ sample of published links, printed with the exact quoted spans and their sources
 import random
 import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +41,7 @@ from influence.schemas.atlas_view import SLUG_PATTERN, AtlasView, RankingRow
 from influence.schemas.channels import ChannelsView
 from influence.schemas.coordinated import CoordinatedView
 from influence.schemas.directions import DirectionCounts, DirectionsView
+from influence.schemas.findings import EvidenceRef, Finding, LawFindings, Question
 from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS, AdoptedPhrase, LineageView
 from influence.services import assessment, coordinated
 from influence.services.atlas_analysis import MIN_ASSESSED_ASKS
@@ -110,13 +111,29 @@ class LawFiles:
     def law(self) -> LawRecord:
         return self.collected.law
 
+    def written(self, name: str) -> bool:
+        """Whether `name` (a file in `FILES`, or `FORECAST_FILE`) was written and is valid."""
+        files = {
+            "atlas.json": self.view,
+            "coordinated.json": self.coordinated,
+            "channels.json": self.channels,
+            "directions.json": self.directions,
+            "lineage.json": self.lineage,
+            FORECAST_FILE: self.forecasts,
+        }
+        return files[name] is not None
+
+    def path(self, name: str) -> str:
+        """Where `name` lives, relative to the data root's parent, as the report cites it."""
+        return f"data/laws/{name}" if name == FORECAST_FILE else f"data/laws/{self.slug}/{name}"
+
     def not_run(self, name: str) -> str:
         """Why a section has no numbers from `name`, and the command that writes it."""
-        command = f"`make {dict(FILES)[name]} LAW='{self.law.procedure_id}'`"
-        path = f"`data/laws/{self.slug}/{name}`"
+        run = f"`{command(self, name)}`"
+        path = f"`{self.path(name)}`"
         if any(problem.startswith(f"`{name}`") for problem in self.problems):
-            return f"Not used: {path} is invalid; rerun {command}."
-        return f"Not run: {path} is missing; run {command}."
+            return f"Not used: {path} is invalid; rerun {run}."
+        return f"Not run: {path} is missing; run {run}."
 
 
 def _known_laws(data_root: Path) -> dict[str, LawRecord]:
@@ -805,6 +822,86 @@ def _headlines(sections: Iterable[list[str]]) -> Iterable[str]:
     for section in sections:
         yield section[0].removeprefix("## ")
         yield from (f"  {line.removeprefix('- ')}" for line in section if "Headline:" in line)
+
+
+# --- The five questions as data --------------------------------------------------------
+
+type Section = Callable[[Sequence[LawFiles]], list[str]]
+# Each question, its section builder and the files it reads, the one it needs most first.
+QUESTIONS: tuple[tuple[Question, Section, tuple[str, ...]], ...] = (
+    ("WHO", who_section, ("atlas.json", "lineage.json")),
+    ("WHAT", what_section, ("lineage.json", "coordinated.json")),
+    ("TOWARDS", towards_section, ("directions.json",)),
+    ("HOW", how_section, ("channels.json",)),
+    ("NEXT", next_section, (FORECAST_FILE,)),
+)
+EVIDENCE = re.compile(r"`(data/laws/[^`]+?\.json)`(?:, field `([^`]+)`)?")
+
+
+def command(law: LawFiles, name: str) -> str:
+    """The make target that writes `name` for this law."""
+    target = "forecast" if name == FORECAST_FILE else dict(FILES)[name]
+    return f"make {target} LAW='{law.law.procedure_id}'"
+
+
+def finding(law: LawFiles, question: Question, section: Section, inputs: Sequence[str]) -> Finding:
+    """One question's report lines for one law, split into headline, details and evidence.
+
+    The lines are exactly the report's, so the explorer and `report.md` never disagree.
+    """
+    lines = section([law])
+    # After the section title, a blank line and the law's name: bullets, some nested.
+    items = [line.strip().removeprefix("- ") for line in lines[3:] if line.strip()]
+    headline = next((i[len("Headline: ") :] for i in items if i.startswith("Headline: ")), None)
+    limitation = next(i[len("Limitation: ") :] for i in items if i.startswith("Limitation: "))
+    notes = tuple(i for i in items if i.startswith(("Not run: ", "Not used: ")))
+    details = tuple(
+        i
+        for i in items
+        if i not in notes and not i.startswith(("Headline: ", "Limitation: ", "Evidence: "))
+    )
+    computed = any(law.written(name) for name in inputs)
+    if computed and headline is None and details:
+        headline, details = details[0], details[1:]
+    references = dict.fromkeys(
+        EvidenceRef(file=match[1], field=match[2] or None)
+        for item in items
+        if item not in notes
+        for match in EVIDENCE.finditer(item)
+    )
+    # Every written input is evidence, even when no line of the section names its field.
+    cited = {reference.file for reference in references}
+    references.update(
+        dict.fromkeys(
+            EvidenceRef(file=path, field=None)
+            for name in inputs
+            if law.written(name) and (path := law.path(name)) not in cited
+        )
+    )
+    return Finding(
+        question=question,
+        title=lines[0].removeprefix("## "),
+        status="computed" if computed else "not_run",
+        headline=headline if computed else None,
+        details=details if computed else (),
+        evidence=tuple(references) if computed else (),
+        limitation=limitation,
+        command=None if computed else command(law, inputs[0]),
+        notes=notes or (() if computed else (law.not_run(inputs[0]),)),
+    )
+
+
+def law_findings(law: LawFiles) -> LawFindings:
+    """The five questions of the brief for one law, as the explorer's Outcomes tab shows them."""
+    return LawFindings(
+        procedure_id=law.law.procedure_id,
+        slug=law.slug,
+        title=law.law.title,
+        run_id=law.collected.manifest.run_id,
+        findings=tuple(
+            finding(law, question, section, inputs) for question, section, inputs in QUESTIONS
+        ),
+    )
 
 
 def write_report(report: Report, path: Path) -> Path:

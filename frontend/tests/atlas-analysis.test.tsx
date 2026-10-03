@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { AtlasAnalysis, type AtlasAnalysisProps } from "../components/atlas-analysis";
+import type { AtlasLawFindings } from "../lib/atlas-findings";
+
+// Outside Next.js's router, the open law is read from jsdom's URL.
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
 
 const source = { title: "Final act, Article 8", url: "https://example.org/act#article-8" };
 const props: AtlasAnalysisProps = {
@@ -35,7 +41,14 @@ const props: AtlasAnalysisProps = {
     NEXT: [],
   },
 };
-afterEach(cleanup);
+beforeEach(() => {
+  window.history.replaceState(null, "", "/atlas");
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 test("labels the observed sample and preserves full, partial and unknown counts separately", () => {
   render(<AtlasAnalysis {...props} />);
@@ -198,4 +211,177 @@ test("all-unknown outcomes leave the rate unavailable rather than showing zero w
   ]);
   expect(displayed.textContent).not.toContain("0%");
   expect(displayed.textContent).not.toContain("0 / 4");
+});
+
+const slug = "2021-0106-COD";
+const findingsPath = `/api/v1/atlas/${slug}/findings`;
+const noFindings: AtlasAnalysisProps["findings"] = {
+  WHO: [],
+  WHAT: [],
+  TOWARDS: [],
+  HOW: [],
+  NEXT: [],
+};
+const lawFindings: AtlasLawFindings = {
+  schema_version: "findings-1",
+  procedure_id: "2021/0106(COD)",
+  slug,
+  title: "Artificial Intelligence Act",
+  run_id: "20261003T120000Z",
+  findings: [
+    {
+      question: "WHO",
+      title: "WHO wins",
+      status: "computed",
+      headline: "0 of 3 actors with asks have at least 3 assessed final-act outcomes.",
+      details: ["Lineage: 0 of 3 amendments (`data/laws/2021-0106-COD/lineage.json`)."],
+      evidence: [
+        { file: "data/laws/2021-0106-COD/atlas.json", field: "rankings" },
+        { file: "data/laws/2021-0106-COD/lineage.json", field: null },
+      ],
+      limitation: "wins count only outcomes traced through published links.",
+      command: null,
+      notes: [],
+    },
+    {
+      question: "WHAT",
+      title: "WHAT they win",
+      status: "computed",
+      headline: "0 of 85 new words of the final act trace to a tabled amendment.",
+      details: [],
+      evidence: [],
+      limitation: "shared wording is text reuse.",
+      command: null,
+      notes: ["Not run: `data/laws/2021-0106-COD/coordinated.json` is missing."],
+    },
+    {
+      question: "HOW",
+      title: "HOW they win",
+      status: "not_run",
+      headline: null,
+      details: [],
+      evidence: [],
+      limitation: "these are channels associated with the law, not causes of its wording.",
+      command: "make channels LAW='2021/0106(COD)'",
+      notes: ["Not run: `data/laws/2021-0106-COD/channels.json` is missing."],
+    },
+    {
+      question: "NEXT",
+      title: "NEXT",
+      status: "not_run",
+      headline: null,
+      details: [],
+      evidence: [],
+      limitation: "a forecast is published as a probability only after a backtest.",
+      command: null,
+      notes: [],
+    },
+  ],
+};
+
+function reply(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function serveFindings(respond: () => Response | Promise<Response>) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const path = new URL(String(input), "http://localhost").pathname;
+    if (path !== findingsPath) {
+      throw new Error(`Unexpected request: ${path}`);
+    }
+    return respond();
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+test("renders each card from the findings endpoint: headline, evidence, limitation, not run", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  const fetchMock = serveFindings(() => reply(lawFindings));
+  render(<AtlasAnalysis {...props} findings={noFindings} />);
+
+  expect(screen.getByRole("status").textContent).toBe("Loading the report's findings…");
+  const who = screen.getByRole("region", { name: "WHO" });
+  expect(await within(who).findByText(/^0 of 3 actors with asks/)).toBeDefined();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(
+    within(who).getByText(
+      "Evidence: data/laws/2021-0106-COD/atlas.json, field rankings; data/laws/2021-0106-COD/lineage.json",
+    ),
+  ).toBeDefined();
+  expect(within(who).getByText("1 more line")).toBeDefined();
+  expect(
+    within(who).getByText("Lineage: 0 of 3 amendments (data/laws/2021-0106-COD/lineage.json)."),
+  ).toBeDefined();
+  expect(
+    within(who).getByText("Limitation: wins count only outcomes traced through published links."),
+  ).toBeDefined();
+  expect(who.textContent).not.toContain("`");
+
+  const what = screen.getByRole("region", { name: "WHAT" });
+  expect(within(what).queryByText(/^Evidence:/)).toBeNull();
+  expect(within(what).queryByText(/more line/)).toBeNull();
+  expect(
+    within(what).getByText("Not run: data/laws/2021-0106-COD/coordinated.json is missing."),
+  ).toBeDefined();
+
+  const how = screen.getByRole("region", { name: "HOW" });
+  expect(how.textContent).toContain("Not run yet: make channels LAW='2021/0106(COD)'");
+  expect(how.textContent).not.toContain("Evidence gap");
+  expect(screen.getByRole("region", { name: "NEXT" }).textContent).toContain(
+    "Not run yet: no command recorded",
+  );
+  expect(
+    within(screen.getByRole("region", { name: "TOWARDS" })).getByText(
+      "Evidence gap: the backend sent no TOWARDS finding.",
+    ),
+  ).toBeDefined();
+  expect(screen.queryByRole("status")).toBeNull();
+});
+
+test("a law that was never collected names the backend's reason in every card", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  serveFindings(() => reply({ detail: "No collected bundle; run `make atlas LAW=...`" }, 404));
+  render(<AtlasAnalysis {...props} findings={noFindings} />);
+
+  const next = screen.getByRole("region", { name: "NEXT" });
+  expect(
+    await within(next).findByText("Not collected: No collected bundle; run make atlas LAW=..."),
+  ).toBeDefined();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("a failed or malformed answer is an explicit error with a retry", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  let answer: Response = reply({ detail: "boom" }, 500);
+  const fetchMock = serveFindings(() => answer);
+  render(<AtlasAnalysis {...props} findings={noFindings} />);
+
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("The Atlas API answered 500: boom");
+  expect(
+    within(screen.getByRole("region", { name: "HOW" })).getByText("Finding could not be loaded."),
+  ).toBeDefined();
+
+  answer = reply({ ...lawFindings, findings: [{ ...lawFindings.findings[0], status: "maybe" }] });
+  fireEvent.click(within(alert).getByRole("button", { name: "Retry findings" }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Invalid findings data: findings[0].status must be computed or not_run.",
+  );
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test("supplied findings still take precedence over the endpoint's", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  serveFindings(() => reply(lawFindings));
+  render(<AtlasAnalysis {...props} />);
+
+  const who = screen.getByRole("region", { name: "WHO" });
+  expect(within(who).getByText("The association has two fully reflected asks.")).toBeDefined();
+  const how = screen.getByRole("region", { name: "HOW" });
+  expect(await within(how).findByText(/Not run yet:/)).toBeDefined();
+  expect(within(who).queryByText(/^0 of 3 actors/)).toBeNull();
 });
