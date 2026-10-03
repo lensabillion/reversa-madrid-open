@@ -1,21 +1,22 @@
-# Influence Graph Backend
+# Influence Atlas Backend
 
-This service provides the public GDPR evidence needed for the first Challenge 03 demo:
-browse amendments, inspect proposed changes alongside lobby submissions, and show the
-organizations and authors connected by historically verified links. An amendment is a
-proposed edit to a law; a submission records changes an organization requested.
+The Python service and pipeline behind our Influence Atlas entry (Reversa Challenge 03,
+[Atlas brief](../docs/brief/influence-atlas-challenge-brief.pdf)). The `influence`
+command collects one EU law's public record (proposal, amendments, final act,
+consultation feedback and its senders), proposes and verifies links from an
+organization's ask to an amendment, traces each ask to the final law, and writes a view
+per law under `data/laws/<procedure>/`, which the API serves to the explorer. Further
+commands list coordinated amendments, the channels a law was lobbied through and the
+direction of each amendment. The [Atlas explainer](../docs/explainer/influence-atlas-primer.md)
+explains the design from first principles; the
+[implementation status](../docs/implementation-status.md) records what is verified,
+decided and next.
 
-The [organizers' brief](../docs/brief/madrid-open-reversa-challenges.pdf), pages 12–15,
-also requires semantic influence scoring and adoption forecasting. This backend is the
-starting evidence demo and an executable lexical baseline. Its `influence submit` command
-writes the first competition CSV, `pairs.csv`, from the lexical comparison score; it does
-not yet deliver `proposals.csv`, a trained influence probability, or an adoption forecast.
-See the [primer](../docs/explainer/influence-graph-primer.md) for the broader design.
-See [implementation status](../docs/implementation-status.md) for verified capabilities,
-remaining competition work and handoff instructions.
+Parts of this backend were built for the superseded first brief and are kept where they
+still serve: the LobbyPlag (GDPR, 2013) evidence routes below, the lexical comparison that
+part 4 builds on, and the `influence submit` pairs command (see "Submission Command").
 The [frozen semantic experiment](evaluation/README.md) records the lexical baseline's
-failure cases and a local reranker comparison, including why it is not ready to replace
-production scoring.
+failure cases and a local reranker comparison.
 
 ## Run With Public Data
 
@@ -253,8 +254,10 @@ ask, so outcome counts count passages, not distinct requests. Only copied-tier l
 published, at part 4's thresholds calibrated on LobbyPlag (one 2013 law), and their precision
 on new laws is unaudited; the sentence is built from `assessment.py`'s revision and tiers.
 Outcomes are traced only for asks with a published or
-unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
-timed.
+unconfirmed link. Tested offline (`tests/test_pipeline.py`). One real run (`measured`,
+3 October): `influence atlas '2021/0106(COD)'` on the AI Act finished in 310 s with the
+public downloads already cached (no uncached timing, one law only), and its `rules-3` view published 0 links (859 unconfirmed, 82 contradicted); see
+[implementation status](../docs/implementation-status.md).
 
 ## Coordinated Amendments Command (Part 3)
 
