@@ -7,8 +7,8 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from practice_fixture import labelled, links_of
 
-from influence.practice.folds import FoldPlan, make_folds
-from influence.practice.labels import LabelledPair, PracticeDataError
+from influence.practice.folds import FoldPlan, connected_components, make_folds, organization_groups
+from influence.practice.labels import LabelledPair, PracticeDataError, input_key
 
 PROPERTY = settings(derandomize=True, database=None, deadline=None, max_examples=300)
 
@@ -59,11 +59,35 @@ def test_a_dominant_component_falls_back_to_organizations_and_purges() -> None:
 def test_fewer_components_than_folds_fall_back_to_organizations() -> None:
     # Found by the property below: two organizations share one text, so they form a single
     # component, yet as two organizations they can still fill two folds.
-    pairs = [labelled("org0", "a0", "s0", False, "c0"), labelled("org1", "a0", "s0", False, "c1")]
+    pairs = [labelled("org0", "a0", "s0", False, "c0"), labelled("org1", "a0", "s1", False, "c1")]
     plan = make_folds(pairs, 2)
     assert plan.grouping == "organizations_with_purge"
     assert _members(pairs, plan) == [{"c0"}, {"c1"}]
     assert all(fold.train == () and len(fold.purged) == 1 for fold in plan.folds)
+
+
+def test_an_identical_input_from_two_organizations_stays_in_one_test_fold() -> None:
+    # Review finding: under the fallback, the same (amendment, submission) text submitted by
+    # two organizations was tested in two folds, so it sat in both the development and the
+    # held-out half of the calibration. Identical inputs now join their organizations.
+    # Grouped by organization alone, org0 and org1 went to folds 1 and 2.
+    pairs = [labelled("big", f"big-{item}", f"big-{item}", True, f"b{item}") for item in range(4)]
+    pairs += [labelled("big", "shared", "big-shared", False, "b-shared")]
+    pairs += [labelled(f"org{org}", "a-dup", "s-dup", True, f"dup{org}") for org in range(2)]
+    pairs += [labelled("org4", "shared", "s4", False, "o4")]
+    plan = make_folds(pairs, 3)
+    assert plan.grouping == "organizations_with_purge"
+    assert _members(pairs, plan) == [
+        {"b0", "b1", "b2", "b3", "b-shared"},
+        {"dup0", "dup1"},
+        {"o4"},
+    ]
+    two_identical = [
+        labelled("org0", "a0", "s0", False, "c0"),
+        labelled("org1", "a0", "s0", True, "c1"),
+    ]
+    with pytest.raises(PracticeDataError, match="1 independent groups cannot fill 2 folds"):
+        make_folds(two_identical, 2)
 
 
 def test_too_few_groups_or_folds_are_rejected() -> None:
@@ -93,7 +117,7 @@ def test_no_organization_or_text_crosses_a_split(
     try:
         plan = make_folds(pairs, k)
     except PracticeDataError:
-        assert len({pair.pair.organization_id for pair in pairs}) < k
+        assert len(connected_components([item.pair for item in pairs], organization_groups)) < k
         return
     every = sorted(index for fold in plan.folds for index in fold.test)
     assert every == list(range(len(pairs)))
@@ -101,6 +125,12 @@ def test_no_organization_or_text_crosses_a_split(
         assert fold.test
         assert sorted((*fold.test, *fold.train, *fold.purged)) == list(range(len(pairs)))
         assert links_of(pairs, fold.test).isdisjoint(links_of(pairs, fold.train))
+    # An identical input is tested in exactly one fold.
+    folds_of_input: dict[object, set[int]] = {}
+    for number, fold in enumerate(plan.folds):
+        for index in fold.test:
+            folds_of_input.setdefault(input_key(pairs[index].pair), set()).add(number)
+    assert all(len(numbers) == 1 for numbers in folds_of_input.values())
     if plan.grouping == "connected_components":
         assert all(fold.purged == () for fold in plan.folds)
     # The same data in another order yields the same folds.
