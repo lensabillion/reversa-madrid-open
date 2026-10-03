@@ -330,6 +330,31 @@ changed group after tabling is listed under the later group (the AI Act's list s
 wording among themselves, so a cluster shows shared wording, not its author. The clusters
 are not yet in `atlas.json` or the explorer.
 
+## Lineage Command (Outcome First)
+
+`influence lineage <law>` (`make lineage LAW='2021/0106(COD)'`) collects the law, then
+starts from the final act: every stretch of it that is not in the Commission's proposal and
+that an amendment's new text holds (a run of at least 8 words with an inserted word and 3
+of the law's rare words) is an adopted phrase, keyed by its place in the final act, so one
+stretch is never counted twice. It then searches the law's consultation documents (Have
+Your Say feedback and attachments, never the law's own texts) for the adopted wording and
+for wording amendments inserted that was not adopted. The output is
+`data/laws/<procedure>/lineage.json` (`schemas/lineage.py`, `LineageView`), written
+atomically, with `status`, `reason`, `counts`, `adopted_phrases`, `tabled_phrases`,
+`adoptions`, `origins`, `credits` and `limitations`.
+
+Counting follows `docs/plan.md` section 7. Every holder of a phrase is credited with the
+whole phrase and a shared one is flagged joint (no fractional credit); each credit carries
+the amendments adopted and the amendments tabled, so Members are ranked by rate per
+amendment tabled ("N of M"). An amendment with no resolved author is credited to the group
+or name it gives, and to the committee text only when no carrier of the phrase names an
+author. An author whose group is unknown credits no group (`phrases_without_group`). A
+document counts as an origin only when it is dated before every carrying amendment
+(`eligibility` "ask_first") and is not a citation. Without the proposal or the final act the
+view is `status: "unknown"` with its reason, and every count that could not be computed is
+null, never zero. `python -m influence.practice.lineage_review` draws a seeded uniform
+sample of phrases for two readers to label. Nothing in this view has been audited yet.
+
 ## Channels Command (Part 7, HOW)
 
 `influence channels <law>` (`make channels LAW='2021/0106(COD)'`) collects the law as

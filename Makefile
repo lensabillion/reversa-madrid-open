@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -82,6 +82,11 @@ collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' 
 coordinated:  ## List near-identical amendments tabled across political groups: make coordinated LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make coordinated LAW='2021/0106(COD)'))
 	$(BACKEND) influence coordinated "$(LAW)" $(ARGS)
+
+# Lineage, outcome-first: the final act's new wording traced to amendments and documents.
+lineage:  ## Trace one law's adopted wording to its amendments and documents: make lineage LAW='2021/0106(COD)' [ARGS=--no-attachments]
+	$(if $(LAW),,$(error LAW is required: make lineage LAW='2021/0106(COD)'))
+	$(BACKEND) influence lineage "$(LAW)" $(ARGS)
 
 channels:  ## Count the channels one law was lobbied through: make channels LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make channels LAW='2021/0106(COD)'))

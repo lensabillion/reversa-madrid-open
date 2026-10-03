@@ -1,27 +1,32 @@
 """Contracts of the lineage pipeline: which wording of the final law came from where.
 
 The Atlas pipeline goes from a submission to an amendment to the law. Lineage starts from the
-law: it finds the phrases of the final act that were not in the Commission's proposal, finds
-the amendments whose inserted text contains them, and then who tabled those amendments and
-which organisations' documents say the same thing earlier. It is a separate pipeline with its
-own view (`lineage-1`) and leaves the `atlas-1` records untouched, until it has passed the
-gates in `docs/design/` and replaces the first.
+law: it finds the stretches of the final act that were not in the Commission's proposal, finds
+the amendments whose new text holds them, and then who tabled those amendments and which
+consultation documents say the same thing earlier. It is a separate pipeline with its own
+view (`lineage-1`) and leaves the `atlas-1` records untouched, until it has passed the gates
+in `docs/design/` and replaces the first.
 
 Pieces and who produces what:
 
-* adoption (`services/lineage.py`): verbatim `AdoptedPhrase`, `AmendmentAdoption`, `Credit`;
-* semantic adoption (`services/lineage_semantic.py`): the same records with kind "semantic",
-  for wording that was reworded, found with Qwen embeddings and judged by the meaning judge;
-* origin (`services/origin.py`): `OriginMatch`, verbatim and semantic. Origin and adoption are
-  two independent facts: an organisation's document can be the origin of an amendment that
-  was never adopted (`TabledPhrase`), and an adopted phrase can have no known origin;
-* review (`practice/lineage_review.py`): reads a `LineageView`, never writes one;
-* assembly (`services/lineage_pipeline.py`, `influence lineage`): `LineageView`.
+* adoption (`services/lineage.py`, `adopt_records`): verbatim `AdoptedPhrase`,
+  `AmendmentAdoption`, `Credit`. A phrase is a place in the final act (an article and a word
+  interval), so one stretch of the law is never counted twice;
+* origin (`services/origin.py`): `OriginMatch` for adopted phrases (`find_origins`) and for
+  inserted wording whether or not it was adopted (`find_tabled_origins`, `TabledPhrase`).
+  Origin and adoption are two independent facts: a document can be the origin of an
+  amendment that was never adopted, and an adopted phrase can have no known origin;
+* assembly (`services/lineage_assembly.py`, `build_lineage`, run by `influence lineage`):
+  `LineageView`, written to `data/laws/<procedure>/lineage.json`;
+* review (`practice/lineage_review.py`): reads a `LineageView`, never writes one.
 
-A verbatim match is a run of identical words and is cheap and nearly unambiguous. A semantic
-match says two texts ask for the same thing in different words; it is found by embeddings and
-confirmed by a judge, so it carries a similarity and is reported apart from verbatim matches.
-Either is evidence of shared wording or meaning, not of who wrote it first or why.
+The "semantic" kind (reworded wording found by embeddings and a judge) is part of the contract
+but no piece produces it yet. A verbatim match is a run of identical words: cheap and nearly
+unambiguous, and still only evidence of shared wording, not of who wrote it first or why.
+
+Counting follows `docs/plan.md` section 7: no fractional credit (every holder of a phrase is
+credited with the whole phrase, and a phrase with several holders is flagged joint), Members
+are ranked by their rate per amendment tabled, and an unknown count is None, never zero.
 """
 
 from datetime import date
@@ -37,6 +42,7 @@ from influence.schemas.atlas import (
     NonEmpty,
     ProcedureId,
     SourceSpan,
+    TimeEligibility,
 )
 from influence.schemas.scoring import FrozenModel
 
@@ -47,21 +53,41 @@ LINEAGE_SCHEMA_VERSION = "lineage-1"
 # count. Provisional: chosen by the owner on 3 October, not calibrated.
 NGRAM_WORDS = 8
 MIN_ADOPTED_RUN_WORDS = 8
+# A phrase carried by amendments of at least this many different political groups is
+# coalition wording rather than one group's request: the same rule as part 3's cross-group
+# clusters (`services/coordinated.py`).
+COALITION_GROUPS = 2
 
 PhraseId = Annotated[str, StringConstraints(pattern=r"^phrase:[0-9a-f]{16}$")]
 type AmendmentStage = Literal["committee", "plenary"]
 type MatchKind = Literal["verbatim", "semantic"]
-type HolderKind = Literal["mep", "group", "committee_text", "organisation"]
+type HolderKind = Literal["mep", "group", "unresolved", "committee_text", "organisation"]
+type AdoptionStatus = Literal["computed", "unknown"]
+_KIND_ORDER: dict[str, int] = {
+    "mep": 0,
+    "group": 1,
+    "unresolved": 2,
+    "committee_text": 3,
+    "organisation": 4,
+}
+_ELIGIBILITY: dict[bool | None, str] = {
+    True: "ask_first",
+    False: "amendment_first",
+    None: "unknown_date",
+}
 
 
 class AdoptedPhrase(FrozenModel):
     """Wording that stands in the final act, is not in the proposal, and was tabled.
 
-    Verbatim: a run of at least `MIN_ADOPTED_RUN_WORDS` identical words. Semantic: a segment
-    of the final act (a sentence or paragraph) that an amendment's inserted text says again in
-    other words, with the embedding `similarity` and, once judged, the judge's probability.
+    Verbatim: one interval of the final act of at least `MIN_ADOPTED_RUN_WORDS` words, the
+    union of the runs amendments share with it, so overlapping runs merge and one stretch of
+    the law is one phrase with one span. Semantic: a segment of the final act that an
+    amendment's text says again in other words, with the embedding `similarity`.
     `text` is the folded words (lower case, alphanumeric tokens) joined by single spaces, so
     it compares across documents; `final_spans` quote the original text where it stands.
+    `holders` are the credit keys of everyone credited with it (see `Credit`); the phrase is
+    joint when there is more than one.
     """
 
     phrase_id: PhraseId
@@ -71,6 +97,11 @@ class AdoptedPhrase(FrozenModel):
     final_spans: tuple[SourceSpan, ...] = Field(min_length=1)
     similarity: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     judge_probability: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
+    holders: tuple[NonEmpty, ...] = ()
+
+    @property
+    def joint(self) -> bool:
+        return len(self.holders) > 1
 
     @model_validator(mode="after")
     def words_count_the_text(self) -> Self:
@@ -103,9 +134,12 @@ class TabledPhrase(FrozenModel):
 
 
 class AmendmentAdoption(FrozenModel):
-    """One amendment whose inserted wording reached the final act, verbatim or reworded.
+    """One amendment whose new wording reached the final act, verbatim or reworded.
 
-    An amendment can have one adoption of each kind.
+    An amendment can have one adoption of each kind. A run counts when it holds at least one
+    word the amendment inserted, so `adopted_words` (the amendment's words inside adopted
+    runs) can exceed `inserted_words` when an insertion rewrites part of a sentence; both
+    are bounded by `new_words`, the words of the amendment's new text.
     """
 
     amendment_id: AmendmentId
@@ -114,43 +148,81 @@ class AmendmentAdoption(FrozenModel):
     committee: str | None = None
     author_ids: tuple[ActorId, ...] = ()
     author_names: tuple[str, ...] = ()
-    # The political group of each author, in the same order as `author_ids`; empty if unknown.
-    author_groups: tuple[str, ...] = ()
+    # The political group of each author, in the same order as `author_ids`; None where the
+    # author's group is unknown. Empty when there are no author IDs.
+    author_groups: tuple[str | None, ...] = ()
     tabled_on: date | None = None
     phrase_ids: tuple[PhraseId, ...] = Field(min_length=1)
     adopted_words: int = Field(ge=1)
     inserted_words: int = Field(ge=1)
+    new_words: int = Field(ge=1)
     longest_run: int = Field(ge=1)
 
     @model_validator(mode="after")
-    def adoption_fits_inside_the_insertion(self) -> Self:
-        if self.adopted_words > self.inserted_words:
-            raise ValueError("An amendment cannot have adopted more words than it inserted")
+    def adoption_fits_inside_the_new_text(self) -> Self:
+        if self.author_groups and len(self.author_groups) != len(self.author_ids):
+            raise ValueError("`author_groups` gives one group per author ID")
+        if self.adopted_words > self.new_words or self.inserted_words > self.new_words:
+            raise ValueError("An amendment cannot adopt or insert more words than it holds")
         if self.longest_run > self.adopted_words:
             raise ValueError("The longest run cannot exceed the adopted words")
         return self
 
 
 class Credit(FrozenModel):
-    """How much adopted wording one holder can be credited with.
+    """The adopted wording one holder is credited with, and the amendments behind it.
 
-    Each phrase is worth 1, split equally among the holders credited for it (co-signers of
-    the amendments that carry it), so a joint compromise amendment does not count in full for
-    every signer. `committee_text` is the Parliament's own committee text, which has no
-    individual author.
+    No fractional credit (`docs/plan.md` section 7): every holder of a phrase is credited
+    with the whole phrase, and `joint_phrases` counts those it shares with another holder of
+    its kind. `amendments` is how many of the holder's amendments reached the final act and
+    `amendments_tabled` how many it tabled on this law, both counting a committee amendment
+    and its identical plenary re-tabling once, so the rate is "N of M". A holder is a Member
+    (`mep`), a political group (through its Members, or named as the tabler), an author name
+    that resolved to no actor (`unresolved`), or `committee_text` when an amendment names no
+    author and no other carrier of the phrase does.
     """
 
     holder_id: NonEmpty
     basis: MatchKind = "verbatim"
     holder_kind: HolderKind
     name: NonEmpty
-    phrases: float = Field(ge=0, allow_inf_nan=False)
-    distinct_phrases: int = Field(ge=0)
+    phrases: int = Field(ge=1)
+    joint_phrases: int = Field(ge=0)
     amendments: int = Field(ge=0)
+    amendments_tabled: int = Field(ge=1)
+
+    @property
+    def rate(self) -> float:
+        """Share of the holder's tabled amendments that reached the final act."""
+        return self.amendments / self.amendments_tabled
+
+    @model_validator(mode="after")
+    def counts_fit(self) -> Self:
+        if self.joint_phrases > self.phrases:
+            raise ValueError("Joint phrases cannot exceed the phrases credited")
+        if self.amendments > self.amendments_tabled:
+            raise ValueError("A holder cannot have more adopting amendments than it tabled")
+        return self
+
+
+def credit_rank(credit: Credit) -> tuple[bool, int, float, int, int, str]:
+    """Order of the credit table: verbatim before semantic, by kind, then rate per amendment.
+
+    Members are ranked only by that rate (`docs/plan.md` section 7); ties go to the larger
+    denominator, then more phrases, then the identifier, so the order is reproducible.
+    """
+    return (
+        credit.basis == "semantic",
+        _KIND_ORDER[credit.holder_kind],
+        -credit.rate,
+        -credit.amendments_tabled,
+        -credit.phrases,
+        credit.holder_id,
+    )
 
 
 class OriginMatch(FrozenModel):
-    """A document that says the adopted wording too, with its date against the amendments'."""
+    """A consultation document that says the adopted wording too, with the dates compared."""
 
     phrase_id: PhraseId
     document_id: DocumentId
@@ -162,34 +234,65 @@ class OriginMatch(FrozenModel):
     similarity: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     words: int = Field(ge=1)
     amendment_ids: tuple[AmendmentId, ...] = Field(min_length=1)
+    # The earliest tabling date of the carrying amendments; None when any of them is
+    # undated, since the undated one may have come first.
     earliest_amendment_on: date | None = None
-    # None when either date is unknown: an undated document cannot be an origin.
+    # None when a date is unknown: an undated document, or carrier, cannot settle the order.
     precedes: bool | None = None
+    # Part 4's name for the same fact: did the document (the ask) come first?
+    eligibility: TimeEligibility = "unknown_date"
     # A run that is a citation of another act ("... of the European Parliament and of the
     # Council of 20 May 2021 ...") is shared wording but not a request.
     is_citation: bool = False
+
+    @property
+    def counts_as_origin(self) -> bool:
+        """Only a dated document that came first and is not a citation counts as an origin."""
+        return self.eligibility == "ask_first" and not self.is_citation
+
+    @model_validator(mode="after")
+    def eligibility_follows_the_dates(self) -> Self:
+        if self.eligibility != _ELIGIBILITY[self.precedes]:
+            raise ValueError("`eligibility` must follow `precedes`")
+        return self
 
 
 class LineageCounts(FrozenModel):
     """Sizes the reader needs to judge a result against how much the law changed.
 
-    `changed_units` counts the units of wording the final act has that the proposal lacks and
-    `linked_units` those of them traced to an amendment, so coverage is linked over changed
-    and a law that barely changed says so instead of looking like a failure.
+    `changed_units` counts the words of the final act that stand in a window the proposal
+    lacks and `linked_units` those of them inside an adopted phrase, so coverage is linked
+    over changed and a law that barely changed says so instead of looking like a failure.
+    A count is None until it has been computed (no proposal or final act, no documents
+    read), never zero. `phrases_without_group` counts adopted phrases none of whose holders
+    has a known political group: they are left out of the group credits and counted here.
+    `documents_with_origin` counts documents with a match that counts as an origin
+    (`OriginMatch.counts_as_origin`).
     """
 
     amendments: int = Field(ge=0)
-    amendments_adopting: int = Field(ge=0)
-    adopted_phrases: int = Field(ge=0)
-    documents_read: int = Field(ge=0)
-    documents_with_origin: int = Field(ge=0)
-    changed_units: int = Field(default=0, ge=0)
-    linked_units: int = Field(default=0, ge=0)
+    amendments_adopting: int | None = Field(default=None, ge=0)
+    adopted_phrases: int | None = Field(default=None, ge=0)
+    phrases_without_group: int | None = Field(default=None, ge=0)
+    documents_read: int | None = Field(default=None, ge=0)
+    documents_with_origin: int | None = Field(default=None, ge=0)
+    changed_units: int | None = Field(default=None, ge=0)
+    linked_units: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def links_fit_inside_the_changes(self) -> Self:
-        if self.linked_units > self.changed_units:
-            raise ValueError("Linked units cannot exceed the units that changed")
+    def parts_fit_inside_their_wholes(self) -> Self:
+        pairs = (
+            (self.linked_units, self.changed_units, "Linked units", "the units that changed"),
+            (
+                self.documents_with_origin,
+                self.documents_read,
+                "Documents with an origin",
+                "the documents read",
+            ),
+        )
+        for part, whole, part_name, whole_name in pairs:
+            if part is not None and whole is not None and part > whole:
+                raise ValueError(f"{part_name} cannot exceed {whole_name}")
         return self
 
 
@@ -205,6 +308,10 @@ class LineageView(FrozenModel):
     method: NonEmpty
     method_revision: NonEmpty
     coverage: tuple[LayerCoverage, ...] = ()
+    # "unknown" when a layer adoption needs (the proposal or the final act) is missing;
+    # `reason` then says which, and nothing is adopted or credited.
+    status: AdoptionStatus = "computed"
+    reason: str | None = None
     counts: LineageCounts
     adopted_phrases: tuple[AdoptedPhrase, ...] = ()
     tabled_phrases: tuple[TabledPhrase, ...] = ()
@@ -215,6 +322,10 @@ class LineageView(FrozenModel):
 
     @model_validator(mode="after")
     def references_resolve(self) -> Self:
+        if (self.status == "unknown") != (self.reason is not None):
+            raise ValueError("An unknown adoption carries its reason, and only then")
+        if self.status == "unknown" and (self.adopted_phrases or self.adoptions or self.credits):
+            raise ValueError("An unknown adoption lists no phrases, adoptions or credits")
         adopted = {phrase.phrase_id for phrase in self.adopted_phrases}
         tabled = {phrase.phrase_id for phrase in self.tabled_phrases}
         if len(adopted) != len(self.adopted_phrases) or len(tabled) != len(self.tabled_phrases):
@@ -234,14 +345,13 @@ class LineageView(FrozenModel):
                 raise ValueError(f"{origin.document_id} names a phrase that is not listed")
             if not set(origin.amendment_ids) <= carriers[origin.phrase_id]:
                 raise ValueError("An origin names an amendment that does not carry its phrase")
-        for basis in ("verbatim", "semantic"):
-            scores = [credit.phrases for credit in self.credits if credit.basis == basis]
-            if scores != sorted(scores, reverse=True):
-                raise ValueError("Credits are listed from most to least within each basis")
+        if list(self.credits) != sorted(self.credits, key=credit_rank):
+            raise ValueError("Credits are listed in `credit_rank` order")
         return self
 
 
 __all__ = [
+    "COALITION_GROUPS",
     "LINEAGE_SCHEMA_VERSION",
     "MIN_ADOPTED_RUN_WORDS",
     "NGRAM_WORDS",
@@ -252,4 +362,5 @@ __all__ = [
     "LineageView",
     "OriginMatch",
     "TabledPhrase",
+    "credit_rank",
 ]
