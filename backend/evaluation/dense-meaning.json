@@ -1,0 +1,536 @@
+{
+  "caveats": [
+    "Every candidate was first proposed by LobbyPlag's own lexical matcher, so verified pairs are lexically similar by construction; this favours BM25 and understates what a meaning signal adds for paraphrase.",
+    "One law (GDPR, 2013) and a pool of about 1,000 proposals; recall falls as the pool grows.",
+    "LobbyPlag proposals are short edits. The meaning scorers read only a proposal's new wording (its deleted wording when it only deletes), as if it were a passage quoted from a paper.",
+    "Negatives are weak: crowd-rejected candidates only; unlabelled candidates are not negatives (bead R1). Positives are mostly verbatim copies, so precision on rewordings is unmeasured.",
+    "Embeddings are 8-bit and computed one text per call, since this build's vectors depend on the batch (see services/qwen_onnx.py).",
+    "A query that cannot run (empty or over-long text) counts as a miss and is listed in `query_errors`."
+  ],
+  "corpus_passages": 1158,
+  "funnel": [
+    {
+      "cosine_at_least": 0.5,
+      "negatives_kept": 1.0,
+      "pairs_kept": 1.0,
+      "positives_kept": 1.0
+    },
+    {
+      "cosine_at_least": 0.6,
+      "negatives_kept": 1.0,
+      "pairs_kept": 0.992647,
+      "positives_kept": 0.988372
+    },
+    {
+      "cosine_at_least": 0.7,
+      "negatives_kept": 0.64,
+      "pairs_kept": 0.772059,
+      "positives_kept": 0.848837
+    },
+    {
+      "cosine_at_least": 0.8,
+      "negatives_kept": 0.16,
+      "pairs_kept": 0.485294,
+      "positives_kept": 0.674419
+    }
+  ],
+  "input_sha256": {
+    "amendments.json": "1ef4693a2b6e4101678f4fa0dc73c58d037b6a465ecbbd317d4e19b307ad1d9a",
+    "documents.json": "7f138e82d581fa5838119c272c93badf1d9c4d30ca3baf4d473a1ad25853f814",
+    "lobbyists.json": "e4613e538dab2de0c71fbb165c798f0c6e132aa0c42f17da8b28788c5382c323",
+    "plags.json": "fb21f05cc0c372fdc60a2117219262cb7b00d52196ebbb118b29fc786dfb9a3c",
+    "proposals.json": "5ba1a001c62f88d40d1a1ae29929eaca9177c1b579e36b65b0065f7e67f587af"
+  },
+  "judges": [
+    {
+      "development_folds": [
+        0,
+        2,
+        4
+      ],
+      "held_out_folds": [
+        1,
+        3
+      ],
+      "proposals": [
+        {
+          "development": null,
+          "floor": 0.9,
+          "held_out": null,
+          "min_pairs": 20,
+          "threshold": null,
+          "tier": "copied"
+        },
+        {
+          "development": null,
+          "floor": 0.8,
+          "held_out": null,
+          "min_pairs": 20,
+          "threshold": null,
+          "tier": "reworded"
+        }
+      ],
+      "reranker_id": "qwen3-reranker-0.6b-seq-cls-onnx-fp16@e5d273d",
+      "reranker_sha256": {
+        "model.onnx": "bd3ee3865c63d1bec518d0785ff551f7c0b78af0d4bf4855653a0c765a2a1292",
+        "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      "scorer": "qwen-judge",
+      "separation": {
+        "negatives": 100,
+        "negatives_mean": 0.964024,
+        "negatives_median": 0.99547,
+        "positives": 172,
+        "positives_mean": 0.970092,
+        "positives_median": 0.995488
+      },
+      "table": [
+        {
+          "all_pairs": {
+            "pairs": 266,
+            "positives": 168,
+            "precision": 0.6316,
+            "wilson_high": 0.6873,
+            "wilson_low": 0.5721
+          },
+          "recall": 0.9767,
+          "threshold": 0.1
+        },
+        {
+          "all_pairs": {
+            "pairs": 266,
+            "positives": 168,
+            "precision": 0.6316,
+            "wilson_high": 0.6873,
+            "wilson_low": 0.5721
+          },
+          "recall": 0.9767,
+          "threshold": 0.2
+        },
+        {
+          "all_pairs": {
+            "pairs": 266,
+            "positives": 168,
+            "precision": 0.6316,
+            "wilson_high": 0.6873,
+            "wilson_low": 0.5721
+          },
+          "recall": 0.9767,
+          "threshold": 0.3
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.4
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.5
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.6
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.7
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.8
+        },
+        {
+          "all_pairs": {
+            "pairs": 265,
+            "positives": 168,
+            "precision": 0.634,
+            "wilson_high": 0.6897,
+            "wilson_low": 0.5744
+          },
+          "recall": 0.9767,
+          "threshold": 0.9
+        }
+      ]
+    },
+    {
+      "development_folds": [
+        0,
+        2,
+        4
+      ],
+      "held_out_folds": [
+        1,
+        3
+      ],
+      "proposals": [
+        {
+          "development": null,
+          "floor": 0.9,
+          "held_out": null,
+          "min_pairs": 20,
+          "threshold": null,
+          "tier": "copied"
+        },
+        {
+          "development": null,
+          "floor": 0.8,
+          "held_out": null,
+          "min_pairs": 20,
+          "threshold": null,
+          "tier": "reworded"
+        }
+      ],
+      "reranker_id": "qwen3-reranker-0.6b-seq-cls-onnx-fp16@e5d273d",
+      "reranker_sha256": {
+        "model.onnx": "bd3ee3865c63d1bec518d0785ff551f7c0b78af0d4bf4855653a0c765a2a1292",
+        "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      "scorer": "qwen-judge-changes",
+      "separation": {
+        "negatives": 100,
+        "negatives_mean": 0.6066,
+        "negatives_median": 0.764778,
+        "positives": 172,
+        "positives_mean": 0.831203,
+        "positives_median": 0.971293
+      },
+      "table": [
+        {
+          "all_pairs": {
+            "pairs": 241,
+            "positives": 159,
+            "precision": 0.6598,
+            "wilson_high": 0.7166,
+            "wilson_low": 0.5978
+          },
+          "recall": 0.9244,
+          "threshold": 0.1
+        },
+        {
+          "all_pairs": {
+            "pairs": 226,
+            "positives": 151,
+            "precision": 0.6681,
+            "wilson_high": 0.7263,
+            "wilson_low": 0.6044
+          },
+          "recall": 0.8779,
+          "threshold": 0.2
+        },
+        {
+          "all_pairs": {
+            "pairs": 219,
+            "positives": 151,
+            "precision": 0.6895,
+            "wilson_high": 0.7471,
+            "wilson_low": 0.6254
+          },
+          "recall": 0.8779,
+          "threshold": 0.3
+        },
+        {
+          "all_pairs": {
+            "pairs": 214,
+            "positives": 151,
+            "precision": 0.7056,
+            "wilson_high": 0.7626,
+            "wilson_low": 0.6413
+          },
+          "recall": 0.8779,
+          "threshold": 0.4
+        },
+        {
+          "all_pairs": {
+            "pairs": 209,
+            "positives": 149,
+            "precision": 0.7129,
+            "wilson_high": 0.77,
+            "wilson_low": 0.6482
+          },
+          "recall": 0.8663,
+          "threshold": 0.5
+        },
+        {
+          "all_pairs": {
+            "pairs": 203,
+            "positives": 145,
+            "precision": 0.7143,
+            "wilson_high": 0.772,
+            "wilson_low": 0.6486
+          },
+          "recall": 0.843,
+          "threshold": 0.6
+        },
+        {
+          "all_pairs": {
+            "pairs": 198,
+            "positives": 143,
+            "precision": 0.7222,
+            "wilson_high": 0.7799,
+            "wilson_low": 0.6561
+          },
+          "recall": 0.8314,
+          "threshold": 0.7
+        },
+        {
+          "all_pairs": {
+            "pairs": 189,
+            "positives": 140,
+            "precision": 0.7407,
+            "wilson_high": 0.798,
+            "wilson_low": 0.6739
+          },
+          "recall": 0.814,
+          "threshold": 0.8
+        },
+        {
+          "all_pairs": {
+            "pairs": 171,
+            "positives": 128,
+            "precision": 0.7485,
+            "wilson_high": 0.8076,
+            "wilson_low": 0.6785
+          },
+          "recall": 0.7442,
+          "threshold": 0.9
+        }
+      ]
+    }
+  ],
+  "kind": "dense-meaning-v1",
+  "labelled_pairs": 272,
+  "model_id": "qwen3-embedding-0.6b-onnx-int8@c25a394",
+  "model_sha256": {
+    "onnx/model_int8.onnx": "6d0ea863f78b4a84afa3c7fcba1ec341572b5e28121aef77b7092b1dfdf679c7",
+    "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a"
+  },
+  "retrieval": [
+    {
+      "candidates_at": null,
+      "config": "bm25 delta",
+      "kind": "ranking",
+      "mrr": 0.62703,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.877907,
+        "20": 0.912791,
+        "5": 0.819767,
+        "50": 0.924419
+      }
+    },
+    {
+      "candidates_at": null,
+      "config": "bm25 whole text",
+      "kind": "ranking",
+      "mrr": 0.635569,
+      "pairs": 172,
+      "query_errors": 33,
+      "recall_at": {
+        "10": 0.790698,
+        "20": 0.790698,
+        "5": 0.77907,
+        "50": 0.796512
+      }
+    },
+    {
+      "candidates_at": null,
+      "config": "dense delta",
+      "kind": "ranking",
+      "mrr": 0.473547,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.680233,
+        "20": 0.732558,
+        "5": 0.668605,
+        "50": 0.761628
+      }
+    },
+    {
+      "candidates_at": null,
+      "config": "dense whole text",
+      "kind": "ranking",
+      "mrr": 0.605274,
+      "pairs": 172,
+      "query_errors": 33,
+      "recall_at": {
+        "10": 0.77907,
+        "20": 0.77907,
+        "5": 0.773256,
+        "50": 0.784884
+      }
+    },
+    {
+      "candidates_at": {
+        "10": 13.201389,
+        "20": 27.1875,
+        "5": 6.548611
+      },
+      "config": "bm25 delta + bm25 whole",
+      "kind": "union",
+      "mrr": null,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.976744,
+        "20": 0.976744,
+        "5": 0.965116
+      }
+    },
+    {
+      "candidates_at": {
+        "10": 19.319444,
+        "20": 40.090278,
+        "5": 9.4375
+      },
+      "config": "bm25 delta + bm25 whole + dense delta",
+      "kind": "union",
+      "mrr": null,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.976744,
+        "20": 0.976744,
+        "5": 0.976744
+      }
+    },
+    {
+      "candidates_at": {
+        "10": 21.270833,
+        "20": 44.270833,
+        "5": 10.145833
+      },
+      "config": "bm25 delta + bm25 whole + dense delta + dense whole",
+      "kind": "union",
+      "mrr": null,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.976744,
+        "20": 0.976744,
+        "5": 0.976744
+      }
+    },
+    {
+      "candidates_at": {
+        "10": 14.541667,
+        "20": 28.555556,
+        "5": 7.173611
+      },
+      "config": "dense delta + dense whole",
+      "kind": "union",
+      "mrr": null,
+      "pairs": 172,
+      "query_errors": 0,
+      "recall_at": {
+        "10": 0.936047,
+        "20": 0.965116,
+        "5": 0.930233
+      }
+    }
+  ],
+  "scorers": [
+    {
+      "auc_mean": 0.8627,
+      "auc_p10": 0.8022,
+      "description": "The edit scorer on clean old and new wording, both originals known",
+      "full_set_auc": 0.8624,
+      "precision_at_top_mean": 0.9801,
+      "precision_at_top_p10": 0.95,
+      "recall_mean": 0.8144,
+      "recall_p10": 0.7333,
+      "scorer": "lexical-delta-v1"
+    },
+    {
+      "auc_mean": 0.6196,
+      "auc_p10": 0.5478,
+      "description": "The edit scorer with the proposal's text as an insertion, original unknown",
+      "full_set_auc": 0.6203,
+      "precision_at_top_mean": 0.638,
+      "precision_at_top_p10": 0.5,
+      "recall_mean": 0.2392,
+      "recall_p10": 0.1333,
+      "scorer": "prose-dice"
+    },
+    {
+      "auc_mean": 0.7978,
+      "auc_p10": 0.7277,
+      "description": "Cosine of the amendment's changed words and the proposal text",
+      "full_set_auc": 0.7983,
+      "precision_at_top_mean": 0.892,
+      "precision_at_top_p10": 0.8,
+      "recall_mean": 1.0,
+      "recall_p10": 1.0,
+      "scorer": "qwen-cosine-delta"
+    },
+    {
+      "auc_mean": 0.5994,
+      "auc_p10": 0.5089,
+      "description": "Cosine of the amendment's whole new text and the proposal text",
+      "full_set_auc": 0.6009,
+      "precision_at_top_mean": 0.6691,
+      "precision_at_top_p10": 0.55,
+      "recall_mean": 0.8075,
+      "recall_p10": 0.7333,
+      "scorer": "qwen-cosine-whole"
+    },
+    {
+      "auc_mean": 0.4996,
+      "auc_p10": 0.4149,
+      "description": "The reranker's P(yes) that the proposal asks for the amendment's change, the amendment shown as old -> new wording",
+      "full_set_auc": 0.5,
+      "precision_at_top_mean": 0.4201,
+      "precision_at_top_p10": 0.3,
+      "recall_mean": 0.9768,
+      "recall_p10": 0.9333,
+      "scorer": "qwen-judge"
+    },
+    {
+      "auc_mean": 0.6855,
+      "auc_p10": 0.6067,
+      "description": "The same question with the amendment shown only as the words it adds and removes",
+      "full_set_auc": 0.6863,
+      "precision_at_top_mean": 0.6775,
+      "precision_at_top_p10": 0.6,
+      "recall_mean": 0.8641,
+      "recall_p10": 0.8,
+      "scorer": "qwen-judge-changes"
+    }
+  ],
+  "verified_pairs": 172
+}
