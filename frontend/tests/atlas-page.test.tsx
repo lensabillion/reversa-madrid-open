@@ -245,6 +245,26 @@ function requested(fetchMock: ReturnType<typeof installFetch>): string[] {
   return fetchMock.mock.calls.map(([input]) => String(input));
 }
 
+/** The findings endpoint's answer for a law none of whose analysis commands has run. */
+const notRunFindings = {
+  schema_version: "findings-1",
+  procedure_id: "2099/0001(COD)",
+  slug,
+  title: "Fixture Regulation on widget safety",
+  run_id: "20991201T090000Z",
+  findings: ["WHO", "WHAT", "TOWARDS", "HOW", "NEXT"].map((question) => ({
+    question,
+    title: question,
+    status: "not_run",
+    headline: null,
+    details: [],
+    evidence: [],
+    limitation: "A limitation.",
+    command: `make ${question.toLowerCase()} LAW='x'`,
+    notes: [],
+  })),
+};
+
 const unexpected = (path: string): never => {
   throw new Error(`Unexpected request: ${path}`);
 };
@@ -280,6 +300,9 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     }
     if (path === coordinatedPath) {
       return noClusterFile();
+    }
+    if (path === `/api/v1/atlas/${slug}/findings`) {
+      return reply(notRunFindings);
     }
     return path === `/api/v1/atlas/${slug}` ? reply(view) : unexpected(path);
   });
@@ -376,18 +399,13 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   expect(
     within(screen.getByRole("table")).getAllByText("Source evidence unavailable."),
   ).toHaveLength(3);
-  for (const section of ["WHO", "WHAT", "TOWARDS", "HOW"]) {
-    expect(
-      within(screen.getByRole("region", { name: section })).getByText(
-        "Evidence gap: no source-backed finding supplied.",
-      ),
-    ).toBeDefined();
+  // The outcome cards read the report's findings for the open law, only once that tab opens.
+  for (const section of ["WHO", "WHAT", "TOWARDS", "HOW", "NEXT"]) {
+    const card = screen.getByRole("region", { name: section });
+    expect(await within(card).findByText(`make ${section.toLowerCase()} LAW='x'`)).toBeDefined();
+    expect(card.textContent).not.toContain("Evidence gap");
   }
-  expect(
-    within(screen.getByRole("region", { name: "NEXT" })).getByText(
-      "Forecast unavailable: no source-backed forecast supplied.",
-    ),
-  ).toBeDefined();
+  expect(requested(fetchMock).at(-1)).toBe(`/api/v1/atlas/${slug}/findings`);
 });
 
 test("a failed consultation collection is explained on the opening graph, not only in other tabs", async () => {
