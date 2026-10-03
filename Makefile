@@ -1,4 +1,4 @@
-# Repository quality gates. `make check` verifies the default gates and changes no source.
+# Repository quality gates. `make check` verifies everything and changes nothing.
 # CI runs these same targets, so a local pass predicts a CI pass.
 
 # Supply-chain cool-off: uv ignores any package file uploaded in the last 14 days.
@@ -21,7 +21,6 @@ NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
 	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend \
-	check-evaluation-runtime audit-evaluation-runtime \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend
 
@@ -55,19 +54,8 @@ check-backend-tests: backend-env  ## Tests, gate probes and branch coverage.
 	$(BACKEND) pytest --cov
 
 # `uv audit` is a preview command in uv 0.12.8; the flag opts in and silences its warning.
-audit-backend: audit-evaluation-runtime  ## Audit production and experiment dependency locks.
+audit-backend:  ## Look up every package in backend/uv.lock in the OSV vulnerability database.
 	uv audit --directory backend --locked --preview-features audit-command
-
-# The frozen experiment has a separate heavyweight environment; normal CI audits its
-# lock without downloading model weights or installing PyTorch.
-audit-evaluation-runtime:
-	UV_EXCLUDE_NEWER=2026-09-18T00:00:00Z uv audit --directory backend/evaluation/runtime --locked --preview-features audit-command
-
-check-evaluation-runtime: backend-env  ## Optional model runtime quality checks; no inference.
-	UV_EXCLUDE_NEWER=2026-09-18T00:00:00Z uv sync --directory backend/evaluation/runtime --locked
-	$(RUFF) format --check backend/evaluation/runtime
-	$(RUFF) check backend/evaluation/runtime
-	$(BACKEND) basedpyright --project evaluation/runtime
 
 fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 	$(BACKEND) ruff check --fix

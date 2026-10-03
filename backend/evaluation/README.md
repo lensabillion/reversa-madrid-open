@@ -20,7 +20,7 @@ No model training, prompt search, threshold tuning, score blending, or fixture r
 followed the results. The model receives only each pair's wording, not its label or
 category. One task instruction compares requested legal outcomes, while preserving
 known originals and explicitly marking unknown originals. The exact prompt is retained
-in `qwen-results.json` and `runtime/run_qwen.py`.
+in `qwen-results.json` and in [`runtime/run_qwen.py`](https://github.com/lensabillion/reversa-madrid-open/blob/114270050273783490dba8c7527bd9d9e270fd7e/backend/evaluation/runtime/run_qwen.py).
 
 | Case | Lexical preferred / decoy | Qwen preferred / decoy | Preferred ranked first: lexical / Qwen |
 | --- | --- | --- | --- |
@@ -50,16 +50,20 @@ to establish who influenced legislation.
 
 ## Reproduce
 
-Run these commands from the repository root, with uv and Python 3.14:
+Run the lexical diagnostic from the repository root, with uv and Python 3.14:
 
 ```sh
 uv run --directory backend --locked python tests/diagnostics_lexical.py
-make check-evaluation-runtime
-uv run --directory backend/evaluation/runtime --locked python run_qwen.py
-make audit-evaluation-runtime
 ```
 
-The lexical command prints deterministic JSON; `lexical-results.json` records this run.
+It prints deterministic JSON; `lexical-results.json` records this run.
+
+The Qwen runtime was removed from the tree on 3 October 2026: nothing in the pipeline
+uses it, and its 55-package lock was audited over the network on every `make check`.
+Its code, lock and `make` targets remain in git history at commit
+[`1142700`](https://github.com/lensabillion/reversa-madrid-open/tree/114270050273783490dba8c7527bd9d9e270fd7e/backend/evaluation/runtime). To rerun it, check out that commit and run
+`make check-evaluation-runtime`, then
+`uv run --directory backend/evaluation/runtime --locked python run_qwen.py`.
 The semantic command downloads only the pinned model's JSON/text/safetensors files
 under ignored `data/models/`, verifies its weights, then atomically replaces
 `qwen-results.json` after all 20 scores succeed. It rejects a changed fixture, a weight
@@ -69,7 +73,7 @@ Network/setup/model exceptions fail the run. The optional heavyweight command is
 experiment, not an online endpoint or hardened untrusted-input service. Keep the
 published result file if retaining the first timing measurement matters.
 
-The isolated runtime has its own generated `uv.lock`, separate from production:
+The isolated runtime had its own generated `uv.lock`, separate from production:
 
 - Python 3.14.7; `torch==2.14.0`, official arm64 cp314 wheel published 2026-09-02.
 - `transformers==5.17.0`, universal wheel published 2026-09-09.
@@ -89,14 +93,12 @@ These short inputs do not establish throughput for long documents or a complete 
 20-proposal pipeline. Attention has quadratic sequence-length cost; 2,048 is a protective
 experiment limit, not evidence that all such inputs meet the short-case timing.
 
-Validation: runtime Ruff and strict basedpyright pass. The isolated dependency audit
-reported “Found no known vulnerabilities and no adverse project statuses in 54 packages”.
-The default unit tests validate the lexical diagnostic loader/ordering contracts without
-requiring model downloads; actual semantic inference is the explicit outer-tier check.
-`make check` and backend CI audit both dependency locks. The optional runtime quality
-target installs the heavyweight environment and checks its types; it does not download
-model weights or run inference. The model experiment is intentionally outside the
-default test gate.
+Validation at the time of the run: runtime Ruff and strict basedpyright passed, and the
+isolated dependency audit reported “Found no known vulnerabilities and no adverse project
+statuses in 54 packages”. The default unit tests validate the lexical diagnostic
+loader/ordering contracts without requiring model downloads; actual semantic inference
+was the explicit outer-tier check. Since the runtime's removal, `make check` and backend
+CI audit only `backend/uv.lock`.
 The model itself has not been unit-tested for arbitrary legal correctness.
 
 ## Public labels and next decision
