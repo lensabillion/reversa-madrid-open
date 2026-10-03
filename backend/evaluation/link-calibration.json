@@ -1,0 +1,425 @@
+{
+  "caveats": [
+    "Every candidate was first proposed by LobbyPlag's own lexical matcher, so all pairs are lexically similar by construction; precision on real submissions can be lower.",
+    "Negatives are weak: pairs a volunteer crowd-checked and never marked as a copy (review finding R1). Most rest on one check, so precision here is against weak negatives.",
+    "One law (GDPR) in one year (2013); the 170 largest-group positives are mostly verbatim copies, so precision for reworded links is unmeasured.",
+    "Folds are organization groups with purged training pairs, so a scorer never sees the organization or texts it is tested on; the development and held-out halves are folds, and the combiner for a development fold was fitted partly on held-out folds' labels, so the held-out check is optimistic by that overlap.",
+    "A threshold here is a proposal only. The practice-loop owner freezes it before the blind audit; nothing in this file establishes it."
+  ],
+  "combiner_weights_all_pairs": {
+    "bias": -1.1193,
+    "direction_agrees": 1.648,
+    "direction_opposes": -0.1259,
+    "lexical_overlap": 2.6537,
+    "negation_conflict": -0.2328,
+    "short_edit": 0.3183
+  },
+  "development_folds": [
+    0,
+    2,
+    4
+  ],
+  "features": [
+    "lexical_overlap",
+    "short_edit",
+    "negation_conflict",
+    "direction_agrees",
+    "direction_opposes"
+  ],
+  "grouping": "organizations_with_purge",
+  "held_out_folds": [
+    1,
+    3
+  ],
+  "input_sha256": {
+    "amendments.json": "1ef4693a2b6e4101678f4fa0dc73c58d037b6a465ecbbd317d4e19b307ad1d9a",
+    "documents.json": "7f138e82d581fa5838119c272c93badf1d9c4d30ca3baf4d473a1ad25853f814",
+    "lobbyists.json": "e4613e538dab2de0c71fbb165c798f0c6e132aa0c42f17da8b28788c5382c323",
+    "plags.json": "fb21f05cc0c372fdc60a2117219262cb7b00d52196ebbb118b29fc786dfb9a3c",
+    "proposals.json": "5ba1a001c62f88d40d1a1ae29929eaca9177c1b579e36b65b0065f7e67f587af"
+  },
+  "kind": "link-calibration-v1",
+  "positives": 172,
+  "proposals": {
+    "lexical-delta-v1": [
+      {
+        "development": {
+          "pairs": 101,
+          "positives": 97,
+          "precision": 0.9604,
+          "wilson_high": 0.9845,
+          "wilson_low": 0.9026
+        },
+        "floor": 0.9,
+        "held_out": {
+          "pairs": 36,
+          "positives": 35,
+          "precision": 0.9722,
+          "wilson_high": 0.9951,
+          "wilson_low": 0.8583
+        },
+        "min_pairs": 20,
+        "threshold": 0.75,
+        "tier": "copied"
+      },
+      {
+        "development": {
+          "pairs": 119,
+          "positives": 104,
+          "precision": 0.8739,
+          "wilson_high": 0.9221,
+          "wilson_low": 0.8024
+        },
+        "floor": 0.8,
+        "held_out": {
+          "pairs": 50,
+          "positives": 36,
+          "precision": 0.72,
+          "wilson_high": 0.8253,
+          "wilson_low": 0.5833
+        },
+        "min_pairs": 20,
+        "threshold": 0.32,
+        "tier": "reworded"
+      }
+    ],
+    "logistic-combiner-v1": [
+      {
+        "development": null,
+        "floor": 0.9,
+        "held_out": null,
+        "min_pairs": 20,
+        "threshold": null,
+        "tier": "copied"
+      },
+      {
+        "development": {
+          "pairs": 125,
+          "positives": 109,
+          "precision": 0.872,
+          "wilson_high": 0.9197,
+          "wilson_low": 0.8022
+        },
+        "floor": 0.8,
+        "held_out": {
+          "pairs": 54,
+          "positives": 37,
+          "precision": 0.6852,
+          "wilson_high": 0.7932,
+          "wilson_low": 0.5526
+        },
+        "min_pairs": 20,
+        "threshold": 0.4,
+        "tier": "reworded"
+      }
+    ]
+  },
+  "rule": "Development folds are the even-numbered ones. On development pairs only, the threshold is the smallest 0.01-grid value with at least 20 pairs at or above it and a Wilson 95% lower bound of precision of at least the tier's floor (copied 0.9, reworded 0.8). Held-out folds then check it.",
+  "scorers": {
+    "lexical-delta-v1": {
+      "description": "The existing lexical score on clean edits: the baseline, 'before'",
+      "draws": {
+        "auc": {
+          "mean": 0.8627,
+          "p10": 0.8022
+        },
+        "precision_at_top": {
+          "mean": 0.9801,
+          "p10": 0.95
+        },
+        "recall": {
+          "mean": 0.8144,
+          "p10": 0.7333
+        }
+      },
+      "folds": [
+        {
+          "auc": 0.9866,
+          "fold": 0,
+          "recall": 0.962
+        },
+        {
+          "auc": 0.6819,
+          "fold": 1,
+          "recall": 0.6087
+        },
+        {
+          "auc": 0.655,
+          "fold": 2,
+          "recall": 0.5417
+        },
+        {
+          "auc": 0.9691,
+          "fold": 3,
+          "recall": 0.9565
+        },
+        {
+          "auc": 0.7368,
+          "fold": 4,
+          "recall": 0.6522
+        }
+      ],
+      "full_set_auc": 0.8624,
+      "full_set_recall": 0.814
+    },
+    "logistic-combiner-v1": {
+      "description": "Logistic regression over lexical_overlap, short_edit, negation_conflict, direction_agrees, direction_opposes, fitted in each training fold",
+      "draws": {
+        "auc": {
+          "mean": 0.8804,
+          "p10": 0.8267
+        },
+        "precision_at_top": {
+          "mean": 0.9272,
+          "p10": 0.85
+        },
+        "recall": {
+          "mean": 0.8496,
+          "p10": 0.7667
+        }
+      },
+      "folds": [
+        {
+          "auc": 0.9873,
+          "fold": 0,
+          "recall": 0.9873
+        },
+        {
+          "auc": 0.7002,
+          "fold": 1,
+          "recall": 0.6087
+        },
+        {
+          "auc": 0.8167,
+          "fold": 2,
+          "recall": 0.6667
+        },
+        {
+          "auc": 0.992,
+          "fold": 3,
+          "recall": 1.0
+        },
+        {
+          "auc": 0.8089,
+          "fold": 4,
+          "recall": 0.6522
+        }
+      ],
+      "full_set_auc": 0.8803,
+      "full_set_recall": 0.8488
+    }
+  },
+  "simulated_tests": {
+    "draws": 2000,
+    "generator": "Python random.Random (Mersenne Twister)",
+    "per_class": 30,
+    "recall_threshold": 0.5,
+    "seed": 0,
+    "top_k": 20
+  },
+  "tables": {
+    "lexical-delta-v1": [
+      {
+        "all_pairs": {
+          "pairs": 188,
+          "positives": 142,
+          "precision": 0.7553,
+          "wilson_high": 0.8113,
+          "wilson_low": 0.6892
+        },
+        "recall": 0.8256,
+        "threshold": 0.1
+      },
+      {
+        "all_pairs": {
+          "pairs": 177,
+          "positives": 141,
+          "precision": 0.7966,
+          "wilson_high": 0.8493,
+          "wilson_low": 0.7313
+        },
+        "recall": 0.8198,
+        "threshold": 0.2
+      },
+      {
+        "all_pairs": {
+          "pairs": 172,
+          "positives": 140,
+          "precision": 0.814,
+          "wilson_high": 0.865,
+          "wilson_low": 0.7492
+        },
+        "recall": 0.814,
+        "threshold": 0.3
+      },
+      {
+        "all_pairs": {
+          "pairs": 159,
+          "positives": 140,
+          "precision": 0.8805,
+          "wilson_high": 0.9221,
+          "wilson_low": 0.8209
+        },
+        "recall": 0.814,
+        "threshold": 0.4
+      },
+      {
+        "all_pairs": {
+          "pairs": 155,
+          "positives": 140,
+          "precision": 0.9032,
+          "wilson_high": 0.9405,
+          "wilson_low": 0.8465
+        },
+        "recall": 0.814,
+        "threshold": 0.5
+      },
+      {
+        "all_pairs": {
+          "pairs": 149,
+          "positives": 136,
+          "precision": 0.9128,
+          "wilson_high": 0.9483,
+          "wilson_low": 0.8565
+        },
+        "recall": 0.7907,
+        "threshold": 0.6
+      },
+      {
+        "all_pairs": {
+          "pairs": 139,
+          "positives": 133,
+          "precision": 0.9568,
+          "wilson_high": 0.9801,
+          "wilson_low": 0.909
+        },
+        "recall": 0.7733,
+        "threshold": 0.7
+      },
+      {
+        "all_pairs": {
+          "pairs": 131,
+          "positives": 127,
+          "precision": 0.9695,
+          "wilson_high": 0.9881,
+          "wilson_low": 0.9241
+        },
+        "recall": 0.7384,
+        "threshold": 0.8
+      },
+      {
+        "all_pairs": {
+          "pairs": 111,
+          "positives": 110,
+          "precision": 0.991,
+          "wilson_high": 0.9984,
+          "wilson_low": 0.9507
+        },
+        "recall": 0.6395,
+        "threshold": 0.9
+      }
+    ],
+    "logistic-combiner-v1": [
+      {
+        "all_pairs": {
+          "pairs": 272,
+          "positives": 172,
+          "precision": 0.6324,
+          "wilson_high": 0.6874,
+          "wilson_low": 0.5736
+        },
+        "recall": 1.0,
+        "threshold": 0.1
+      },
+      {
+        "all_pairs": {
+          "pairs": 243,
+          "positives": 164,
+          "precision": 0.6749,
+          "wilson_high": 0.7307,
+          "wilson_low": 0.6137
+        },
+        "recall": 0.9535,
+        "threshold": 0.2
+      },
+      {
+        "all_pairs": {
+          "pairs": 216,
+          "positives": 161,
+          "precision": 0.7454,
+          "wilson_high": 0.7988,
+          "wilson_low": 0.6833
+        },
+        "recall": 0.936,
+        "threshold": 0.3
+      },
+      {
+        "all_pairs": {
+          "pairs": 179,
+          "positives": 146,
+          "precision": 0.8156,
+          "wilson_high": 0.8656,
+          "wilson_low": 0.7524
+        },
+        "recall": 0.8488,
+        "threshold": 0.4
+      },
+      {
+        "all_pairs": {
+          "pairs": 166,
+          "positives": 146,
+          "precision": 0.8795,
+          "wilson_high": 0.9206,
+          "wilson_low": 0.8212
+        },
+        "recall": 0.8488,
+        "threshold": 0.5
+      },
+      {
+        "all_pairs": {
+          "pairs": 154,
+          "positives": 139,
+          "precision": 0.9026,
+          "wilson_high": 0.9401,
+          "wilson_low": 0.8455
+        },
+        "recall": 0.8081,
+        "threshold": 0.6
+      },
+      {
+        "all_pairs": {
+          "pairs": 129,
+          "positives": 124,
+          "precision": 0.9612,
+          "wilson_high": 0.9833,
+          "wilson_low": 0.9125
+        },
+        "recall": 0.7209,
+        "threshold": 0.7
+      },
+      {
+        "all_pairs": {
+          "pairs": 81,
+          "positives": 79,
+          "precision": 0.9753,
+          "wilson_high": 0.9932,
+          "wilson_low": 0.9144
+        },
+        "recall": 0.4593,
+        "threshold": 0.8
+      },
+      {
+        "all_pairs": {
+          "pairs": 46,
+          "positives": 45,
+          "precision": 0.9783,
+          "wilson_high": 0.9962,
+          "wilson_low": 0.8866
+        },
+        "recall": 0.2616,
+        "threshold": 0.9
+      }
+    ]
+  },
+  "weak_negatives": 100
+}
