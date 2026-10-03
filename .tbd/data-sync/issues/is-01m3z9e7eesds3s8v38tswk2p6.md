@@ -5,17 +5,19 @@ title: "Part 3 · Find candidates: per-law index over amendment changes and subm
 kind: feature
 status: in_progress
 priority: 0
-version: 8
+version: 9
 delegate: claude-code@dani
 labels: []
 dependencies:
   - type: blocks
     target: is-01m40fgfbf2anx19zzzv3y9bqy
 parent_id: is-01m3ygrva6wcq297g7j12g99c2
+child_order_hints:
+  - is-01m414pkmsscy580y1yzvrjsw4
 hold: null
 hold_until: null
 created_at: 2026-10-02T21:48:31.565Z
-updated_at: 2026-10-03T11:53:22.903Z
+updated_at: 2026-10-03T15:04:12.184Z
 started_at: 2026-10-03T09:58:40.190Z
 ---
 Pick the passages of a long submission that match the amendment's change, keep alternatives and offsets, bound repeated-term credit (R7), and lift the scorer's 800-token limit for whole papers without silent truncation. Measure with the practice harness on whole papers. Depends on step 2.
