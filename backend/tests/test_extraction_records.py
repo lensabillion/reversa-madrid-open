@@ -54,6 +54,25 @@ def test_records_round_trip(tmp_path: Path) -> None:
     assert tuple(read_records(path, Amendment)) == FIXTURE.amendments
 
 
+def test_a_record_holding_unicode_line_separators_stays_one_record(tmp_path: Path) -> None:
+    # Real submissions hold these; JSON leaves them unescaped and `str.splitlines` cuts there.
+    odd = FIXTURE.amendments[0].model_copy(update={"new_text": "one\u2028two\u2029three\u0085four"})
+    path = tmp_path / "amendments.jsonl"
+    path.write_bytes(encode_records([odd, FIXTURE.amendments[1]])[0])
+
+    assert tuple(read_records(path, Amendment)) == (odd, FIXTURE.amendments[1])
+
+
+def test_an_empty_file_holds_no_record_and_bad_bytes_are_named(tmp_path: Path) -> None:
+    path = tmp_path / "amendments.jsonl"
+    path.write_bytes(b"")
+    assert tuple(read_records(path, Amendment)) == ()
+
+    path.write_bytes(b"\xff\n")
+    with pytest.raises(RecordError, match="Cannot read"):
+        tuple(read_records(path, Amendment))
+
+
 def test_reading_names_the_bad_line_and_a_missing_file(tmp_path: Path) -> None:
     path = tmp_path / "amendments.jsonl"
     content, _ = encode_records(FIXTURE.amendments[:1])

@@ -34,12 +34,20 @@ def encode_records(records: Iterable[AtlasRecord]) -> tuple[bytes, int]:
 
 
 def read_records[T: AtlasRecord](path: Path, model: type[T]) -> Iterator[T]:
-    """Validate every line, naming the line number of the first failure."""
+    """Validate every line, naming the line number of the first failure.
+
+    Records are split at line feeds only. Submissions hold characters that
+    `str.splitlines` treats as line ends (U+2028, U+2029, U+0085) and that JSON leaves
+    unescaped, so `splitlines` cuts such a record in two. The writer ends every record
+    with a line feed and JSON escapes any line feed inside one.
+    """
     try:
-        content = path.read_text(encoding="utf-8")
-    except OSError as error:
+        content = path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
         raise RecordError(f"Cannot read {path}") from error
-    for number, line in enumerate(content.splitlines(), start=1):
+    if not content:
+        return
+    for number, line in enumerate(content.removesuffix("\n").split("\n"), start=1):
         try:
             yield model.model_validate_json(line)
         except ValidationError as error:
