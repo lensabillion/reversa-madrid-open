@@ -46,6 +46,7 @@ Everything below was built for the first brief. The third column says what it be
 | PDF/text ingestion | PR #11: page-aware extraction with byte, page, text and expansion limits | Part 1 (collect): consultation papers to passages | No OCR or column reconstruction |
 | Evidence workspace (frontend) | PRs #12, #13, #17: three-column view of original law, amendment and lobby wording | Part 8: the evidence card the jury reads | Shows supplied or LobbyPlag pairs, not our graph yet |
 | LobbyPlag browsing | 4,867 amendment detail records rehearsed; 1,957 candidate links, 172 verified | Comparison only, marked as historical labels | Never an edge in our graph |
+| Extraction foundations (data layout, HTTP cache, rate-limited fetcher, per-law manifest, six typed tables, entity resolution, source catalog, probe/fetch CLI) | `make check-backend` on `feat/extraction-foundations` before merging `main`: 174 backend tests, 100% branch coverage (986 statements, 182 branches) | Part 1 (collect): the fetch, cache and table layer under `rev-pjk2` | No response parser for any source: no catalog URL has been hit by a live request from this repository, and parsers wait on probed shapes. No proposal-to-final diff, no amendment PDF parsing, no coverage report |
 | Gates | `make check` on `main` at `b4b5444` plus these docs, 3 October 11:07: exit 0; 192 backend tests, 100% branch coverage (996 statements, 214 branches); 37 frontend tests; build; both audits clean | Unchanged | Tests establish behavior, not accuracy |
 
 Data on disk under `data/` (`measured` 2026-10-03): Parltrack `ep_amendments.json.zst`
@@ -98,6 +99,8 @@ Open decisions are not settled until the project owner agrees.
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
+| Parsed tables are JSON Lines, not Parquet | Decided 2026-10-03 | The playbook asks for Parquet; pyarrow is a new dependency the 14-day cool-off and `no-build` policy have not cleared, and JSON Lines is equally safe against delimiters in legal text. The typed row models in `backend/src/influence/extraction/tables.py` are the contract, so the container can change without touching a parser |
+| Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
 | D1: language-model judge (none, local open model, Claude or Jev) | **Open** | Now runs on thousands of candidates, not 60 pairs; bead `rev-jaig`; [Atlas explainer §10](explainer/influence-atlas-primer.md#10-models-from-hugging-face) |
@@ -132,6 +135,32 @@ Cut lines and the hour-by-hour plan are in
 [explainer §12](explainer/influence-atlas-primer.md#12-todays-plan).
 Public-source coverage, the any-law runtime and forecast quality are unverified until
 those beads report measurements.
+
+Extraction has foundations but no parsers. The order the playbook sets, and the order to
+keep: probe every catalog URL and record the real response shapes, resolve one procedure
+identifier into a manifest, split the proposal and final act into units and diff them,
+chunk consultation submissions into one ask per passage, parse committee amendment PDFs,
+then write the per-law coverage report. Nothing in that sequence should be written before
+the step it depends on has a recorded response shape. Create a bead per step.
+
+## Agent 1 Handoff: Data and Integration
+
+The full handoff is [docs/agents/agent-1-handoff.md](agents/agent-1-handoff.md): branches,
+what is done and measured, what is unfinished, the gate's state, the next
+steps in order and how to run things on the Windows laptop. In short, at 14:15 CEST on
+3 October:
+
+- PR [#25](https://github.com/lensabillion/reversa-madrid-open/pull/25) holds the shared
+  contracts (`schemas/atlas.py`, schema `atlas-1`) and fixtures; all nine CI checks are
+  green; Agents 2 and 3 build against commit `f1525db`. It awaits the owner's merge.
+- Draft PR [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)
+  (`feat/collect-law`) holds the law-query parser, the resumable stage store, and the
+  Parltrack, Transparency Register and actor-resolution connectors (each at 100% branch
+  coverage), the CELLAR law-text connector, and the Have Your Say connector with passage
+  splitting (its real-data check is not reported yet). The backend gate passes at 14:35:
+  486 tests, 100% branch coverage (`measured`).
+- Not started: the collect service, `influence collect <query>`, the run on real sources
+  for the AI Act and its timings. No link, score or graph exists yet.
 
 ## Continuing in Another Chat
 
