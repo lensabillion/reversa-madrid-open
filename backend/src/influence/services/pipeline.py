@@ -6,6 +6,13 @@ passages, candidates by BM25 (`services/retrieval.py`), a verdict on every candi
 (`services/outcomes.py`), the graph (`services/atlas_graph.py`) and descriptive outcome
 counts (`services/atlas_analysis.py`). Nothing is scored, ranked or judged here.
 
+The outcome counts take every ask, not only the shown ones, so their denominators are
+complete: an ask without a traced outcome counts as unknown, never as a loss and never left
+out. Asks without a link are not traced to the final act on their own wording, because that
+costs one alignment pass over every final provision per ask: about 130 ms per ask against
+712 provisions, measured on 3 October 2026, which is over an hour for the AI Act's 29,000
+passages.
+
 One stand-in remains until part 3's ask extraction exists: every consultation passage is
 treated as one ask (`ASK_METHOD`). That is enough to find and quote links, but it makes
 outcome counts count passages, not distinct requests, and the view says so.
@@ -74,7 +81,10 @@ LIMITATIONS = (
     f"{' and '.join(sorted(DEFAULT_PUBLISHABLE))}-tier links are published, at thresholds "
     "calibrated on LobbyPlag's labelled pairs from one 2013 law; their precision on this law "
     "has not been audited yet.",
-    "Outcomes are traced only for asks with a published or unconfirmed link.",
+    "Outcomes are traced only for asks with a published or unconfirmed link; every other "
+    "ask counts as unknown in the rankings, not as a loss.",
+    "Ask extraction v0 records no direction, so an ask to keep the proposal's text unchanged "
+    "is not recognised and is never judged as a defence of the status quo.",
 )
 
 
@@ -250,10 +260,19 @@ def assess_candidates(
 
 
 def origin_links(links: Iterable[LinkAssessment]) -> dict[str, LinkAssessment]:
-    """Each ask's strongest link it could have caused: published first, then by score."""
+    """Each ask's strongest link it could have caused: published first, then by score.
+
+    Only a link whose ask came first can be the ask's origin, so eligibility is checked
+    before strength: a stronger link to an earlier amendment must not hide a weaker one the
+    ask could have caused.
+    """
     origins: dict[str, LinkAssessment] = {}
     for link in sorted(
-        (link for link in links if link.status in TRACED_STATUSES),
+        (
+            link
+            for link in links
+            if link.status in TRACED_STATUSES and link.time_eligibility == "ask_first"
+        ),
         key=lambda link: (link.status != "published", -link.support_score, link.link_id),
     ):
         origins.setdefault(link.ask_id, link)
@@ -266,21 +285,47 @@ def trace(
     links: Iterable[LinkAssessment],
     articles: Sequence[ArticleVersion],
 ) -> tuple[Outcome, ...]:
-    """Outcomes for every ask with a link it could have caused, through that amendment."""
+    """Outcomes for every ask with a published or unconfirmed link.
+
+    The ask is traced through its origin amendment when one came after it, and otherwise
+    directly against the final act on its own wording. Asks with no such link are not
+    traced (see the module docstring); the outcome counts treat them as unknown.
+    """
+    links = tuple(links)
     origins = origin_links(links)
+    linked = {link.ask_id for link in links if link.status in TRACED_STATUSES}
     outcomes: list[Outcome] = []
     for ask in asks:
+        if ask.ask_id not in linked:
+            continue
         link = origins.get(ask.ask_id)
-        if link is not None:
-            outcomes.extend(trace_outcomes(ask, amendments[link.amendment_id], link, articles))
+        amendment = amendments[link.amendment_id] if link is not None else None
+        outcomes.extend(trace_outcomes(ask, amendment, link, articles))
     return tuple(outcomes)
 
 
 def _rankings(
     law: LawRecord, actors: Sequence[Actor], asks: Sequence[Ask], outcomes: Sequence[Outcome]
-) -> tuple[RankingRow, ...]:
+) -> tuple[tuple[RankingRow, ...], tuple[str, ...]]:
+    """Final-act rows over every ask, and the sentences that qualify them.
+
+    The sentences say how many asks the rows count and how many of those are unknown, and
+    repeat each final-act coverage gap the analysis found, so a reader of the rankings sees
+    why the counts may be incomplete.
+    """
     analysis = aggregate_outcomes(laws=(law,), actors=actors, asks=asks, outcomes=outcomes)
-    return tuple(
+    (total,) = (counts for counts in analysis.totals if counts.stage == "final_act")
+    prefix = "final_act: "
+    notes = (
+        f"Final-act outcome counts cover all {total.observed_asks} ask(s): "
+        f"{total.assessed_asks} assessed and {total.unknown} unknown.",
+        *(
+            f"Final-act counts may be incomplete: {gap.removeprefix(prefix)}"
+            for gap in analysis.coverage_gaps
+            if gap.startswith(prefix)
+        ),
+    )
+    rows = tuple(
         RankingRow(
             actor_id=row.actor_id,
             actor_name=row.actor_name,
@@ -296,6 +341,7 @@ def _rankings(
         for row in analysis.rows
         if row.counts.stage == "final_act"
     )
+    return rows, notes
 
 
 def build_view(
@@ -354,6 +400,9 @@ def build_view(
         links=shown,
         outcomes=outcomes,
     )
+    # Every ask and every actor, not the shown subset: counting only shown asks would leave
+    # out the asks nobody matched and overstate each actor's win rate.
+    rankings, ranking_notes = _rankings(law, collected.actors, asks, outcomes)
     run_id = collected.manifest.run_id
     try:
         snapshot = build_graph(
@@ -383,9 +432,10 @@ def build_view(
         coverage=law.coverage,
         bundle=bundle,
         snapshot=snapshot,
-        rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
+        rankings=rankings,
         limitations=(
             *LIMITATIONS,
+            *ranking_notes,
             *(
                 (
                     f"{len(unsearchable)} amendment(s) were too long or empty to search "
