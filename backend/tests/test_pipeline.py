@@ -5,6 +5,7 @@ a rare phrase, and a consultation submission, dated before it, that asks for tha
 """
 
 import json
+from collections import Counter
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +20,14 @@ from influence import cli
 from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.repositories import hys
-from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, SourceSpan, span_matches
+from influence.schemas.atlas import (
+    Actor,
+    LawRecord,
+    LinkAssessment,
+    SourceSpan,
+    id_part,
+    span_matches,
+)
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN
 from influence.services import assessment, pipeline
 from influence.services.pipeline import PipelineError
@@ -87,7 +95,8 @@ def test_a_matching_pair_becomes_a_published_copied_link_with_its_graph(tmp_path
         SLUG,
         "Artificial Intelligence Act",
     )
-    assert (view.ask_method, view.limitations) == (pipeline.ASK_METHOD, pipeline.LIMITATIONS)
+    assert view.ask_method == pipeline.ASK_METHOD
+    assert view.limitations[: len(pipeline.LIMITATIONS)] == pipeline.LIMITATIONS
     # The scoring sentence names the revision and published tiers part 4 actually uses.
     scoring = view.limitations[1]
     assert f"({assessment.METHOD_REVISION})" in scoring
@@ -131,8 +140,78 @@ def test_only_asks_with_a_link_they_could_have_caused_are_traced(tmp_path: Path)
     traced = {o.ask_id for o in view.bundle.outcomes}
     caused = {item.ask_id for item in view.bundle.links if item.status in pipeline.TRACED_STATUSES}
     assert traced == caused
-    (row,) = (row for row in view.rankings if row.actor_name == "Acme Unknown Lobby")
-    assert row.observed_asks == 1
+
+
+def test_rankings_count_every_ask_not_only_the_shown_ones(tmp_path: Path) -> None:
+    """Regression: rankings once counted only asks a shown link reached (2 of 5 here)."""
+    law = collected(matching_world(tmp_path))
+    view = pipeline.build_view(law, generated_at=LATER, publish_prose=True)
+
+    asks = pipeline.asks_from_passages(law.passages)
+    assert len(asks) == 5
+    assert len(view.bundle.asks) < len(asks)
+    per_actor = Counter(ask.actor_id for ask in asks)
+    assert {row.actor_id: row.observed_asks for row in view.rankings} == per_actor
+    for row in view.rankings:
+        assert row.assessed_asks + row.unknown == row.observed_asks
+        assert row.full + row.partial + row.not_observed == row.assessed_asks
+    # The asks nobody linked count as unknown, never as losses or as absent.
+    (lobby,) = (row for row in view.rankings if row.actor_name == "Acme Unknown Lobby")
+    assert (lobby.observed_asks, lobby.not_observed, lobby.unknown) == (2, 0, 2)
+    notes = view.limitations[len(pipeline.LIMITATIONS) :]
+    assert notes[0] == "Final-act outcome counts cover all 5 ask(s): 0 assessed and 5 unknown."
+    # The analysis's coverage gaps reach the view instead of being dropped.
+    assert notes[1] == (
+        f"Final-act counts may be incomplete: {AI_ACT}: ask inventory mismatch: "
+        "coverage reports 4, supplied 5 canonical asks"
+    )
+    assert not any(note.startswith(("heard: ", "parliament_position: ")) for note in notes)
+
+
+def _link(ask_id: str, amendment_id: str, score: float, when: str) -> LinkAssessment:
+    return LinkAssessment.model_validate(
+        {
+            "link_id": f"link:{id_part(amendment_id)}:{id_part(ask_id)}",
+            "procedure_id": AI_ACT,
+            "amendment_id": amendment_id,
+            "ask_id": ask_id,
+            "status": "unconfirmed",
+            "support_score": score,
+            "time_eligibility": when,
+            "method": "m",
+            "method_revision": "r",
+        }
+    )
+
+
+def test_a_late_stronger_link_does_not_hide_an_earlier_eligible_origin(tmp_path: Path) -> None:
+    """Regression: the strongest link was chosen before checking that the ask came first."""
+    law = collected(matching_world(tmp_path))
+    first, second, third = pipeline.asks_from_passages(law.passages)[:3]
+    early, late = law.amendments[0].amendment_id, law.amendments[-1].amendment_id
+    assert early != late
+    links = (
+        _link(first.ask_id, late, 0.9, "amendment_first"),
+        _link(first.ask_id, early, 0.4, "ask_first"),
+        _link(second.ask_id, late, 0.9, "amendment_first"),
+    )
+    amendments = {amendment.amendment_id: amendment for amendment in law.amendments}
+
+    origins = pipeline.origin_links(links)
+    outcomes = pipeline.trace((first, second, third), amendments, links, law.articles)
+
+    assert origins == {first.ask_id: links[1]}
+    by_ask = {(outcome.ask_id, outcome.stage): outcome for outcome in outcomes}
+    assert {outcome.amendment_id for outcome in outcomes if outcome.ask_id == first.ask_id} == {
+        early
+    }
+    # An ask whose only link came after the amendment is traced on its own wording.
+    (alone,) = (outcome for outcome in outcomes if outcome.ask_id == second.ask_id)
+    assert (alone.relation, alone.stage) == ("direct_to_final", "final_act")
+    assert alone.amendment_id is None
+    assert by_ask[(first.ask_id, "heard")].relation == "via_amendment"
+    # An ask with no link at all is not traced; the counts treat it as unknown.
+    assert all(outcome.ask_id != third.ask_id for outcome in outcomes)
 
 
 def test_a_law_without_matches_has_an_empty_but_valid_view(tmp_path: Path) -> None:

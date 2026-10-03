@@ -11,6 +11,11 @@ Two markups exist and they share nothing. Official Journal acts carry ELI subdiv
 Word export with no ids, so their structure is read from the English text itself
 ("Whereas:", "Article 5"). A document that fits neither yields its text and no provisions,
 with the reason: an invented provision would be quoted as law.
+
+A proposal's annexes are separate streams of the same CELLAR item, so they are fetched with
+the act and split at their "ANNEX I" headings into the same one-provision-per-annex shape the
+Official Journal gives a final act. Without them, wording that the final act's annexes kept
+from the proposal would look new.
 """
 
 import hashlib
@@ -237,6 +242,10 @@ class FetchedAct:
     sha256: str
     media_type: str | None
     body: bytes = field(repr=False)
+    # The proposal's annex streams, in order; a final act has none (its annexes are inline).
+    annexes: tuple[bytes, ...] = field(default=(), repr=False)
+    # One "<url>: <reason>" per annex stream that was listed and could not be fetched.
+    annex_gaps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -270,16 +279,30 @@ def act_stream_url(listing: bytes) -> str | None:
     return min(streams)[1] if streams else None
 
 
+def annex_stream_urls(listing: bytes) -> tuple[str, ...]:
+    """The annex streams of a 300 Multiple Choices list, in their stream order."""
+    streams = [
+        (int(order), href)
+        for href, name, order in _STREAM.findall(listing.decode("utf-8", errors="replace"))
+        if "annex" in name.lower()
+    ]
+    return tuple(href for _, href in sorted(streams))
+
+
 def fetch_act(
     fetcher: CachedFetcher, celex: str, *, language: str = "eng", refresh: bool = False
 ) -> FetchedAct | MissingAct:
     """Fetch one act as XHTML. A gap comes back as a `MissingAct`, never as an exception.
 
-    Final acts answer 200. Proposals answer 300 with a list of streams, of which the act
-    stream is fetched. `language` is the three-letter code CELLAR negotiates on.
+    Final acts answer 200. Proposals answer 300 with a list of streams: the act stream is
+    fetched, then each annex stream. A lost annex is recorded in `annex_gaps` rather than
+    failing the act. With annexes, `sha256` covers the act and annex bodies in stream order,
+    so it still identifies exactly the bytes the text came from. `language` is the
+    three-letter code CELLAR negotiates on.
     """
     url = celex_url(celex)
     headers = {"Accept": ACT_ACCEPT, "Accept-Language": language}
+    annex_urls: tuple[str, ...] = ()
     try:
         response = fetcher.get(
             url, refresh=refresh, headers=headers, accept_status=(HTTP_MULTIPLE_CHOICES,)
@@ -289,19 +312,32 @@ def fetch_act(
             if stream is None:
                 reason = "CELLAR listed several streams and none is recognisable as the act"
                 return MissingAct(celex, url, language, "failed", reason, HTTP_MULTIPLE_CHOICES)
+            annex_urls = annex_stream_urls(response.body)
             url = stream
             response = fetcher.get(url, refresh=refresh, headers=headers)
     except FetchError as error:
         status = "missing" if error.status == HTTP_NOT_FOUND else "failed"
         return MissingAct(celex, url, language, status, error.reason, error.status)
+    annexes: list[bytes] = []
+    gaps: list[str] = []
+    for annex_url in annex_urls:
+        try:
+            annexes.append(fetcher.get(annex_url, refresh=refresh, headers=headers).body)
+        except FetchError as error:
+            gaps.append(f"{annex_url}: {error.reason}")
+    digest = hashlib.sha256(response.body)
+    for annex in annexes:
+        digest.update(annex)
     return FetchedAct(
         celex=celex,
         url=url,
         language=language,
         retrieved_at=response.metadata.fetched_at,
-        sha256=hashlib.sha256(response.body).hexdigest(),
+        sha256=digest.hexdigest(),
         media_type=response.metadata.content_type,
         body=response.body,
+        annexes=tuple(annexes),
+        annex_gaps=tuple(gaps),
     )
 
 
@@ -383,6 +419,10 @@ _RECITALS_CLOSE = re.compile(r"HA(VE|S) ADOPTED")
 # Where the enacting terms stop in a proposal; the financial statement follows.
 _ARTICLES_CLOSE = re.compile(r"Done at |This (Regulation|Decision) shall be binding")
 _OJ_DATE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
+# The heading line of one annex of a proposal: "ANNEX", "ANNEX I", "ANNEX 2". The cover page
+# says "ANNEXES" and a cross-reference says "Annex III", so neither opens an annex.
+_ANNEX_HEADING = re.compile(r"ANNEX(?:\s+([IVXLC]+|\d+[a-z]?))?")
+NO_ANNEX_HEADING = "An annex stream with no 'ANNEX' heading line; its text is not split"
 
 NO_STRUCTURE = (
     "No provision structure recognised: no ELI subdivision ids (rct_, art_, anx_) "
@@ -476,6 +516,8 @@ class SplitProvisions(NamedTuple):
     reason: str | None
     # The Official Journal date printed in the act's header; None for a proposal.
     published_on: date | None
+    # Why an annex stream gave no provisions; empty when every annex stream was split.
+    annex_reasons: tuple[str, ...] = ()
 
 
 type _Section = tuple[ProvisionKind, str, list[_Block]]
@@ -594,6 +636,34 @@ def _provisions(sections: Iterable[_Section]) -> list[tuple[ProvisionKind, str, 
     return provisions
 
 
+def _annex_sections(blocks: Iterable[_Block]) -> list[_Section]:
+    """Split a proposal's annex stream at each "ANNEX I" heading; the cover page is dropped.
+
+    The heading block opens the annex and stays in its text, as the Official Journal's
+    annex container does, so the two stages' annexes compare like for like.
+    """
+    sections: list[_Section] = []
+    for block in blocks:
+        heading = _ANNEX_HEADING.fullmatch(block.text.split("\n", 1)[0])
+        if heading is not None:
+            label = f"Annex {heading[1]}" if heading[1] else "Annex"
+            sections.append(("annex", label, [block]))
+        elif sections:
+            sections[-1][2].append(block)
+    return sections
+
+
+def _blocks_of(markup_bytes: bytes, what: str) -> list[_Block]:
+    try:
+        markup = markup_bytes.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise CellarError(f"The text of {what} is not UTF-8") from error
+    parser = _BlockParser()
+    parser.feed(markup)
+    parser.close()
+    return parser.blocks
+
+
 def _published_on(blocks: Iterable[_Block]) -> date | None:
     for block in blocks:
         match = _OJ_DATE.fullmatch(block.text)
@@ -614,25 +684,29 @@ def split_provisions(
     stage: ArticleStage,
     document_id: str,
     version_date: date | None,
+    annexes: Sequence[bytes] = (),
 ) -> SplitProvisions:
     """Extract the act's plain text and split it into recitals, articles and paragraphs.
 
-    Linear in the size of the document. `version_date` None takes the Official Journal
-    date printed in the act, when there is one. Every `article_id` is unique within the
-    act: a repeated label gets a numeric suffix rather than overwriting the first.
+    `annexes` are a proposal's annex streams: their text follows the act's in the document
+    text and each "ANNEX I" heading opens one annex provision. Linear in the size of the
+    document. `version_date` None takes the Official Journal date printed in the act, when
+    there is one. Every `article_id` is unique within the act: a repeated label gets a
+    numeric suffix rather than overwriting the first.
     """
-    try:
-        markup = xhtml_bytes.decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise CellarError(f"The text of {celex} is not UTF-8") from error
-    parser = _BlockParser()
-    parser.feed(markup)
-    parser.close()
-    blocks = parser.blocks
-    document_text = DocumentText(document_id=document_id, text=_join(blocks))
+    blocks = _blocks_of(xhtml_bytes, celex)
     published_on = _published_on(blocks)
     structured = any(_eli_section(block) is not None for block in blocks)
     sections = _eli_sections(blocks) if structured else _text_sections(blocks)
+    annex_reasons: list[str] = []
+    for number, annex in enumerate(annexes, start=1):
+        annex_blocks = _blocks_of(annex, f"{celex} annex stream {number}")
+        found = _annex_sections(annex_blocks)
+        if annex_blocks and not found:
+            annex_reasons.append(f"{celex} annex stream {number}: {NO_ANNEX_HEADING}")
+        sections.extend(found)
+        blocks.extend(annex_blocks)
+    document_text = DocumentText(document_id=document_id, text=_join(blocks))
     used: dict[str, int] = {}
     records: list[ArticleVersion] = []
     for kind, provision, text in _provisions(sections):
@@ -652,4 +726,6 @@ def split_provisions(
             )
         )
     reason = None if records else NO_STRUCTURE
-    return SplitProvisions(document_text, tuple(records), reason, published_on)
+    return SplitProvisions(
+        document_text, tuple(records), reason, published_on, tuple(annex_reasons)
+    )

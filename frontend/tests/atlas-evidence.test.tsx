@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { AtlasEvidence, type AtlasEvidenceProps } from "../components/atlas-evidence";
 
@@ -122,4 +122,87 @@ test("distinguishes a known empty final provision from unavailable final text", 
   expect(within(final).getByText("Known empty final wording")).toBeDefined();
   expect(within(final).queryByText("Final wording unavailable")).toBeNull();
   expect(within(final).getByRole("link", { name: "Published position paper" })).toBeDefined();
+});
+
+/** Deterministic filler of exactly `length` code points (ASCII, so UTF-16 length agrees). */
+function filler(length: number, offset = 0): string {
+  let text = "";
+  for (let index = offset; text.length < length; index += 1) {
+    text += `recital ${index % 89} considers the market. `;
+  }
+  return text.slice(0, length);
+}
+
+function omitted(region: HTMLElement): number[] {
+  return [...(region.textContent ?? "").matchAll(/… ([\d,]+) characters omitted …/gu)].map(
+    (match) => Number(match[1]?.replaceAll(",", "")),
+  );
+}
+
+test("short fixture sources render whole, with no expand control", () => {
+  render(<AtlasEvidence {...props} />);
+  const ask = screen.getByRole("region", { name: "Lobby request" });
+  expect(within(ask).queryByRole("button")).toBeNull();
+  expect(omitted(ask)).toEqual([]);
+});
+
+test("a late highlight in a 44,114-character submission shows beside its amendment and expands", () => {
+  const quote = "providers shall keep automatically generated logs";
+  const before = `😀 ${filler(40_000 - 2)}🇪🇺 `;
+  const start = Array.from(before).length;
+  const text = before + quote + filler(44_114 - start - quote.length, 11);
+  expect(Array.from(text).length).toBe(44_114);
+  render(
+    <AtlasEvidence
+      {...props}
+      submission={{ ...excerpt, text, spans: [{ start, end: start + quote.length, text: quote }] }}
+    />,
+  );
+  const ask = screen.getByRole("region", { name: "Lobby request" });
+  expect(ask.querySelector("mark")?.textContent).toBe(quote);
+  expect(ask.textContent).toContain(`🇪🇺 ${quote}`);
+  expect(ask.textContent?.length).toBeLessThan(1_500);
+  const gaps = omitted(ask);
+  expect(gaps).toHaveLength(2);
+  const shown = Array.from(ask.querySelector("[lang]")?.textContent ?? "").length;
+  expect(gaps[0]).toBeGreaterThan(39_000);
+  expect(shown).toBeLessThan(1_000);
+  const amendment = screen.getByRole("region", { name: "Proposed amendment" });
+  expect(amendment.querySelector("mark")?.textContent).toBe("shall");
+  expect(within(ask).getByRole("link", { name: "Published position paper" })).toBeDefined();
+
+  const expand = within(ask).getByRole("button", {
+    name: "Show full source text (44,114 characters)",
+  });
+  expect(expand.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(expand);
+  expect(ask.textContent).toContain(text);
+  expect(ask.querySelector("mark")?.textContent).toBe(quote);
+  expect(omitted(ask)).toEqual([]);
+  const collapse = within(ask).getByRole("button", { name: "Show cited passages only" });
+  expect(collapse.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(collapse);
+  expect(omitted(ask)).toEqual(gaps);
+});
+
+test("distant spans in one long source each get a window, none dropped", () => {
+  const text = `😀${filler(50_000)}`;
+  const characters = Array.from(text);
+  const spans = [1_000, 25_000, 48_000].map((start) => ({
+    start,
+    end: start + 20,
+    text: characters.slice(start, start + 20).join(""),
+  }));
+  render(<AtlasEvidence {...props} submission={{ ...excerpt, text, spans }} />);
+  const ask = screen.getByRole("region", { name: "Lobby request" });
+  expect([...ask.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(
+    spans.map((span) => span.text),
+  );
+  const gaps = omitted(ask);
+  expect(gaps).toHaveLength(4);
+  const visible = [...ask.querySelectorAll("[lang] > span.block")]
+    .filter((node) => !node.textContent?.includes("characters omitted"))
+    .map((node) => Array.from(node.textContent ?? "").length);
+  expect(visible).toHaveLength(3);
+  expect([...gaps, ...visible].reduce((sum, size) => sum + size, 0)).toBe(characters.length);
 });
