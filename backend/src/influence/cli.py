@@ -12,7 +12,9 @@ it (`lineage.json`). `influence channels <law>` collects, then counts the channe
 was lobbied through: consultation stages, timing, tabling Members and coalitions
 (`channels.json`). `influence directions <law>` collects, then counts which way the
 amendments move the law and, through the atlas view's published links, each actor's asks
-(`directions.json`). `influence submit` is the first brief's pairs command, kept until
+(`directions.json`). `influence forecast <law> [<law> ...]` reads every written atlas view,
+validates the forecast on the completed laws and forecasts the named open laws' asks
+(`data/laws/forecast.json`). `influence submit` is the first brief's pairs command, kept until
 part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
 or output failure, 2 on a command-line usage error.
 """
@@ -36,6 +38,7 @@ from influence.extraction.records import RecordError
 from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
 from influence.schemas.coordinated import CoordinatedCluster, CoordinatedView
+from influence.schemas.forecast_view import ForecastView
 from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
@@ -49,6 +52,14 @@ from influence.services.collect import (
 )
 from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.direction import build_directions, write_directions
+from influence.services.forecast import LeakageError
+from influence.services.forecasting import (
+    ForecastError,
+    build_forecasts,
+    read_evidence,
+    resolve_law,
+    write_forecasts,
+)
 from influence.services.lineage_assembly import build_lineage, write_lineage
 from influence.services.pipeline import (
     Collected,
@@ -384,6 +395,63 @@ def _list_directions(result: CollectResult) -> int:
     return 0
 
 
+def _forecast(queries: Sequence[str], data_root: Path | None) -> int:
+    root = data_root if data_root is not None else default_data_root()
+    try:
+        laws, problems = read_evidence(root)
+        targets = {resolve_law(query, [law.law for law in laws]).procedure_id for query in queries}
+        view = build_forecasts(
+            laws,
+            {law.slug for law in laws if law.law.procedure_id in targets},
+            generated_at=datetime.now(UTC),
+            problems=problems,
+        )
+        path = write_forecasts(view, root)
+    except (ForecastError, LeakageError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("No forecast file was written.", file=sys.stderr)
+        return 1
+    _print_forecast(view)
+    print(f"forecast: {path.absolute()}")
+    return 0
+
+
+def _print_forecast(view: ForecastView) -> None:
+    check = view.validation
+    print(
+        f"History: {check.training_examples} decided asks ({check.training_wins} won) from "
+        f"{check.training_laws} completed law(s); {check.tested_splits} of {check.splits} "
+        f"rolling splits tested on {check.test_examples} asks"
+    )
+    if check.adequate:
+        print(
+            f"Probabilities published: Brier {check.model_brier:.3f} against prevalence "
+            f"{check.baseline_brier:.3f}"
+        )
+    else:
+        print("No probability published; scenarios only, because:")
+        for reason in check.reasons:
+            print(f"  {reason}")
+    rule = view.fallback_rule
+    print(f"Fallback rule {rule.rule}: {'computable' if rule.computable else 'not computable'}")
+    for law in view.laws:
+        role = "target" if law.target else "history"
+        excluded = ", ".join(f"{reason} {count}" for reason, count in law.excluded.items())
+        print(
+            f"  {law.procedure_id} ({law.status}, {role}): {law.asks} asks, "
+            f"{law.training_examples} trained, {law.forecasts} forecast; "
+            f"excluded: {excluded or 'none'}"
+        )
+        if law.note is not None:
+            print(f"    {law.note}")
+    kinds = Counter(item.scenario or item.score_type for item in view.forecasts)
+    for kind, count in sorted(kinds.items()):
+        print(f"  {count} x {kind}")
+    for limitation in view.limitations:
+        if limitation.startswith("Skipped view"):
+            print(f"  {limitation}")
+
+
 def _collect(
     query: str,
     data_root: Path | None,
@@ -497,6 +565,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             action="store_true",
             help="skip submission attachments (faster; the asks layer is then partial)",
         )
+    forecast = commands.add_parser(
+        "forecast",
+        help="forecast the open asks of named laws from every written atlas view",
+        description=(
+            "Read every atlas view under the data root, validate the forecast on the completed "
+            "laws' decided asks with rolling time splits, and forecast the open asks of the "
+            "named laws into data/laws/forecast.json. A probability is published only when "
+            "validation beats the prevalence baseline; otherwise each forecast is a scenario."
+        ),
+    )
+    forecast.add_argument(
+        "laws",
+        nargs="+",
+        help="laws with an atlas view: slug, procedure number, CELEX, COM reference or name",
+    )
+    forecast.add_argument(
+        "--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT"
+    )
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -524,6 +610,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("tuple[SetupGroup, ...]", args.only),
             refresh=cast("bool", args.refresh),
         )
+    if args.command == "forecast":
+        return _forecast(cast("list[str]", args.laws), cast("Path | None", args.data_root))
     after: dict[str, Callable[[CollectResult], int] | None] = {
         "collect": None,
         "atlas": _build_view,
