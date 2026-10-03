@@ -131,7 +131,8 @@ def test_an_adoption_cannot_adopt_more_than_it_inserted() -> None:
         AmendmentAdoption.model_validate(base | {"inserted_words": MIN_ADOPTED_RUN_WORDS - 1})
     with pytest.raises(ValidationError, match="longest run"):
         AmendmentAdoption.model_validate(
-            base | {"longest_run": MIN_ADOPTED_RUN_WORDS + 5, "adopted_words": 13}
+            base
+            | {"longest_run": MIN_ADOPTED_RUN_WORDS + 5, "adopted_words": MIN_ADOPTED_RUN_WORDS + 4}
         )
     assert AmendmentAdoption.model_validate(base | {"kind": "semantic"}).kind == "semantic"
 

@@ -1,6 +1,7 @@
 """Origins: exact quotations, honest dates, citations flagged, coalition wording visible."""
 
 from datetime import UTC, date, datetime
+from functools import partial
 
 import pytest
 from hypothesis import given
@@ -15,15 +16,21 @@ from influence.schemas.atlas import (
     SourceSpan,
     span_matches,
 )
-from influence.schemas.lineage import AdoptedPhrase, AmendmentAdoption
+from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS, AdoptedPhrase, AmendmentAdoption
+from influence.services import origin
+from influence.services.lineage import Rarity
 from influence.services.origin import (
     OriginError,
     coalition_phrase_ids,
-    find_origins,
     is_citation,
     submitters_from,
 )
 from influence.services.prose_match import words_of
+
+# No word is common, so these tests see the run-length rules alone; rarity has its own tests.
+EVERY_WORD_RARE = Rarity(frozenset())
+find_origins = partial(origin.find_origins, rarity=EVERY_WORD_RARE)
+find_tabled_origins = partial(origin.find_tabled_origins, rarity=EVERY_WORD_RARE)
 
 SHA = "0" * 64
 RETRIEVED = datetime(2026, 10, 3, tzinfo=UTC)
@@ -103,7 +110,7 @@ def test_a_shorter_shared_run_still_counts_when_it_is_long_enough() -> None:
 
 
 def test_a_run_shorter_than_the_adopted_minimum_is_not_an_origin() -> None:
-    text = " ".join(REQUEST.split()[:10]) + " but nothing more"
+    text = " ".join(REQUEST.split()[: MIN_ADOPTED_RUN_WORDS - 1]) + " but nothing more"
     assert find_origins([phrase()], [adoption()], [document(text=text)]) == ()
 
 
@@ -326,3 +333,135 @@ def test_every_origin_span_is_an_exact_substring_of_its_document(
         assert match.words >= 12
         run = " ".join(word.text for word in words_of(match.span.text))
         assert f" {run} " in f" {folded} "
+
+
+# --- Tabled wording: documents tied to amendments whether or not they were adopted ---------
+
+
+def amendment(
+    number: int = 1,
+    new_text: str = REQUEST,
+    old_text: str | None = None,
+    tabled_on: date | None = date(2099, 3, 1),
+) -> Amendment:
+    return Amendment(
+        amendment_id=f"am:2099-0001-COD:IMCO:{number}",
+        procedure_id="2099/0001(COD)",
+        document_id="doc:parltrack:x",
+        stage="committee",
+        tabled_on=tabled_on,
+        old_text=old_text,
+        new_text=new_text,
+    )
+
+
+def test_a_document_is_tied_to_an_amendment_that_was_never_adopted() -> None:
+    text = f"Our position. We ask that {REQUEST.upper()}. Thank you."
+    found = find_tabled_origins(
+        [amendment(old_text="Providers shall keep logs.")], [document(text=text)]
+    )
+    (tabled,) = found.phrases
+    (match,) = found.origins
+    # Only the words the amendment inserted count: "providers", "shall keep" and "logs" were
+    # already in its original, so the tabled wording is what follows them.
+    inserted = REQUEST.split(" logs ", 1)[1]
+    assert tabled.text == inserted
+    assert tabled.amendment_ids == ("am:2099-0001-COD:IMCO:1",)
+    assert match.phrase_id == tabled.phrase_id
+    assert match.span.text == inserted.upper()
+    assert span_matches(match.span, text)
+    assert (match.earliest_amendment_on, match.precedes, match.is_citation) == (
+        date(2099, 3, 1),
+        True,
+        False,
+    )
+
+
+def test_amendments_inserting_the_same_wording_share_one_phrase_and_the_earliest_date() -> None:
+    amendments = [
+        amendment(2, tabled_on=date(2099, 6, 1)),
+        amendment(1, tabled_on=date(2099, 1, 15)),
+        amendment(3, tabled_on=None),
+    ]
+    undated = document("2", REQUEST, published=None)
+    found = find_tabled_origins(amendments, [document(text=REQUEST), undated])
+    (tabled,) = found.phrases
+    ids = ("am:2099-0001-COD:IMCO:1", "am:2099-0001-COD:IMCO:2", "am:2099-0001-COD:IMCO:3")
+    assert tabled.amendment_ids == ids
+    dated, unknown = sorted(found.origins, key=lambda m: m.document_id)
+    assert (dated.amendment_ids, dated.earliest_amendment_on) == (ids, date(2099, 1, 15))
+    assert dated.precedes is False
+    assert unknown.precedes is None
+    only_undated = find_tabled_origins([amendment(tabled_on=None)], [document(text=REQUEST)])
+    assert (only_undated.origins[0].earliest_amendment_on, only_undated.origins[0].precedes) == (
+        None,
+        None,
+    )
+
+
+def test_adopted_wording_is_left_to_find_origins_and_only_the_rest_is_tabled() -> None:
+    extra = " and publish a yearly summary of incidents in plain language for every citizen"
+    wholly = find_tabled_origins([amendment()], [document(text=REQUEST)], adopted=[phrase()])
+    assert (wholly.phrases, wholly.origins) == ((), ())
+    longer = REQUEST + extra
+    partly = find_tabled_origins(
+        [amendment(new_text=longer)], [document(text=longer)], adopted=[phrase()]
+    )
+    assert [p.text for p in partly.phrases] == [longer]
+    semantic = phrase().model_copy(update={"kind": "semantic", "similarity": 0.9})
+    assert find_tabled_origins([amendment()], [document(text=REQUEST)], adopted=[semantic]).phrases
+
+
+def test_the_proposals_own_wording_and_short_runs_are_not_a_request() -> None:
+    proposal = find_tabled_origins(
+        [amendment()], [document(text=REQUEST)], proposal_texts=[REQUEST]
+    )
+    assert (proposal.phrases, proposal.origins) == ((), ())
+    short = " ".join(REQUEST.split()[: MIN_ADOPTED_RUN_WORDS - 1]) + " but nothing more"
+    assert find_tabled_origins([amendment()], [document(text=short)]).origins == ()
+
+
+def test_a_tabled_citation_is_flagged_and_the_submitter_is_named() -> None:
+    citation = "regulation eu 2016 679 of the european parliament and of the council on protection"
+    acme = Actor(actor_id="actor:tr:1", kind="organisation", name="Acme", resolution="unresolved")
+    source, text = document(text=citation)
+    found = find_tabled_origins(
+        [amendment(new_text=citation)],
+        [(source, text)],
+        submitters={source.document_id: acme},
+    )
+    (match,) = found.origins
+    assert (match.is_citation, match.organisation, match.actor_id) == (True, "Acme", "actor:tr:1")
+
+
+def test_tabled_search_refuses_a_text_of_another_document() -> None:
+    source, _ = document("1", REQUEST)
+    other = DocumentText(document_id="doc:hys_attachment:2", text=REQUEST)
+    with pytest.raises(OriginError, match="does not belong"):
+        find_tabled_origins([amendment()], [(source, other)])
+
+
+@given(
+    body=st.lists(WORD, min_size=12, max_size=24),
+    before=st.lists(WORD, max_size=10),
+    after=st.lists(WORD, max_size=10),
+    separator=st.sampled_from([" ", ", ", " - ", "\n"]),
+)
+def test_every_tabled_origin_quotes_its_document_and_names_carriers_of_its_phrase(
+    body: list[str], before: list[str], after: list[str], separator: str
+) -> None:
+    text = separator.join([*before, *body, *after])
+    found = find_tabled_origins([amendment(new_text=" ".join(body))], [document(text=text)])
+    carriers = {p.phrase_id: set(p.amendment_ids) for p in found.phrases}
+    for match in found.origins:
+        assert span_matches(match.span, text)
+        assert match.words >= 12
+        assert set(match.amendment_ids) <= carriers[match.phrase_id]
+
+
+def test_a_run_of_the_laws_common_words_is_no_origin_adopted_or_tabled() -> None:
+    common = Rarity(frozenset(REQUEST.split()))
+    docs = [document(text=REQUEST)]
+    assert origin.find_origins([phrase()], [adoption()], docs, rarity=common) == ()
+    tabled = origin.find_tabled_origins([amendment()], docs, rarity=common)
+    assert (tabled.phrases, tabled.origins) == ((), ())
