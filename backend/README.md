@@ -29,9 +29,26 @@ make dev-backend
 
 The API is at `http://127.0.0.1:8000`, interactive documentation at `/docs`, and the
 machine-readable contract at `/openapi.json`. `/health` and `/api/v1/score` work without
-downloaded data. Data routes require these five LobbyPlag files in `data/lobbyplag/`:
-`amendments.json`, `proposals.json`, `plags.json`, `documents.json`, and `lobbyists.json`.
-The directory is ignored by Git.
+downloaded data.
+
+The law views (`/api/v1/lineage`, `/api/v1/atlas`) come from the data root. `make
+dev-backend` sets it to the committed snapshots in `mock-data/`, so the explorer works on a
+fresh checkout without running the pipeline. To serve the laws you built with `make
+lineage` or `make atlas`, set it to `data/` (a relative path is taken from the repository
+root, because the Makefile makes it absolute before uv runs the server in `backend/`):
+
+```sh
+INFLUENCE_DATA_ROOT=data make dev-backend
+```
+
+`make dev-backend` prints the root it serves before the server starts. `mock-data/` holds
+lineage views only, so `/atlas` lists no laws until you serve `data/`. The API's own
+default, and every pipeline command's, stays the repository's `data/`.
+
+The LobbyPlag data routes read a separate directory (`INFLUENCE_DATA_DIR`, below), which
+the setting above does not change. They require these five LobbyPlag files in
+`data/lobbyplag/`: `amendments.json`, `proposals.json`, `plags.json`, `documents.json`, and
+`lobbyists.json`. The directory is ignored by Git.
 
 For a fresh checkout, download the public snapshot pinned to an upstream commit:
 
@@ -268,7 +285,8 @@ The plan's fifth label, "Not analysed (DE)", needs per-passage language counts t
 not carry yet and is not derived.
 
 The API reads the same data root as the command (`INFLUENCE_DATA_ROOT`, default the
-repository's `data/`; `create_app(atlas_data_root=...)` in tests).
+repository's `data/`; `create_app(atlas_data_root=...)` in tests). `make dev-backend` serves
+`mock-data/` instead unless `INFLUENCE_DATA_ROOT` is set (see "Run With Public Data").
 
 **Limits, stated in every view.** Ask extraction is a stand-in: every passage is one
 ask, so outcome counts count passages, not distinct requests. Only copied-tier links are
@@ -299,7 +317,9 @@ change also touches every other fold-based result (`practice-results.json`,
 `influence lineage <law>` writes `lineage.json` (see "Lineage Command (Outcome First)" below)
 and prints the explorer URL, `http://localhost:3000/lineage?law=<slug>`. The API reads the
 written views back (`services/lineage_views.py`, `routers/lineage.py`), from the same data
-root as the command (`INFLUENCE_DATA_ROOT`, default the repository's `data/`):
+root as the command (`INFLUENCE_DATA_ROOT`, default the repository's `data/`). `make
+dev-backend` serves `mock-data/` instead unless `INFLUENCE_DATA_ROOT` is set, so after a run
+start it with `INFLUENCE_DATA_ROOT=data` to see the new view:
 
 | Endpoint | Answer |
 | --- | --- |

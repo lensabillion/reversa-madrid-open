@@ -243,7 +243,7 @@ cloud container, Have Your Say index not built, so title search): collect 560.6 
 9 m 34 s; 631 adopted phrases from 838 of 5,660 amendments; 10,454 of 73,606 new final-act
 words traced; 195 of 788 documents said wording first; 153 named organisations. Its
 `lineage.json` is committed as `mock-data/laws/2021-0106-COD/lineage.json`
-(`INFLUENCE_DATA_ROOT=mock-data make dev-backend` serves it). Not verified: the run with
+(`make dev-backend` serves it by default since `rev-o9ac`). Not verified: the run with
 `--jev` (semantic origins), and any audit of the shown links. Observed, not explained: all
 530 dated non-citation matches have the submission first (0 amendment-first).
 
@@ -365,6 +365,7 @@ Open decisions are not settled until the project owner agrees.
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
 | D5: organizer questions of the first brief | **Superseded**; the remaining question is answered: the organizers allow code written before today (3 October) | Bead `rev-qvmx`, closed |
 | No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
+| `make dev-backend` serves `mock-data/` unless `INFLUENCE_DATA_ROOT` is set | Asked by the owner 2026-10-03; decided when the owner merges the PR (bead `rev-o9ac`) | The explorer then works on a fresh checkout without the pipeline. Only the dev server changes: the pipeline commands and the API's own default stay `data/`, so no run writes into the committed snapshots. `/atlas` is empty by default because `mock-data/` has no Atlas view |
 | Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
 

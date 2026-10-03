@@ -61,8 +61,15 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 	$(BACKEND) ruff check --fix
 	$(BACKEND) ruff format
 
-dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
-	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
+# The API serves the committed snapshots in mock-data/, so the explorer works without
+# running the pipeline; `INFLUENCE_DATA_ROOT=data make dev-backend` serves your own runs.
+# The root is made absolute here because uv runs the server in backend/, where a relative
+# path would miss. Only this target changes it: the pipeline commands still write to data/.
+DEV_DATA_ROOT := $(abspath $(or $(INFLUENCE_DATA_ROOT),mock-data))
+
+dev-backend:  ## Serve the API at http://127.0.0.1:8000 from mock-data/ (or INFLUENCE_DATA_ROOT), restarting when src/ changes.
+	@echo "Serving law views from $(DEV_DATA_ROOT)"
+	INFLUENCE_DATA_ROOT="$(DEV_DATA_ROOT)" $(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
 
 # The any-law command: collect, then parts 3 to 7, into data/laws/<procedure>/atlas.json.
 atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
