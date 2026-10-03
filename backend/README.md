@@ -294,6 +294,30 @@ changed group after tabling is listed under the later group (the AI Act's list s
 wording among themselves, so a cluster shows shared wording, not its author. The clusters
 are not yet in `atlas.json` or the explorer.
 
+## Channels Command (Part 7, HOW)
+
+`influence channels <law>` (`make channels LAW='2021/0106(COD)'`) collects the law as
+`influence collect` does, then counts the channels the law was lobbied through, from the
+collected records alone, and writes `data/laws/<procedure>/channels.json`
+(`schemas/channels.py`, `ChannelsView`, method `channels-1`). It reads no link, so the
+counts exist for any law before part 4 has verified anything. Every count sits beside its
+denominator; every count describes the record (a channel associated with the law), never a
+cause.
+
+| Section | What it counts | Source |
+| --- | --- | --- |
+| `consultation` | Feedback per Have Your Say publication (one consultation stage), with the publication's type code from the Have Your Say index (`PROP_REG` is feedback on the proposal); submitters by actor kind and register category; organisations carrying a register ID, of all organisations | `documents.jsonl`, `passages.jsonl`, `actors.jsonl`, `data/catalog/hys-index.jsonl` |
+| `timing` | Feedback dated before or on/after `proposed_on`; amendments tabled before or on/after `proposed_on` and `completed_on`; undated records and records with no reference date counted apart | `law.jsonl`, `documents.jsonl`, amendments |
+| `meps` | Amendments by stage, committee and political group of the tabling Members (a co-signed amendment counts once per group); amendments with no known author or no known group; the 20 Members who tabled the most | amendments, MEP actors |
+| `coalitions` | Amendments co-signed by several Members, and across groups; part 3's coordinated clusters (`find_coordinated`) and how many span groups | amendments, MEP actors |
+| `votes_and_meetings` | Part 1's coverage rows for `votes` and `meetings`, status and reason; no count is shown because neither is collected yet | `law.jsonl` |
+
+When the Have Your Say index is not built, publication types are `null` and
+`publication_type_gap` says why. Organisations whose submissions share wording are not
+counted (comparing every pair of submissions is too slow for a live run); the file's
+`limitations` list this and the other gaps. **Not measured**: no real law has been run
+through this command yet; it is tested offline on fixture laws only.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
