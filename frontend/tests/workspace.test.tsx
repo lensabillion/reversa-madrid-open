@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, expect, test, vi } from "vitest";
-import HomePage from "../app/page";
+import HomePage from "../app/workspace/page";
 import type {
   AmendmentDetail,
   AmendmentPage,

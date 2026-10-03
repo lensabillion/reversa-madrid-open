@@ -12,6 +12,7 @@ const excerpt = {
     url: "https://example.org/paper.pdf",
     page: 2,
     publishedAt: "2023-02-01",
+    tabledOn: null,
   },
 };
 const props: AtlasEvidenceProps = {
@@ -30,6 +31,7 @@ const props: AtlasEvidenceProps = {
     status: "unknown",
     explanation: "The final text has not been supplied.",
     finalText: null,
+    tracedVia: null,
   },
 };
 afterEach(cleanup);
@@ -98,6 +100,7 @@ test("renders partial outcome evidence without upgrading it to a full win", () =
         status: "partial",
         explanation: "Only the record-keeping obligation remains.",
         finalText: excerpt,
+        tracedVia: null,
       }}
     />,
   );
@@ -115,6 +118,7 @@ test("distinguishes a known empty final provision from unavailable final text", 
         status: "full",
         explanation: "The requested deletion is reflected in the final act.",
         finalText: { ...excerpt, text: "", spans: [] },
+        tracedVia: null,
       }}
     />,
   );
@@ -122,6 +126,39 @@ test("distinguishes a known empty final provision from unavailable final text", 
   expect(within(final).getByText("Known empty final wording")).toBeDefined();
   expect(within(final).queryByText("Final wording unavailable")).toBeNull();
   expect(within(final).getByRole("link", { name: "Published position paper" })).toBeDefined();
+});
+
+test("dates amendment wording by its tabling date, not an unknown publication date", () => {
+  const tabled = {
+    ...excerpt,
+    source: { ...excerpt.source, publishedAt: null, tabledOn: "2022-01-25" },
+  };
+  render(<AtlasEvidence {...props} amendment={tabled} />);
+  const amendment = screen.getByRole("region", { name: "Proposed amendment" });
+  expect(within(amendment).getByText("Page 2 · Tabled 2022-01-25")).toBeDefined();
+  expect(within(amendment).queryByText(/Publication date unknown/)).toBeNull();
+});
+
+test("names the other amendment an ask's final text was traced through, without its outcome", () => {
+  render(
+    <AtlasEvidence
+      {...props}
+      outcome={{
+        status: "unknown",
+        explanation: "Traced elsewhere.",
+        finalText: null,
+        tracedVia: "am:other",
+      }}
+    />,
+  );
+  const final = screen.getByRole("region", { name: "Final legal text" });
+  expect(
+    within(final).getByText("Final text traced via another amendment (am:other)"),
+  ).toBeDefined();
+  expect(
+    within(screen.getByRole("region", { name: "Legal outcome" })).getByRole("heading").textContent,
+  ).toBe("Final text traced via another amendment (am:other)");
+  expect(screen.queryByText("Final outcome unknown")).toBeNull();
 });
 
 /** Deterministic filler of exactly `length` code points (ASCII, so UTF-16 length agrees). */

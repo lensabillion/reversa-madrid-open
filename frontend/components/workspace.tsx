@@ -167,6 +167,9 @@ export default function EvidenceWorkspace() {
           <Link href="/lineage" className={`${buttonStyle} text-stone-500`}>
             Lineage explorer
           </Link>
+          <Link href="/atlas" className={`${buttonStyle} text-stone-500`}>
+            Atlas explorer
+          </Link>
         </nav>
       </header>
       <div hidden={mode !== "compare"}>

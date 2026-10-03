@@ -13,10 +13,14 @@ export interface AtlasDataNotice {
 
 type WorkspaceView = "graph" | "evidence" | "outcomes" | "coordinated";
 
+const disclosureSummary =
+  "cursor-pointer font-medium text-teal-800 underline decoration-teal-300 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700";
+
 /**
  * Explain the investigation before offering evidence and supplied outcome calculations.
- * `coordinated` adds a fourth view. The workspace always opens on the graph, whose source
- * layers say why a graph is empty.
+ * `coordinated` adds a fourth view. The workspace always opens on the graph. The explanation and
+ * the data notice stay one line until opened, so the graph is in the first screen; source layers
+ * follow the graph, or come first when the graph is empty because they say why.
  */
 export function AtlasWorkspace({
   snapshot,
@@ -32,7 +36,8 @@ export function AtlasWorkspace({
   coverage: readonly AtlasLayerCoverage[];
   coverageNotes: readonly string[];
   dataNotice: AtlasDataNotice;
-  analysis: ReactNode;
+  /** A function receives a callback that opens one published link in the Evidence view. */
+  analysis: ReactNode | ((openEvidence: (linkId: string) => void) => ReactNode);
   coordinated?: ReactNode;
 }) {
   const [view, setView] = useState<WorkspaceView>("graph");
@@ -50,27 +55,22 @@ export function AtlasWorkspace({
     !links.some(
       (link) => link.id === selectedLink && link.evidence.assessment.status === "published",
     );
+  const sourceLayers = <AtlasSourceLayers coverage={coverage} links={links} />;
+  const graphEmpty = snapshot.nodes.length === 0;
   return (
     <main className="min-h-screen bg-stone-50 text-stone-900">
-      <header className="border-b border-stone-200 bg-white px-5 py-6 sm:px-8">
-        <div className="mx-auto max-w-[1536px]">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-800">
-            Influence Atlas
-          </p>
-          <h1 className="mt-3 max-w-3xl font-serif text-3xl leading-tight sm:text-4xl">
-            Whose requests appear in EU law?
-          </h1>
-          <p className="mt-4 max-w-3xl text-base leading-7 text-stone-600">
-            Organizations ask lawmakers to change legislation. We connect those requests to matching
-            amendments, then check what appears in the final law.
-          </p>
-          <details className="mt-4 text-sm text-stone-600">
-            <summary className="cursor-pointer font-medium text-teal-800">
-              How does the investigation work?
-            </summary>
+      <header className="border-b border-stone-200 bg-white px-5 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-[1536px] flex-wrap items-baseline gap-x-6 gap-y-2 text-sm">
+          <h1 className="font-serif text-xl leading-tight">Whose requests appear in EU law?</h1>
+          <details className="min-w-0 text-stone-600 open:basis-full">
+            <summary className={disclosureSummary}>How does the investigation work?</summary>
+            <p className="mt-3 max-w-3xl leading-6">
+              Organizations ask lawmakers to change legislation. We connect those requests to
+              matching amendments, then check what appears in the final law.
+            </p>
             <ol
               aria-label="How to read the investigation"
-              className="mt-6 grid gap-4 text-sm sm:grid-cols-3"
+              className="mt-3 grid gap-4 sm:grid-cols-3"
             >
               {[
                 ["1. Who asked?", "Read the organization's request in its public submission."],
@@ -81,41 +81,43 @@ export function AtlasWorkspace({
                 ],
               ].map(([title, text]) => (
                 <li key={title} className="border-l-2 border-teal-700 pl-4">
-                  <p className="font-semibold">{title}</p>
-                  <p className="mt-1 leading-6 text-stone-600">{text}</p>
+                  <p className="font-semibold text-stone-900">{title}</p>
+                  <p className="mt-1 leading-6">{text}</p>
                 </li>
               ))}
             </ol>
           </details>
           <section
             aria-label="About these results"
-            className="mt-6 min-w-0 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+            className="min-w-0 has-[details[open]]:basis-full"
           >
-            <p>{dataNotice.summary}</p>
-            <details className="mt-1">
-              <summary className="cursor-pointer font-medium underline decoration-amber-400 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-800">
+            <details>
+              <summary className={disclosureSummary}>
                 Coverage, methods and excluded records
               </summary>
-              <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain border-t border-amber-200 pt-3">
-                <ul className="list-disc space-y-3 pl-5 pr-3 [overflow-wrap:anywhere]">
-                  {dataNotice.details.map((detail) => (
-                    <li key={detail}>{detail}</li>
-                  ))}
-                </ul>
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 leading-6 text-amber-950">
+                <p className="font-medium">{dataNotice.summary}</p>
+                <div className="mt-2 max-h-64 overflow-y-auto overscroll-contain border-t border-amber-200 pt-2">
+                  <ul className="list-disc space-y-3 pl-5 pr-3 [overflow-wrap:anywhere]">
+                    {dataNotice.details.map((detail) => (
+                      <li key={detail}>{detail}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </details>
           </section>
         </div>
       </header>
-      <div className="mx-auto max-w-[1600px] px-5 py-6 sm:px-8">
-        <nav aria-label="Atlas workspace" className="mb-6 flex flex-wrap gap-2">
+      <div className="mx-auto max-w-[1600px] px-5 py-4 sm:px-8">
+        <nav aria-label="Atlas workspace" className="mb-4 flex flex-wrap gap-2">
           {views.map(([value, label]) => (
             <button
               key={value}
               type="button"
               aria-pressed={view === value}
               onClick={() => setView(value)}
-              className={`rounded-full px-5 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${view === value ? "bg-teal-900 text-white" : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-100"}`}
+              className={`rounded-full px-4 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${view === value ? "bg-teal-900 text-white" : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-100"}`}
             >
               {label}
             </button>
@@ -123,7 +125,7 @@ export function AtlasWorkspace({
         </nav>
         {view === "graph" && (
           <>
-            <AtlasSourceLayers coverage={coverage} links={links} />
+            {graphEmpty && sourceLayers}
             <AtlasGraph
               snapshot={snapshot}
               onSelectLink={(linkId) => {
@@ -131,6 +133,7 @@ export function AtlasWorkspace({
                 setView("evidence");
               }}
             />
+            {!graphEmpty && <div className="mt-6">{sourceLayers}</div>}
           </>
         )}
         {view === "evidence" && selectedUnavailable && (
@@ -155,7 +158,12 @@ export function AtlasWorkspace({
               from the final text. Requests with unknown outcomes stay separate. Getting the
               requested result does not prove that an organization caused it.
             </p>
-            {analysis}
+            {typeof analysis === "function"
+              ? analysis((linkId) => {
+                  setSelectedLink(linkId);
+                  setView("evidence");
+                })
+              : analysis}
           </section>
         )}
         {view === "coordinated" && coordinated}

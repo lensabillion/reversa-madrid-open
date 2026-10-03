@@ -57,6 +57,8 @@ interface Amendment extends AtlasRecord {
   amendment_id: string;
   procedure_id: string;
   document_id: string;
+  /** ISO date the amendment was tabled; `null` when the source gives none. */
+  tabled_on: string | null;
   old_text: string | null;
   new_text: string;
   justification: string | null;
@@ -243,6 +245,7 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
     spans: readonly ResolvedSpan[],
     procedureId: string,
     language: string | null,
+    tabledOn: string | null,
   ): AtlasExcerpt {
     const source = required(texts, recordId);
     const text = source.fields[field];
@@ -268,6 +271,7 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
         url: document.url,
         page: pages.size === 1 ? (spans[0]?.page ?? null) : null,
         publishedAt: document.published_at,
+        tabledOn,
       },
     };
   }
@@ -347,15 +351,24 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
     }
     const oldSpans = amendmentSpans.filter((span) => span.field === "old_text");
     const newSpans = amendmentSpans.filter((span) => span.field === "new_text");
-    const outcome = finalOutcomes.get(ask.ask_id);
+    // An ask is traced to the final act once, through one amendment; another link's card
+    // for the same ask must not borrow that result (rev-7wst).
+    const askOutcome = finalOutcomes.get(ask.ask_id);
+    const tracedVia =
+      askOutcome !== undefined &&
+      askOutcome.amendment_id !== null &&
+      askOutcome.amendment_id !== amendment.amendment_id
+        ? askOutcome.amendment_id
+        : null;
+    const outcome = tracedVia === null ? askOutcome : undefined;
     let finalText: AtlasExcerpt | null = null;
     if (outcome) {
       const spans = outcome.spans.map((span) => resolve(span));
       const first = spans[0];
       if (outcome.article_id !== null) {
-        finalText = excerpt(outcome.article_id, "text", spans, law.procedure_id, null);
+        finalText = excerpt(outcome.article_id, "text", spans, law.procedure_id, null, null);
       } else if (first) {
-        finalText = excerpt(first.recordId, first.field, spans, law.procedure_id, null);
+        finalText = excerpt(first.recordId, first.field, spans, law.procedure_id, null, null);
       }
     }
     const names = [...new Set([ask.actor_id, ...ask.joint_actor_ids])].map(
@@ -394,6 +407,7 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
           askSpans.length > 0 ? askSpans : [anchor],
           law.procedure_id,
           ask.language,
+          null,
         ),
         original:
           amendment.old_text === null
@@ -404,6 +418,7 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
                 oldSpans,
                 law.procedure_id,
                 amendment.language,
+                amendment.tabled_on,
               ),
         amendment: excerpt(
           amendment.amendment_id,
@@ -411,15 +426,128 @@ export function atlasLinkViews(bundle: AtlasBundle): AtlasLinkView[] {
           newSpans,
           law.procedure_id,
           amendment.language,
+          amendment.tabled_on,
         ),
         outcome: {
           status: outcome?.result ?? "unknown",
           explanation: outcome
             ? `${outcome.relation === "direct_to_final" ? "Direct ask-to-final assessment; no amendment attribution. " : ""}${outcome.reason ?? `Pipeline final-act result: ${outcome.result}.`}`
-            : "No final-act outcome was supplied.",
+            : tracedVia === null
+              ? "No final-act outcome was supplied."
+              : `The ask's final-act result was traced through amendment ${tracedVia}; this amendment's own path to the final act was not assessed.`,
           finalText,
+          tracedVia,
         },
       },
     };
   });
+}
+
+/** One cited source of a ranking row: the records it covers, and where to read them. */
+export interface AtlasRankingEvidence {
+  /** Stable, deduplicated key: the source URL, or the record id when no source is known. */
+  key: string;
+  recordIds: readonly string[];
+  /** The source document's title; the record id when the record is not in the loaded view. */
+  title: string;
+  /** The source document's URL as supplied; `null` when the record is not in the loaded view. */
+  url: string | null;
+  /** A published evidence card of the row's actor that shows one of these records. */
+  linkId: string | null;
+}
+
+interface EvidenceGroup {
+  recordIds: string[];
+  title: string;
+  url: string | null;
+  linkId: string | null;
+}
+
+/**
+ * Resolves the evidence record ids a backend ranking row supplies (documents, passages,
+ * asks, amendments, articles, outcomes) to their source documents, grouped by URL, and to a
+ * published evidence card of the same actor that shows them. Never invents a source: an id
+ * absent from the loaded records stays listed with `url: null`. Indexing is O(L·O + R) once
+ * (L links, O outcomes; one law at a time); each row then costs O(E) for its E ids.
+ */
+export function atlasRankingEvidence(
+  bundle: AtlasBundle,
+): (actorId: string, recordIds: readonly string[]) => AtlasRankingEvidence[] {
+  const documents = new Map(bundle.documents.map((row) => [row.document_id, row]));
+  const asks = new Map(bundle.asks.map((row) => [row.ask_id, row]));
+  const outcomes = new Map(bundle.outcomes.map((row) => [row.outcome_id, row]));
+  const documentOf = new Map<string, string>([
+    ...bundle.documents.map((row) => [row.document_id, row.document_id] as const),
+    ...bundle.passages.map((row) => [row.passage_id, row.document_id] as const),
+    ...bundle.asks.map((row) => [row.ask_id, row.document_id] as const),
+    ...bundle.amendments.map((row) => [row.amendment_id, row.document_id] as const),
+    ...bundle.articles.map((row) => [row.article_id, row.document_id] as const),
+  ]);
+  function sourceDocument(recordId: string): string | null {
+    const direct = documentOf.get(recordId);
+    if (direct !== undefined) {
+      return direct;
+    }
+    const outcome = outcomes.get(recordId);
+    const via = outcome?.article_id ?? outcome?.spans[0]?.record_id ?? null;
+    return via === null ? null : (documentOf.get(via) ?? null);
+  }
+  // For each actor named on a published card's ask: record id -> the first card showing it.
+  const cards = new Map<string, Map<string, string>>();
+  for (const link of [...bundle.links].sort((a, b) => a.link_id.localeCompare(b.link_id))) {
+    const ask = asks.get(link.ask_id);
+    if (link.status !== "published" || ask === undefined) {
+      continue;
+    }
+    const shown: (string | null)[] = [
+      ask.ask_id,
+      ask.document_id,
+      ask.span.record_id,
+      ask.passage_id,
+      link.amendment_id,
+      documentOf.get(link.amendment_id) ?? null,
+      ...link.ask_spans.map((span) => span.record_id),
+      ...link.amendment_spans.map((span) => span.record_id),
+    ];
+    for (const outcome of bundle.outcomes) {
+      if (
+        outcome.ask_id === ask.ask_id &&
+        (outcome.amendment_id === null || outcome.amendment_id === link.amendment_id)
+      ) {
+        shown.push(
+          outcome.outcome_id,
+          outcome.article_id,
+          ...outcome.spans.map((span) => span.record_id),
+        );
+      }
+    }
+    for (const actorId of new Set([ask.actor_id, ...ask.joint_actor_ids])) {
+      const records = cards.get(actorId) ?? new Map<string, string>();
+      for (const id of shown) {
+        if (id !== null && !records.has(id)) {
+          records.set(id, link.link_id);
+        }
+      }
+      cards.set(actorId, records);
+    }
+  }
+  return (actorId, recordIds) => {
+    const actorCards = cards.get(actorId);
+    const groups = new Map<string, EvidenceGroup>();
+    for (const recordId of new Set(recordIds)) {
+      const documentId = sourceDocument(recordId);
+      const document = documentId === null ? undefined : documents.get(documentId);
+      const key = document === undefined ? recordId : document.url;
+      const group = groups.get(key) ?? {
+        recordIds: [],
+        title: document === undefined ? recordId : (document.title ?? document.document_id),
+        url: document === undefined ? null : document.url,
+        linkId: null,
+      };
+      group.recordIds.push(recordId);
+      group.linkId ??= actorCards?.get(recordId) ?? null;
+      groups.set(key, group);
+    }
+    return [...groups].map(([key, group]) => ({ key, ...group }));
+  };
 }
