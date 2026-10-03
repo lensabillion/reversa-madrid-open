@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { AtlasModes } from "../components/atlas-coverage";
+import { AtlasModes, CoverageSummary, coverageSummary } from "../components/atlas-coverage";
 import { AtlasWorkspace } from "../components/atlas-workspace";
 import { type AtlasBundle, atlasLinkViews } from "../lib/atlas";
 import type { AtlasLayerCoverage, AtlasLayerStatus } from "../lib/atlas-api";
@@ -219,4 +219,65 @@ test("mode labels are listed verbatim, and no list is drawn without them", () =>
   const { container } = render(<AtlasModes modes={[]} />);
   expect(container.textContent).toBe("");
   expect(screen.queryByRole("list")).toBeNull();
+});
+
+const notCollected = [
+  "Parliament position: not collected in this run. Connector not built.",
+  "Meetings: not collected in this run. Connector not built.",
+  "Votes: not collected in this run. Register feed offline.",
+];
+
+test("the coverage summary counts and names every layer in one line", () => {
+  expect(coverageSummary(notCollected, "details on the Graph tab")).toEqual({
+    line: "3 source layers not collected in this run: Parliament position, meetings, votes — details on the Graph tab",
+    digest: true,
+  });
+  expect(coverageSummary(notCollected.slice(2), null)).toEqual({
+    line: "1 source layer not collected in this run: Votes",
+    digest: true,
+  });
+});
+
+test("mixed states are summarised as gaps, and notes without a layer are counted", () => {
+  const notes = [
+    "Plenary amendments: missing from the source. None were tabled.",
+    "Asks: partly collected. 1 of 5 submissions has no publication date.",
+    "Snapshot predates the final act",
+  ];
+  expect(coverageSummary(notes, null)?.line).toBe(
+    "2 source layers with gaps: Plenary amendments, asks; and 1 other note",
+  );
+});
+
+test("notes that name no layer are shown verbatim, and no notes render nothing", () => {
+  expect(coverageSummary([], "details on the Graph tab")).toBeNull();
+  const complete = ["Every source layer recorded for this law is complete."];
+  expect(coverageSummary(complete, "details on the Graph tab")).toEqual({
+    line: "Every source layer recorded for this law is complete.",
+    digest: false,
+  });
+  const { container } = render(<CoverageSummary notes={[]} seeAlso={null} />);
+  expect(container.innerHTML).toBe("");
+  render(<CoverageSummary notes={complete} seeAlso={null} />);
+  const aside = screen.getByRole("complementary", { name: "Source coverage" });
+  expect(aside.querySelector("details")).toBeNull();
+  expect(within(aside).getByText(complete[0] ?? "")).toBeDefined();
+});
+
+test("the summary line is the disclosure label and every full note stays inside it", () => {
+  render(<CoverageSummary notes={notCollected} seeAlso="details on the Graph tab" />);
+  const aside = screen.getByRole("complementary", { name: "Source coverage" });
+  const details = aside.querySelector("details");
+  expect(details?.open).toBe(false);
+  const summary = details?.querySelector("summary");
+  expect(summary?.textContent).toBe(
+    "Source coverage: 3 source layers not collected in this run: Parliament position, meetings, votes — details on the Graph tab",
+  );
+  expect([...(details?.querySelectorAll("li") ?? [])].map((item) => item.textContent)).toEqual(
+    notCollected,
+  );
+  if (summary) {
+    fireEvent.click(summary);
+  }
+  expect(details?.open).toBe(true);
 });
