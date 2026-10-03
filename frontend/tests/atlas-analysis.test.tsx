@@ -23,7 +23,15 @@ const props: AtlasAnalysisProps = {
       partial: 1,
       notObserved: 3,
       unknown: 4,
-      sources: [source],
+      evidence: [
+        {
+          key: source.url,
+          recordIds: ["art:act:article-8"],
+          title: source.title,
+          url: source.url,
+          linkId: "link:association-1",
+        },
+      ],
     },
   ],
   findings: {
@@ -59,7 +67,17 @@ test("labels the observed sample and preserves full, partial and unknown counts 
     within(row)
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
-  ).toEqual(["Example association", "2 / 6", "10", "1", "3", "4", "Final act, Article 8"]);
+  ).toEqual([
+    "Example association",
+    "2 of 6 assessed",
+    "10",
+    "1",
+    "3",
+    "4",
+    "Final act, Article 8",
+  ]);
+  expect(screen.getByRole("columnheader", { name: "Fully reflected, of assessed asks" }));
+  expect(screen.queryByText(/too few to rank/)).toBeNull();
   expect(
     screen.getByText(
       /The denominator includes assessed outcomes, including partial outcomes, and excludes unknown/,
@@ -135,17 +153,19 @@ test("keeps zero sample, missing ranking evidence, and missing coverage explicit
           partial: 0,
           notObserved: 0,
           unknown: 0,
-          sources: [],
+          evidence: [],
         },
       ]}
     />,
   );
   expect(screen.getByText("Coverage information unavailable.")).toBeDefined();
   expect(
-    screen.getByRole("cell", { name: "Rate unavailable · 0 full wins; 0 assessed asks" }),
+    screen.getByRole("cell", {
+      name: "Rate unavailable · 0 full wins; 0 assessed asks too few to rank (fewer than 3 assessed)",
+    }),
   ).toBeDefined();
-  expect(screen.queryByText("0 / 0")).toBeNull();
-  expect(screen.getByText("Source evidence unavailable.")).toBeDefined();
+  expect(screen.queryByText(/0 of 0/)).toBeNull();
+  expect(screen.getByText("No evidence records supplied for this row.")).toBeDefined();
   rerender(<AtlasAnalysis {...props} rankings={[]} />);
   expect(screen.getByText("Rankings unavailable: no observed sample supplied.")).toBeDefined();
 });
@@ -202,7 +222,7 @@ test("all-unknown outcomes leave the rate unavailable rather than showing zero w
       .map((cell) => cell.textContent),
   ).toEqual([
     "Example association",
-    "Rate unavailable · 0 full wins; 0 assessed asks",
+    "Rate unavailable · 0 full wins; 0 assessed asks too few to rank (fewer than 3 assessed)",
     "4",
     "0",
     "0",
@@ -384,4 +404,97 @@ test("supplied findings still take precedence over the endpoint's", async () => 
   const how = screen.getByRole("region", { name: "HOW" });
   expect(await within(how).findByText(/Not run yet:/)).toBeDefined();
   expect(within(who).queryByText(/^0 of 3 actors/)).toBeNull();
+});
+
+test("a 1 of 1 row is an anecdote: shown as a count with a too-few-to-rank marker", () => {
+  const row = props.rankings[0];
+  if (!row) {
+    throw new Error("Ranking fixture missing");
+  }
+  render(
+    <AtlasAnalysis
+      {...props}
+      rankings={[
+        {
+          ...row,
+          actorId: "acme",
+          actor: "Acme Unknown Lobby",
+          fullWins: 1,
+          observedAsks: 1,
+          assessedAsks: 1,
+          partial: 0,
+          notObserved: 0,
+          unknown: 0,
+        },
+        { ...row, fullWins: 1, assessedAsks: 3 },
+      ]}
+    />,
+  );
+  const anecdote = screen.getByRole("row", { name: /Acme Unknown Lobby/ });
+  expect(within(anecdote).getByText("1 of 1 assessed")).toBeDefined();
+  expect(within(anecdote).getByText("too few to rank (fewer than 3 assessed)")).toBeDefined();
+  expect(within(anecdote).queryByText(/1 \/ 1|100%/)).toBeNull();
+  const ranked = screen.getByRole("row", { name: /Example association/ });
+  expect(within(ranked).getByText("1 of 3 assessed")).toBeDefined();
+  expect(within(ranked).queryByText(/too few to rank/)).toBeNull();
+});
+
+test("ranking evidence links each source, opens the actor's card, and names missing records", () => {
+  const row = props.rankings[0];
+  if (!row) {
+    throw new Error("Ranking fixture missing");
+  }
+  const opened: string[] = [];
+  const evidence = [
+    ...row.evidence,
+    {
+      key: "doc:missing",
+      recordIds: ["doc:missing", "passage:missing-1"],
+      title: "doc:missing",
+      url: null,
+      linkId: null,
+    },
+    {
+      key: "javascript:alert(1)",
+      recordIds: ["doc:unsafe"],
+      title: "Unsafe",
+      url: "javascript:alert(1)",
+      linkId: null,
+    },
+    ...["a", "b"].map((id) => ({
+      key: `https://example.org/${id}`,
+      recordIds: [`doc:${id}`],
+      title: `Document ${id}`,
+      url: `https://example.org/${id}`,
+      linkId: null,
+    })),
+  ];
+  const { rerender } = render(
+    <AtlasAnalysis
+      {...props}
+      rankings={[{ ...row, evidence }]}
+      onOpenEvidence={(linkId) => opened.push(linkId)}
+    />,
+  );
+  const cell = within(screen.getByRole("row", { name: /Example association/ }));
+  const link = cell.getByRole("link", { name: source.title });
+  expect(link.getAttribute("href")).toBe(source.url);
+  expect(link.getAttribute("title")).toBe("art:act:article-8");
+  fireEvent.click(cell.getByRole("button", { name: "Open evidence card" }));
+  expect(opened).toEqual(["link:association-1"]);
+  expect(
+    cell.getByText(
+      "doc:missing, passage:missing-1: not in the loaded records; no source available.",
+    ),
+  ).toBeDefined();
+  expect(cell.getByText("doc:unsafe: source link unavailable.")).toBeDefined();
+  expect(cell.queryByRole("link", { name: "Unsafe" })).toBeNull();
+  expect(cell.getByText("2 more sources")).toBeDefined();
+  expect(cell.getAllByRole("link", { hidden: true }).map((item) => item.textContent)).toEqual([
+    source.title,
+    "Document a",
+    "Document b",
+  ]);
+  rerender(<AtlasAnalysis {...props} rankings={[{ ...row, evidence }]} />);
+  expect(screen.queryByRole("button", { name: "Open evidence card" })).toBeNull();
 });

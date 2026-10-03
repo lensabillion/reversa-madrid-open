@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type ReactNode, useMemo } from "react";
-import { atlasLinkViews } from "../lib/atlas";
+import { atlasLinkViews, atlasRankingEvidence } from "../lib/atlas";
 import {
   AtlasApiError,
   type AtlasLawSummary,
@@ -98,6 +98,7 @@ function prepareLawAtlas(view: AtlasView): LawAtlas {
     throw new Error(`Unsupported Atlas graph schema: ${String(view.snapshot.schema_version)}`);
   }
   const links = atlasLinkViews(view.bundle);
+  const rankingEvidence = atlasRankingEvidence(view.bundle);
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
@@ -128,7 +129,7 @@ function prepareLawAtlas(view: AtlasView): LawAtlas {
       partial: row.partial,
       notObserved: row.not_observed,
       unknown: row.unknown,
-      sources: [],
+      evidence: rankingEvidence(row.actor_id, row.evidence_record_ids),
     })),
   };
 }
@@ -226,14 +227,15 @@ function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void 
         coverageNotes={atlas.coverageNotes}
         dataNotice={atlas.dataNotice}
         coordinated={<AtlasCoordinated procedureId={view.procedure_id} state={coordinated} />}
-        analysis={
+        analysis={(openEvidence) => (
           <AtlasAnalysis
             sampleLabel={`${view.title}, ${view.procedure_id}: final-act outcomes of Atlas run ${view.run_id}`}
             coverageNotes={atlas.coverageNotes}
             rankings={atlas.rankings}
+            onOpenEvidence={openEvidence}
             findings={noFindings}
           />
-        }
+        )}
       />
     </>
   );
