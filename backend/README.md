@@ -318,6 +318,44 @@ counted (comparing every pair of submissions is too slow for a live run); the fi
 `limitations` list this and the other gaps. **Not measured**: no real law has been run
 through this command yet; it is tested offline on fixture laws only.
 
+## Directions Command (Part 7, TOWARDS)
+
+`influence directions <law>` (`make directions LAW='2021/0106(COD)'`) collects the law as
+`influence collect` does, then labels which way each amendment moves the law and writes
+`data/laws/<procedure>/directions.json` (`schemas/directions.py`, `DirectionsView`). The
+rules (`services/direction.py`, method `direction-rules-1`) are fixed English cue lists
+over the diff part 4 uses, applied in this precedence; the first that fires decides:
+
+| Order | Direction | Fires when |
+| ---: | --- | --- |
+| 1 | `delete` | The new wording is empty or Parltrack's `deleted` marker, or the edit inserts nothing and removes at least half of the original |
+| 2 | `unknown` | The original wording is unknown (`original_unknown`) or over the diff's bounds (`over_long`) |
+| 3 | `keep` | Both sides hold the same words |
+| 4 | `exempt` | An exemption phrase occurs more often after the edit: "shall not apply", "exempt", "derogation", "excluding", "with the exception of", "except" |
+| 5 | `delay` | "postpone", "defer", "transitional period" or "grace period" is added, or a year or period is replaced by a later or longer one |
+| 6 | `stricter` / `weaker` | Obligation cues added minus removed ("shall", "must", "required", "at least", "minimum", "prohibit", "ban", "may not" against "may", "can", "optional"; a removed exemption counts as stricter); a tie falls through |
+| 7 | `add` | The edit only inserts wording |
+| 8 | `other` | Anything else |
+
+So "shall" to "may" is weaker, and an inserted "not" that makes "shall not apply" is an
+exemption, not a stricter "shall". Part 4 keeps its narrower `amendment_direction` for its
+same-direction signal; changing it would change published scores without practice-loop
+evidence.
+
+The file holds the counts for every amendment, by stage, by political group (an amendment
+co-signed across groups counts once in each; amendments with no author of known group are
+`without_group`) and for the twenty Members who tabled most, plus one example amendment
+per direction with the deciding wording quoted at exact offsets. Actor directions are read
+only through the published links of the law's `atlas.json`, one count per link: without
+that view `actors_status` is `no_atlas_view`, and with no published link it is
+`no_published_links`, each with its reason. Unconfirmed and contradicted links are never
+used. Run `make atlas` first to get actor directions.
+
+**Limits.** Rule-based and English-only; a direction describes an edit, not the stance of
+whoever tabled or asked for it, and counts are not causes. Tested offline
+(`tests/test_direction.py`, including a table of edits per rule); not yet run on real data,
+timed, or audited against human labels.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the

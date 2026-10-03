@@ -8,7 +8,9 @@ writes the view the explorer serves (`atlas.json`). `influence coordinated <law>
 then lists the near-identical amendments tabled by different political groups
 (`coordinated.json`). `influence channels <law>` collects, then counts the channels the law
 was lobbied through: consultation stages, timing, tabling Members and coalitions
-(`channels.json`). `influence submit` is the first brief's pairs command, kept until
+(`channels.json`). `influence directions <law>` collects, then counts which way the
+amendments move the law and, through the atlas view's published links, each actor's asks
+(`directions.json`). `influence submit` is the first brief's pairs command, kept until
 part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
 or output failure, 2 on a command-line usage error.
 """
@@ -43,7 +45,14 @@ from influence.services.collect import (
     source_revision,
 )
 from influence.services.coordinated import build_coordination, write_coordination
-from influence.services.pipeline import PipelineError, build_view, load_collected, write_view
+from influence.services.direction import build_directions, write_directions
+from influence.services.pipeline import (
+    PipelineError,
+    build_view,
+    load_collected,
+    read_view,
+    write_view,
+)
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
 from influence.services.submission import SubmissionError, run_submission
 
@@ -51,6 +60,8 @@ from influence.services.submission import SubmissionError, run_submission
 EXPECTED_PAIRS = 60
 # Clusters `influence coordinated` prints; the file holds all of them.
 CLUSTERS_SHOWN = 10
+# Political groups and actors `influence directions` prints; the file holds all of them.
+GROUPS_SHOWN = 10
 QUOTE_CHARACTERS = 200
 # The index crawl asks about 4,170 pages over about 35 minutes; a line per 250 shows it
 # is moving without flooding the terminal.
@@ -274,6 +285,46 @@ def _list_channels(result: CollectResult, index: Path) -> int:
     return 0
 
 
+def _counted(pairs: Sequence[tuple[str, int]]) -> str:
+    return ", ".join(f"{name} {count}" for name, count in pairs if count) or "none"
+
+
+def _list_directions(result: CollectResult) -> int:
+    try:
+        collected = load_collected(result.bundle)
+        view = build_directions(
+            collected.law,
+            collected.manifest.run_id,
+            collected.amendments,
+            collected.actors,
+            # The collect bundle is `<data root>/laws/<slug>`, where `atlas` writes its view.
+            read_view(result.bundle.parent.parent, result.bundle.name),
+            generated_at=datetime.now(UTC),
+        )
+        path = write_directions(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no directions file was written.", file=sys.stderr)
+        return 1
+    print(f"Directions of {view.amendments} amendments: {_counted(view.counts.pairs())}")
+    for stage in view.by_stage:
+        print(f"  {stage.stage}: {_counted(stage.counts.pairs())}")
+    for group in view.by_group[:GROUPS_SHOWN]:
+        print(f"  {group.group} ({group.amendments}): {_counted(group.counts.pairs())}")
+    if view.actors_reason is not None:
+        print(f"Actors: {view.actors_status}: {view.actors_reason}")
+    for actor in view.actors[:GROUPS_SHOWN]:
+        print(
+            f"  {actor.name} ({actor.published_links} published links): "
+            f"{_counted(actor.counts.pairs())}"
+        )
+    for example in view.examples:
+        quote = " ".join(example.span.text.split())[:QUOTE_CHARACTERS]
+        print(f'  {example.direction:<9}{example.amendment_id}  "{quote}"')
+    print(f"directions: {path.absolute()}")
+    return 0
+
+
 def _collect(
     query: str,
     data_root: Path | None,
@@ -354,6 +405,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "political groups",
         ),
         ("channels", "collect one law, then count the channels it was lobbied through"),
+        (
+            "directions",
+            "collect one law, then count which way its amendments and, through published "
+            "links, each actor's asks move it",
+        ),
     ):
         command = commands.add_parser(
             name,
@@ -414,6 +470,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast("Path | None", args.data_root) or default_data_root()
             ).hys_index,
         ),
+        "directions": _list_directions,
     }
     if args.command in after:
         return _collect(
