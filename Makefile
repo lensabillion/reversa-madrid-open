@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas lineage coordinated channels directions \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -66,9 +66,13 @@ dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ ch
 
 # The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
 # EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
-atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
+atlas:  ## Collect one law and build its Atlas view: make atlas LAW='2021/0106(COD)' [ARGS=...]
 	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
 	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
+
+lineage:  ## Collect one law and build the explorer's lineage view: make lineage LAW='2021/0106(COD)' [ARGS=...]
+	$(if $(LAW),,$(error LAW is required: make lineage LAW='2021/0106(COD)'))
+	$(BACKEND) influence lineage "$(LAW)" $(ARGS)
 
 # Run once per machine before the first `make collect` (needs network). Present files are
 # kept, so a rerun after a failure fetches only what is missing.

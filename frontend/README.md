@@ -100,10 +100,39 @@ Its full `make check` also passes 106 backend and 38 frontend tests, build and a
 Browser inspection confirmed the three explanatory captions and Amazon's filename/page
 inside its own column. Model accuracy is unchanged by this display clarification.
 
+## Lineage Explorer Page
+
+`/lineage` is the explorer: the header's **Lineage explorer** link opens it from the
+evidence workspace. It shows, for each law `make lineage` has built, which wording of the
+final act came from which amendments, who tabled them, and which submissions said the same
+words, and when. It reads two backend endpoints through the `/api/v1/…` proxy:
+`GET /api/v1/lineage` (the law list) and `GET /api/v1/lineage/{slug}` (one `lineage-1`
+view; 404 when the law has none).
+
+The selected law lives in the URL (`/lineage?law=2021-0106-COD`). `lib/lineage.ts`
+(`prepareLineage`) joins the view into rows: every adopted phrase with its final-act
+quotation, the amendments that carry it and the submissions that say it; every tabled
+phrase the same way; credits split into groups and holders in the backend's order. A
+record that names a phrase or amendment the view lacks rejects the whole view, as in the
+Atlas page. Phrases are ordered by evidence (an earlier, non-citation submission first,
+then any submission, then length) and paged 20 at a time; a filter keeps only wording a
+submission said first. Each submission is labelled "Said before the amendments", "Said
+after the first amendment", "Order unknown" or "Citation, not a request", straight from the
+view's `precedes` and `is_citation`. Limitations and coverage gaps sit in a disclosure.
+
+- `app/lineage/page.tsx`: the route; a Suspense boundary lets the shell prerender
+- `components/lineage-law-browser.tsx`: law selector, URL state, the view, every state
+- `lib/lineage-api.ts`: endpoint types and readers; `lib/lineage.ts`: the adapter
+
+`tests/lineage-adapter.test.ts` and `tests/lineage-page.test.tsx` read
+`backend/tests/fixtures/lineage/view.json`, which the backend writes from its offline test
+world. Checked once by hand in headless Chromium: the production build against the real
+backend serving that view. Not verified: a real law's run.
+
 ## Atlas Explorer Page
 
-`/atlas` shows the Atlas for the laws the pipeline has built; the header's **Influence
-Atlas** link opens it from the evidence workspace. It reads two backend endpoints, through
+`/atlas` shows the Atlas view (`make atlas`) for the laws the pipeline has built. No link
+leads to it any more; it is reached by its URL. It reads two backend endpoints, through
 the same `/api/v1/…` proxy:
 
 | Endpoint | Answer |

@@ -1,0 +1,199 @@
+{
+  "schema_version": "lineage-1",
+  "procedure_id": "2021/0106(COD)",
+  "slug": "2021-0106-COD",
+  "title": "Artificial Intelligence Act",
+  "run_id": "20261003T120000Z",
+  "generated_at": "2026-10-03T12:30:00Z",
+  "method": "lineage-verbatim",
+  "method_revision": "verbatim-8w-3rare-v1",
+  "coverage": [
+    {
+      "layer": "metadata",
+      "status": "complete",
+      "count": 1,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "proposal",
+      "status": "complete",
+      "count": 8,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "parliament_position",
+      "status": "not_collected",
+      "count": null,
+      "reason": "CELLAR files only Parliament's legislative resolution, not its consolidated position text, and the EP API adopted-texts connector is not built",
+      "source_updated_on": null
+    },
+    {
+      "layer": "final_act",
+      "status": "complete",
+      "count": 6,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "committee_amendments",
+      "status": "complete",
+      "count": 2,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "plenary_amendments",
+      "status": "complete",
+      "count": 1,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "asks",
+      "status": "complete",
+      "count": 4,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "actors",
+      "status": "complete",
+      "count": 5,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "meetings",
+      "status": "not_collected",
+      "count": null,
+      "reason": "No connector for this layer is built yet",
+      "source_updated_on": null
+    },
+    {
+      "layer": "votes",
+      "status": "not_collected",
+      "count": null,
+      "reason": "No connector for this layer is built yet",
+      "source_updated_on": null
+    }
+  ],
+  "counts": {
+    "amendments": 3,
+    "amendments_adopting": 1,
+    "adopted_phrases": 1,
+    "documents_read": 5,
+    "documents_with_origin": 1,
+    "changed_units": 0,
+    "linked_units": 0
+  },
+  "adopted_phrases": [
+    {
+      "phrase_id": "phrase:52e459c5406f739b",
+      "kind": "verbatim",
+      "text": "for at least six months after the system is placed on the market",
+      "words": 13,
+      "final_spans": [
+        {
+          "record_id": "art:32024R1689:article-12",
+          "field": "text",
+          "page": null,
+          "start": 30,
+          "end": 94,
+          "text": "for at least six months after the system is placed on the market"
+        }
+      ],
+      "similarity": null,
+      "judge_probability": null
+    }
+  ],
+  "tabled_phrases": [],
+  "adoptions": [
+    {
+      "amendment_id": "am:2021-0106-COD:ENVI:PE7-7",
+      "kind": "verbatim",
+      "stage": "committee",
+      "committee": "ENVI",
+      "author_ids": [
+        "actor:mep:197721",
+        "actor:mep:125042"
+      ],
+      "author_names": [
+        "César Luena",
+        "Javi López",
+        "Margrete Auken on behalf of the Verts/ALE Group"
+      ],
+      "author_groups": [],
+      "tabled_on": "2022-01-25",
+      "phrase_ids": [
+        "phrase:52e459c5406f739b"
+      ],
+      "adopted_words": 13,
+      "inserted_words": 13,
+      "longest_run": 13
+    }
+  ],
+  "origins": [
+    {
+      "phrase_id": "phrase:52e459c5406f739b",
+      "document_id": "doc:hys_feedback:4",
+      "actor_id": "actor:name:hys_feedback.acme-unknown-lobby",
+      "organisation": "Acme Unknown Lobby",
+      "published_at": "2021-08-06T23:57:37+02:00",
+      "span": {
+        "record_id": "doc:hys_feedback:4",
+        "field": "text",
+        "page": null,
+        "start": 40,
+        "end": 104,
+        "text": "for at least six months after the system is placed on the market"
+      },
+      "kind": "verbatim",
+      "similarity": null,
+      "words": 13,
+      "amendment_ids": [
+        "am:2021-0106-COD:ENVI:PE7-7"
+      ],
+      "earliest_amendment_on": "2022-01-25",
+      "precedes": true,
+      "is_citation": false
+    }
+  ],
+  "credits": [
+    {
+      "holder_id": "S&D",
+      "basis": "verbatim",
+      "holder_kind": "group",
+      "name": "S&D",
+      "phrases": 1.0,
+      "distinct_phrases": 1,
+      "amendments": 1
+    },
+    {
+      "holder_id": "actor:mep:125042",
+      "basis": "verbatim",
+      "holder_kind": "mep",
+      "name": "Margrete AUKEN",
+      "phrases": 0.5,
+      "distinct_phrases": 1,
+      "amendments": 1
+    },
+    {
+      "holder_id": "actor:mep:197721",
+      "basis": "verbatim",
+      "holder_kind": "mep",
+      "name": "Brando BENIFEI",
+      "phrases": 0.5,
+      "distinct_phrases": 1,
+      "amendments": 1
+    }
+  ],
+  "limitations": [
+    "Verbatim matching only: a phrase is a run of at least 8 identical words holding at least 3 of the law's rare words; reworded adoptions are not found yet.",
+    "Shared wording is evidence of shared text, not of authorship: the final act is also shaped by the Council and the trilogues, and the same wording can come from a common draft, a coalition or a quotation.",
+    "Credit splits each phrase equally among the holders of the amendments that carry it; it measures adopted wording, not political weight.",
+    "These claims have not passed the human review gate (practice/lineage_review.py) yet.",
+    "1 amendment(s) have no original wording; their whole text was treated as inserted."
+  ]
+}

@@ -1,0 +1,548 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
+import type { AtlasSourceSpan } from "../lib/atlas";
+import { AtlasApiError } from "../lib/atlas-api";
+import {
+  type LineageCreditRow,
+  type LineageCreditTable,
+  type LineageOriginRow,
+  type LineagePhraseRow,
+  type PreparedLineage,
+  prepareLineage,
+} from "../lib/lineage";
+import {
+  type LineageLawSummary,
+  type LineageView,
+  lineageLawsUrl,
+  lineageViewUrl,
+  readLineageLaws,
+  readLineageView,
+} from "../lib/lineage-api";
+import { useResource } from "../lib/use-resource";
+import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
+
+const buildCommand = "make lineage LAW='2021/0106(COD)'";
+/** Phrases shown before "Show more"; the AI Act has hundreds, and each card is tall. */
+export const PHRASES_PER_PAGE = 20;
+const CREDITS_SHOWN = 15;
+
+const count = new Intl.NumberFormat("en-US");
+const share = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+/** A law without a lineage view is an expected answer here, not a failure to load. */
+type LawViewResult = { found: true; view: LineageView } | { found: false; detail: string };
+
+async function readLawView(url: string, signal: AbortSignal): Promise<LawViewResult> {
+  try {
+    return { found: true, view: await readLineageView(url, signal) };
+  } catch (error: unknown) {
+    if (error instanceof AtlasApiError && error.status === 404) {
+      return { found: false, detail: error.detail };
+    }
+    throw error;
+  }
+}
+
+function plural(value: number, one: string, many: string): string {
+  return `${count.format(value)} ${value === 1 ? one : many}`;
+}
+
+function day(value: string | null): string {
+  return value === null ? "date unknown" : value.slice(0, 10);
+}
+
+function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
+  return (
+    <blockquote className="border-l-2 border-teal-700 bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900">
+      <span className="sr-only">{label}: </span>
+      {span.text}
+    </blockquote>
+  );
+}
+
+function Timing({ origin }: { origin: LineageOriginRow }) {
+  if (origin.isCitation) {
+    return (
+      <span className="rounded-sm bg-stone-200 px-2 py-0.5 text-stone-700">
+        Citation, not a request
+      </span>
+    );
+  }
+  if (origin.precedes === null) {
+    return (
+      <span className="rounded-sm bg-stone-100 px-2 py-0.5 text-stone-600">Order unknown</span>
+    );
+  }
+  return origin.precedes ? (
+    <span className="rounded-sm bg-[#e8efea] px-2 py-0.5 font-medium text-teal-900">
+      Said before the amendments
+    </span>
+  ) : (
+    <span className="rounded-sm bg-amber-50 px-2 py-0.5 text-amber-900">
+      Said after the first amendment
+    </span>
+  );
+}
+
+function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
+  return (
+    <li className="rounded-sm border border-stone-200 bg-white">
+      <article aria-label={`Phrase ${phrase.phraseId}`} className="grid gap-0 lg:grid-cols-3">
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+            {phrase.adopted ? "In the final act" : "Tabled, not adopted"}
+          </h4>
+          {phrase.finalQuotes.length > 0 ? (
+            phrase.finalQuotes.map((span) => (
+              <Quote
+                key={`${span.record_id}:${span.start}`}
+                span={span}
+                label="Final act wording"
+              />
+            ))
+          ) : (
+            <p className="font-serif text-[15px] leading-6 text-stone-900">{phrase.text}</p>
+          )}
+          <p className="text-xs text-stone-500">
+            {plural(phrase.words, "word", "words")} · {phrase.kind}
+          </p>
+        </section>
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+            {plural(phrase.amendments.length, "amendment carries it", "amendments carry it")}
+          </h4>
+          <ul className="space-y-2 text-sm text-stone-700">
+            {phrase.amendments.map((amendment) => (
+              <li key={amendment.amendmentId}>
+                <span className="block font-mono text-xs text-stone-800">
+                  {amendment.amendmentId}
+                </span>
+                {amendment.stage !== null && (
+                  <span className="block text-xs text-stone-500">
+                    {amendment.stage}
+                    {amendment.committee === null ? "" : ` · ${amendment.committee}`} · tabled{" "}
+                    {day(amendment.tabledOn)}
+                    {amendment.adoptedWords !== null && amendment.insertedWords !== null
+                      ? ` · ${count.format(amendment.adoptedWords)} of ${count.format(amendment.insertedWords)} inserted words adopted`
+                      : ""}
+                  </span>
+                )}
+                {amendment.authors.length > 0 && (
+                  <span className="block text-xs text-stone-600">
+                    {amendment.authors.join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="space-y-3 p-4">
+          <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+            {phrase.origins.length === 0
+              ? "No submission says it"
+              : plural(phrase.origins.length, "submission says it", "submissions say it")}
+          </h4>
+          <ul className="space-y-3">
+            {phrase.origins.map((origin) => (
+              <li key={origin.documentId} className="space-y-1.5 text-sm">
+                <p className="font-medium text-stone-900">
+                  {origin.organisation ?? "Unnamed submitter"}
+                </p>
+                <p className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-stone-500">
+                    {day(origin.publishedAt)} · {origin.documentId}
+                  </span>
+                  <Timing origin={origin} />
+                </p>
+                <Quote span={origin.quote} label="Submission wording" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      </article>
+    </li>
+  );
+}
+
+type PhraseTab = "adopted" | "tabled";
+
+function Phrases({ lineage }: { lineage: PreparedLineage }) {
+  const [tab, setTab] = useState<PhraseTab>("adopted");
+  const [onlyEarlier, setOnlyEarlier] = useState(false);
+  const [shown, setShown] = useState(PHRASES_PER_PAGE);
+  const all = tab === "adopted" ? lineage.adopted : lineage.tabled;
+  const phrases = onlyEarlier ? all.filter((phrase) => phrase.hasEarlierRequest) : all;
+  function choose(next: PhraseTab) {
+    setTab(next);
+    setShown(PHRASES_PER_PAGE);
+  }
+  const tabStyle = (active: boolean) =>
+    `rounded-sm px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-teal-700 ${active ? "bg-teal-900 text-white" : "bg-white text-stone-700 hover:bg-stone-100"}`;
+  return (
+    <section aria-labelledby="lineage-phrases" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 id="lineage-phrases" className="font-serif text-xl text-stone-900">
+          Wording and where it came from
+        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={tab === "adopted"}
+            onClick={() => choose("adopted")}
+            className={tabStyle(tab === "adopted")}
+          >
+            Adopted ({count.format(lineage.adopted.length)})
+          </button>
+          <button
+            type="button"
+            aria-pressed={tab === "tabled"}
+            onClick={() => choose("tabled")}
+            className={tabStyle(tab === "tabled")}
+          >
+            Tabled, not adopted ({count.format(lineage.tabled.length)})
+          </button>
+          <label className="flex items-center gap-2 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={onlyEarlier}
+              onChange={(event) => {
+                setOnlyEarlier(event.target.checked);
+                setShown(PHRASES_PER_PAGE);
+              }}
+            />
+            Only wording a submission said first
+          </label>
+        </div>
+      </div>
+      <p className="max-w-3xl text-sm leading-6 text-stone-600">
+        {tab === "adopted"
+          ? "Each phrase stands in the final act, was not in the Commission's proposal, and was inserted by the amendments listed. Submissions that contain the same words are shown with their dates."
+          : "Wording that amendments inserted and a submission also says, but that did not reach the final act."}
+      </p>
+      {phrases.length === 0 ? (
+        <p className="text-sm text-stone-600">No phrase matches this selection.</p>
+      ) : (
+        <ol className="space-y-3">
+          {phrases.slice(0, shown).map((phrase) => (
+            <PhraseCard key={phrase.phraseId} phrase={phrase} />
+          ))}
+        </ol>
+      )}
+      {phrases.length > shown && (
+        <button
+          type="button"
+          onClick={() => setShown((value) => value + PHRASES_PER_PAGE)}
+          className={retryStyle}
+        >
+          Show more ({count.format(phrases.length - shown)} left)
+        </button>
+      )}
+    </section>
+  );
+}
+
+function CreditList({ title, rows }: { title: string; rows: readonly LineageCreditRow[] }) {
+  const [all, setAll] = useState(false);
+  if (rows.length === 0) {
+    return null;
+  }
+  const shown = all ? rows : rows.slice(0, CREDITS_SHOWN);
+  return (
+    <div className="space-y-2">
+      <h4 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+        {title}
+      </h4>
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs text-stone-500">
+          <tr>
+            <th scope="col" className="py-1 font-normal">
+              Name
+            </th>
+            <th scope="col" className="py-1 text-right font-normal">
+              Phrase credit
+            </th>
+            <th scope="col" className="py-1 text-right font-normal">
+              Phrases
+            </th>
+            <th scope="col" className="py-1 text-right font-normal">
+              Amendments
+            </th>
+          </tr>
+        </thead>
+        <tbody className="tabular-nums">
+          {shown.map((row) => (
+            <tr key={`${row.kind}:${row.holderId}`} className="border-t border-stone-100">
+              <td className="py-1.5 pr-3 text-stone-900">{row.name}</td>
+              <td className="py-1.5 text-right">{share.format(row.phrases)}</td>
+              <td className="py-1.5 text-right">{count.format(row.distinctPhrases)}</td>
+              <td className="py-1.5 text-right">{count.format(row.amendments)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length > CREDITS_SHOWN && (
+        <button type="button" onClick={() => setAll((value) => !value)} className={retryStyle}>
+          {all ? "Show fewer" : `Show all ${count.format(rows.length)}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
+  return (
+    <section aria-labelledby="lineage-credits" className="space-y-4">
+      <h3 id="lineage-credits" className="font-serif text-xl text-stone-900">
+        Who tabled the adopted wording
+      </h3>
+      <p className="max-w-3xl text-sm leading-6 text-stone-600">
+        Each adopted phrase is worth 1, split equally among the Members who tabled an amendment
+        carrying it, so co-signers of one compromise do not each count in full. A group's credit is
+        the sum of its Members' shares.
+      </p>
+      {tables.length === 0 ? (
+        <p className="text-sm text-stone-600">No adopted wording, so no credit to share.</p>
+      ) : (
+        tables.map((table) => (
+          <div key={table.basis} className="grid gap-6 lg:grid-cols-2">
+            <CreditList title={`Political groups (${table.basis})`} rows={table.groups} />
+            <CreditList
+              title={`Members and committee text (${table.basis})`}
+              rows={table.holders}
+            />
+          </div>
+        ))
+      )}
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-stone-200 bg-white px-4 py-3">
+      <dt className="text-xs text-stone-500">{label}</dt>
+      <dd className="mt-1 text-2xl tabular-nums text-stone-900">{value}</dd>
+    </div>
+  );
+}
+
+type Prepared = { ok: true; lineage: PreparedLineage } | { ok: false; error: string };
+
+function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
+  const prepared = useMemo<Prepared>(() => {
+    try {
+      return { ok: true, lineage: prepareLineage(view) };
+    } catch (error: unknown) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }, [view]);
+  if (!prepared.ok) {
+    return (
+      <StateMessage announce="alert" title={`The lineage data for ${view.title} is invalid`}>
+        <p>
+          Nothing from this run is shown, because partial or repaired evidence could mislead. The
+          explorer rejected the data with this message:
+        </p>
+        <p className="font-mono text-xs text-red-800">{prepared.error}</p>
+        <p>Rebuild the law with the pipeline, then reload it.</p>
+        <button type="button" onClick={onRetry} className={retryStyle}>
+          Reload law
+        </button>
+      </StateMessage>
+    );
+  }
+  const { lineage } = prepared;
+  const { counts } = view;
+  const gaps = view.coverage.flatMap((row) => {
+    const note = coverageNote(row);
+    return note === null ? [] : [note];
+  });
+  return (
+    <main className="mx-auto max-w-[1536px] space-y-8 px-5 py-6 sm:px-8">
+      <header className="space-y-1">
+        <h2 className="font-serif text-2xl text-stone-900">{view.title}</h2>
+        <p className="text-xs text-stone-500">
+          {view.procedure_id} · {view.method} ({view.method_revision}) · run {view.run_id},
+          generated {view.generated_at}
+        </p>
+      </header>
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="Adopted phrases" value={count.format(counts.adopted_phrases)} />
+        <Stat
+          label="Amendments with adopted wording"
+          value={`${count.format(counts.amendments_adopting)} of ${count.format(counts.amendments)}`}
+        />
+        <Stat
+          label="Tabled phrases a submission says"
+          value={count.format(lineage.tabled.length)}
+        />
+        <Stat
+          label="Submissions that say tabled or adopted wording"
+          value={`${count.format(counts.documents_with_origin)} of ${count.format(counts.documents_read)}`}
+        />
+      </dl>
+      <Credits tables={lineage.credits} />
+      <Phrases lineage={lineage} />
+      <details className="rounded-sm border border-stone-200 bg-white p-4 text-sm leading-6 text-stone-600">
+        <summary className="cursor-pointer font-medium text-stone-900">
+          Limitations and source coverage
+        </summary>
+        <ul className="mt-3 list-disc space-y-1 pl-5">
+          {view.limitations.map((limitation) => (
+            <li key={limitation}>{sentence(limitation)}</li>
+          ))}
+          {gaps.length === 0 ? (
+            <li>Every source layer recorded for this law is complete.</li>
+          ) : (
+            gaps.map((gap) => <li key={gap}>{gap}</li>)
+          )}
+        </ul>
+      </details>
+    </main>
+  );
+}
+
+function LawContent({ slug, law }: { slug: string; law: LineageLawSummary | null }) {
+  const result = useResource(lineageViewUrl(slug), readLawView);
+  const name = law === null ? slug : law.title;
+  if (result.error !== null) {
+    return (
+      <StateMessage announce="alert" title={`The lineage of ${name} could not be loaded`}>
+        <p>{result.error}</p>
+        <p>Check that the backend is running (make dev-backend), then retry.</p>
+        <button type="button" onClick={result.retry} className={retryStyle}>
+          Retry law
+        </button>
+      </StateMessage>
+    );
+  }
+  if (result.data === null) {
+    return (
+      <StateMessage announce="status" title={`Loading the lineage of ${name}…`}>
+        <p>Reading the law's adopted wording, amendments and submissions from the backend.</p>
+      </StateMessage>
+    );
+  }
+  if (!result.data.found) {
+    return (
+      <StateMessage announce="alert" title={`No lineage view for ${name}`}>
+        <p>{result.data.detail}</p>
+        <p>
+          Build it from the repository root with its procedure reference, for example{" "}
+          <code className="font-mono text-xs text-stone-800">{buildCommand}</code>, then reload this
+          page.
+        </p>
+      </StateMessage>
+    );
+  }
+  return <LawLineageView view={result.data.view} onRetry={result.retry} />;
+}
+
+/**
+ * Lists the laws with a lineage view and opens the one named by `?law=`, so a reload or a
+ * shared link reopens it. Selection uses the history API, which Next.js syncs with
+ * `useSearchParams`, so back and forward move between laws without a page load.
+ */
+export function LineageLawBrowser() {
+  const searchParams = useSearchParams();
+  const selected = searchParams.get("law") || null;
+  const laws = useResource(lineageLawsUrl, readLineageLaws);
+  const collected = laws.data?.laws ?? null;
+  function select(slug: string) {
+    if (slug === selected) {
+      return;
+    }
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("law", slug);
+    window.history.pushState(null, "", `?${params.toString()}`);
+  }
+  const navStyle =
+    "rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700";
+  return (
+    <div className="min-h-dvh bg-stone-50 text-stone-900">
+      <header className="flex h-[76px] items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
+        <div className="flex items-center gap-4">
+          <span className="text-xl font-semibold tracking-tight text-stone-900">Influence</span>
+          <span className="hidden h-5 w-px bg-stone-300 sm:block" />
+          <span className="hidden text-sm text-stone-500 sm:block">Lineage explorer</span>
+        </div>
+        <nav aria-label="Other views" className="flex gap-1">
+          <Link href="/" className={navStyle}>
+            Evidence workspace
+          </Link>
+        </nav>
+      </header>
+      <nav
+        aria-label="Collected laws"
+        className="border-b border-stone-200 bg-white px-5 py-5 sm:px-8"
+      >
+        <div className="mx-auto max-w-[1536px]">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
+            Collected laws
+          </h2>
+          {laws.loading && (
+            <p role="status" className="mt-3 text-sm text-stone-500">
+              Loading collected laws…
+            </p>
+          )}
+          {laws.error !== null && (
+            <div role="alert" className="mt-3 space-y-2 text-sm leading-6 text-stone-600">
+              <p>The list of collected laws could not be loaded. {laws.error}</p>
+              <p>Check that the backend is running (make dev-backend), then retry.</p>
+              <button type="button" onClick={laws.retry} className={retryStyle}>
+                Retry laws
+              </button>
+            </div>
+          )}
+          {collected?.length === 0 && (
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
+              No law has a lineage view yet. Build one from the repository root, for example{" "}
+              <code className="font-mono text-xs text-stone-800">{buildCommand}</code>, then reload
+              this page.
+            </p>
+          )}
+          {collected !== null && collected.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {collected.map((law) => (
+                <li key={law.slug}>
+                  <button
+                    type="button"
+                    aria-pressed={law.slug === selected}
+                    onClick={() => select(law.slug)}
+                    className={`rounded-sm border px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${law.slug === selected ? "border-teal-800 bg-[#e8efea]" : "border-stone-300 bg-white hover:bg-stone-100"}`}
+                  >
+                    <span className="block text-sm font-medium text-stone-900">{law.title}</span>
+                    <span className="mt-1 block text-xs tabular-nums text-stone-500">
+                      {law.procedure_id} ·{" "}
+                      {plural(law.adopted_phrases, "adopted phrase", "adopted phrases")}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </nav>
+      {selected === null ? (
+        collected !== null &&
+        collected.length > 0 && (
+          <StateMessage announce={null} title="Choose a law">
+            <p>
+              Open a collected law to see which of its final wording came from which amendments, who
+              tabled them, and which submissions said it first.
+            </p>
+          </StateMessage>
+        )
+      ) : (
+        <LawContent
+          key={selected}
+          slug={selected}
+          law={collected?.find((law) => law.slug === selected) ?? null}
+        />
+      )}
+    </div>
+  );
+}

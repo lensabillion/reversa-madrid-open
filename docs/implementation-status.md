@@ -158,6 +158,30 @@ the delta query at 5 per amendment, which PR #41 measured at 0.82 recall@5 on Lo
 against 0.98 for the union of the delta and whole-text queries at about 6.5 candidates;
 adopting it is open.
 
+## Explorer Reads the Lineage View — 3 October 2026
+
+The owner asked to connect the frontend to lineage instead of the Atlas view (bead
+`rev-658l`). The lineage pieces (adoption, origin, tabled origin, review) were merged but
+nothing assembled them into a `LineageView`. Now:
+
+- `influence lineage <law>` (`make lineage LAW=...`) collects, runs adoption and both origin
+  searches through `services/lineage_pipeline.py`, and writes
+  `data/laws/<slug>/lineage.json`; `GET /api/v1/lineage` and `GET /api/v1/lineage/{slug}`
+  serve it ([backend README](../backend/README.md#lineage-command-and-view-api-the-explorers-view)).
+- The page `/lineage` lists the laws with a lineage view and shows each adopted or tabled
+  phrase beside its final-act quotation, the amendments that carry it and the submissions
+  that say it, with the date order, plus credit by political group and Member
+  ([frontend README](../frontend/README.md#lineage-explorer-page)). The evidence
+  workspace's header now links to `/lineage`; `/atlas` still works by URL.
+
+Verified offline (`measured`, cloud container): `make check-backend` passes with 1,245
+tests and 100% branch coverage; `make check-frontend` passes with 132 tests, Biome, `tsc`
+and the production build. In headless Chromium, the production build against the real
+backend serving the test world's view showed the phrase, its amendment and the earlier
+submission. Not verified: a real law (`make lineage LAW='AI Act'` has not been run), its
+time, or the precision of the claims (the review gate in `practice/lineage_review.py`
+has not been run). Semantic adoption is not part of the view yet.
+
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
 `influence coordinated <law>` (`make coordinated LAW=...`, bead `rev-637f`) lists the
@@ -219,6 +243,7 @@ Open decisions are not settled until the project owner agrees.
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
 | Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) |
 | Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | **Proposed** 2026-10-03; decided when the owner merges the PR that adds it | [docs/plan.md](plan.md), §3 for each choice and its reason; bead `rev-f090` | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| The explorer reads the lineage view (`/lineage`), not the Atlas view | Asked by the owner 2026-10-03; decided when the owner merges the PR (bead `rev-658l`) | Lineage starts from the final law, so every shown claim is wording that reached the law; `/atlas` and `make atlas` stay until a separate change removes them |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |

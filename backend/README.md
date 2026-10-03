@@ -256,6 +256,39 @@ Outcomes are traced only for asks with a published or
 unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
 timed.
 
+## Lineage Command and View API (the Explorer's View)
+
+`influence lineage <law>` (`make lineage LAW='2021/0106(COD)'`) runs `influence collect`,
+then `services/lineage_pipeline.py` over the collected bundle, then writes `lineage.json`
+(`LineageView`, `schemas/lineage.py`, `lineage-1`) beside it. The explorer's `/lineage` page
+reads this view. Lineage starts from the final law rather than from the submissions; the
+assembly adds no matching of its own and calls the lineage pieces in order:
+
+| Step | Code | Writes into the view |
+| --- | --- | --- |
+| Adoption | `services/lineage.py` `adopt`: runs of at least 8 words, holding 3 of the law's rare words, that stand in the final act, are absent from the proposal, and an amendment inserted | `adopted_phrases`, `adoptions`, `credits` |
+| Origins of adopted wording | `services/origin.py` `find_origins` over the submissions | `origins` |
+| Origins of tabled wording | `services/origin.py` `find_tabled_origins`: inserted wording a submission says that was not adopted | `tabled_phrases`, more `origins` |
+
+Only submissions are searched for origins (`hys_feedback`, `hys_attachment`,
+`public_statement`); the proposal and the final act are left out, because the final act
+holds every adopted phrase and would be its own origin. `counts.documents_read` is the
+number of submissions searched.
+
+| Endpoint | Answer |
+| --- | --- |
+| `GET /api/v1/lineage` | `{"laws": [{slug, procedure_id, title, run_id, adopted_phrases, amendments_adopting, documents_with_origin}]}` for every law with a `lineage.json` |
+| `GET /api/v1/lineage/{slug}` | The `LineageView`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
+
+**Limits, stated in every view.** Verbatim matching only (`lineage_semantic` is not run);
+shared wording is not authorship; credit measures adopted wording, not political weight;
+the claims have not passed the human review (`practice/lineage_review.py`).
+`counts.changed_units` and `linked_units` stay 0: nothing measures them yet. Tested offline
+(`tests/test_lineage_pipeline.py`); not yet run on a real law or timed.
+`tests/fixtures/lineage/view.json` is the test world's view, regenerated with
+`uv run --directory backend --locked python tests/test_lineage_pipeline.py`; the frontend
+tests read it, so its TypeScript types are checked against real backend JSON.
+
 ## Coordinated Amendments Command (Part 3)
 
 `influence coordinated <law>` (`make coordinated LAW='2021/0106(COD)'`) collects the law

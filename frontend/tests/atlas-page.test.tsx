@@ -465,7 +465,7 @@ test("an unreachable API fails the law list explicitly, and Retry recovers", asy
   render(<AtlasPage />);
 
   const failure = await screen.findByRole("alert");
-  expect(failure.textContent).toContain("The Atlas API could not be reached at /api/v1/atlas.");
+  expect(failure.textContent).toContain("The API could not be reached at /api/v1/atlas.");
   fireEvent.click(within(failure).getByRole("button", { name: "Retry laws" }));
   expect(await findLaw(/Fixture Regulation on widget safety/)).toBeDefined();
   expect(screen.queryByRole("alert")).toBeNull();
@@ -493,7 +493,7 @@ test.each([
   {
     failure: "a network failure",
     respond: () => Promise.reject(new TypeError("Failed to fetch")),
-    message: `The Atlas API could not be reached at /api/v1/atlas/${slug}.`,
+    message: `The API could not be reached at /api/v1/atlas/${slug}.`,
   },
 ])(
   "a law request with $failure shows its message, and Retry recovers",

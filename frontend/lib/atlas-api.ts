@@ -166,7 +166,8 @@ async function errorDetail(response: Response): Promise<string> {
   return response.statusText || "no detail was supplied";
 }
 
-async function readAtlasJson<T>(url: string, signal: AbortSignal): Promise<T> {
+/** Reads one JSON answer of the backend's read API; a non-2xx answer is an `AtlasApiError`. */
+export async function readApiJson<T>(url: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, { signal, cache: "no-store" });
@@ -174,7 +175,7 @@ async function readAtlasJson<T>(url: string, signal: AbortSignal): Promise<T> {
     if (signal.aborted) {
       throw error;
     }
-    throw new Error(`The Atlas API could not be reached at ${url}.`, { cause: error });
+    throw new Error(`The API could not be reached at ${url}.`, { cause: error });
   }
   if (!response.ok) {
     throw new AtlasApiError(response.status, await errorDetail(response));
@@ -185,10 +186,10 @@ async function readAtlasJson<T>(url: string, signal: AbortSignal): Promise<T> {
 
 /** Reads `GET /api/v1/atlas`; with `useResource`, the URL keys and cancels the request. */
 export function readAtlasLaws(url: string, signal: AbortSignal): Promise<AtlasLawList> {
-  return readAtlasJson(url, signal);
+  return readApiJson(url, signal);
 }
 
 /** Reads `GET /api/v1/atlas/{slug}`; a law without a run answers 404 as an `AtlasApiError`. */
 export function readAtlasView(url: string, signal: AbortSignal): Promise<AtlasView> {
-  return readAtlasJson(url, signal);
+  return readApiJson(url, signal);
 }
