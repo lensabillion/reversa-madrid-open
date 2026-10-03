@@ -523,7 +523,15 @@ curl --fail http://127.0.0.1:8000/api/v1/compare \
 
 Send raw file bytes to `/documents/extract` with `Content-Type: application/pdf`,
 `text/plain`, or `text/markdown`. It returns `format`, numbered `pages` with extracted
-`text`, `warnings`, and `character_count`. Extraction does not guess which columns are
+`text`, `warnings`, `character_count`, `glyphs_guessed` and `glyphs_unresolved`. PDF
+ligature code points (U+FB00 to U+FB06) expand to their letters. A ligature glyph that
+the PDF font maps to no character comes out of pypdf as U+0000 (`signi\0cant`); it is
+restored as fi, fl, ff, ffi or ffl when the spelling appears elsewhere in the document or
+a known word part covers it, and otherwise replaced by a space. Both counts carry a
+warning, and Have Your Say attachments record them in `extraction_method`
+(`pypdf+glyph_repair:guessed=N,unresolved=M`) and in the asks coverage reason. The
+repair runs before passages are cut, so every span indexes the repaired text.
+Extraction does not guess which columns are
 original/proposed wording or select evidence passages. The same service can be called
 by a future batch adapter without HTTP. Files are processed in memory and are not saved.
 
