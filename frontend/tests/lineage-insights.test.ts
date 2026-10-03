@@ -198,6 +198,18 @@ test("the funnel quotes the view's counts and provision coverage, never a stand-
     part: counts.documents_with_origin,
     whole: counts.documents_read,
   });
+  const split = steps[4]?.split;
+  expect((split?.lexical ?? 0) + (split?.semantic ?? 0)).toBe(counts.documents_with_origin);
+});
+
+test("the funnel counts a document reworded-only when it has no word-for-word origin", () => {
+  const reworded = { ...origin, document_id: "doc:hys_feedback:77", kind: "semantic" as const };
+  const both = { ...origin, document_id: "doc:hys_feedback:78" };
+  const steps = lineageFunnel(
+    withOrigins([origin, reworded, both, { ...both, kind: "semantic" }]),
+    rankOrganisations(view),
+  );
+  expect(steps[4]?.split).toEqual({ lexical: 2, semantic: 1 });
 });
 
 test("a funnel step reads unknown when its text was not fully collected", () => {

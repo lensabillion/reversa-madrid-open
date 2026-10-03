@@ -12,7 +12,7 @@ import {
   type OrganisationRow,
 } from "../lib/lineage-insights";
 import { retryStyle } from "./atlas-law-browser";
-import { KindBadge, KindLegend, KindSplitBar } from "./lineage-kind";
+import { KindBadge, KindLegend, KindSplitBar, kindStyle } from "./lineage-kind";
 import type { LawTab } from "./lineage-law-browser";
 
 const count = new Intl.NumberFormat("en-US");
@@ -369,9 +369,35 @@ function ratioOf(step: FunnelStep): number | null {
     : step.part / step.whole;
 }
 
-/** One hundred cells, `filled` of them dark: "N of every 100" without reading a scale. */
-function Waffle({ ratio, label }: { ratio: number; label: string }) {
+/**
+ * One hundred cells, the share of them filled: "N of every 100" without reading a scale. With
+ * a `split`, filled cells take the method colours (teal lexical first, then violet semantic).
+ */
+function Waffle({
+  ratio,
+  label,
+  semanticRatio,
+}: {
+  ratio: number;
+  label: string;
+  /** Of `ratio`, the share found only by a reworded match; `null` when not split by method. */
+  semanticRatio: number | null;
+}) {
   const filled = ratio > 0 ? Math.max(1, Math.round(ratio * 100)) : 0;
+  const semantic =
+    semanticRatio === null || semanticRatio === 0
+      ? 0
+      : Math.min(filled, Math.max(1, Math.round(semanticRatio * 100)));
+  const lexical = filled - semantic;
+  const fill = (cell: number): string => {
+    if (cell >= filled) {
+      return "bg-stone-200";
+    }
+    if (semanticRatio === null) {
+      return "bg-stone-800";
+    }
+    return cell < lexical ? kindStyle.verbatim.mark : kindStyle.semantic.mark;
+  };
   return (
     <span
       role="img"
@@ -380,10 +406,7 @@ function Waffle({ ratio, label }: { ratio: number; label: string }) {
       className="grid w-fit shrink-0 grid-cols-10 gap-[3px]"
     >
       {Array.from({ length: 100 }, (_, cell) => (
-        <span
-          key={cell}
-          className={`size-2.5 rounded-[2px] ${cell < filled ? "bg-stone-800" : "bg-stone-200"}`}
-        />
+        <span key={cell} className={`size-2.5 rounded-[2px] ${fill(cell)}`} />
       ))}
     </span>
   );
@@ -496,9 +519,31 @@ export function LineageFunnel({ steps }: { steps: readonly FunnelStep[] }) {
                       <span className="text-base">{copy.headline}</span>
                     </p>
                     <p className="text-sm font-medium tabular-nums text-stone-700">{exact}</p>
+                    {step.split !== null && (
+                      <p className="flex flex-wrap gap-2 pt-1 text-sm">
+                        <KindBadge
+                          kind="verbatim"
+                          note={`${count.format(step.split.lexical)} same words`}
+                        />
+                        <KindBadge
+                          kind="semantic"
+                          note={`${count.format(step.split.semantic)} other words only`}
+                        />
+                      </p>
+                    )}
                     <p className="max-w-xl text-sm leading-6 text-stone-600">{copy.note}</p>
                   </div>
-                  {ratio !== null && <Waffle ratio={ratio} label={`${share}: ${exact}`} />}
+                  {ratio !== null && (
+                    <Waffle
+                      ratio={ratio}
+                      label={`${share}: ${exact}`}
+                      semanticRatio={
+                        step.split === null || step.whole === null || step.whole === 0
+                          ? null
+                          : step.split.semantic / step.whole
+                      }
+                    />
+                  )}
                 </div>
               </div>
             </li>

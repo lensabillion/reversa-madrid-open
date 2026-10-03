@@ -380,6 +380,11 @@ export interface FunnelStep {
   whole: number | null;
   /** Extra counts the step's sentence quotes, `null` when not counted. */
   detail: number | null;
+  /**
+   * For the documents step: documents with a word-for-word origin, and documents whose only
+   * origins are reworded (Jev-judged), so the two add up to the documents with an origin.
+   */
+  split: { lexical: number; semantic: number } | null;
 }
 
 function provisions(view: LineageView, layer: "proposal" | "final_act"): number | null {
@@ -399,26 +404,45 @@ export function lineageFunnel(
   ranking: OrganisationRanking,
 ): readonly FunnelStep[] {
   const { counts } = view;
+  const kinds = new Map<string, Set<OriginMatchRecord["kind"]>>();
+  for (const origin of view.origins) {
+    if (countsAsOrigin(origin)) {
+      const seen = kinds.get(origin.document_id) ?? new Set();
+      seen.add(origin.kind);
+      kinds.set(origin.document_id, seen);
+    }
+  }
+  const lexical = [...kinds.values()].filter((seen) => seen.has("verbatim")).length;
   return [
-    { id: "proposal", part: provisions(view, "proposal"), whole: null, detail: null },
-    { id: "final", part: provisions(view, "final_act"), whole: null, detail: counts.changed_units },
+    { id: "proposal", part: provisions(view, "proposal"), whole: null, detail: null, split: null },
+    {
+      id: "final",
+      part: provisions(view, "final_act"),
+      whole: null,
+      detail: counts.changed_units,
+      split: null,
+    },
     {
       id: "traced",
       part: counts.linked_units,
       whole: counts.changed_units,
       detail: counts.adopted_phrases,
+      split: null,
     },
     {
       id: "amendments",
       part: counts.amendments_adopting,
       whole: counts.amendments,
       detail: null,
+      split: null,
     },
     {
       id: "documents",
       part: counts.documents_with_origin,
       whole: counts.documents_read,
       detail: ranking.rows.filter((row) => row.adoptedFirst > 0).length,
+      split:
+        counts.documents_with_origin === null ? null : { lexical, semantic: kinds.size - lexical },
     },
   ];
 }
