@@ -23,6 +23,7 @@ from influence.schemas.atlas_view import AtlasView
 from influence.schemas.directions import DirectionCounts, DirectionsView
 from influence.services import direction, pipeline
 from influence.services.pipeline import PipelineError
+from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 AI_ACT = "2021/0106(COD)"
 SLUG = "2021-0106-COD"
@@ -323,7 +324,10 @@ def test_counts_by_stage_group_and_member_with_one_quoted_example_per_direction(
         assert span_matches(example.span, text)
     assert (view.actors_status, view.atlas_run_id, view.actors) == ("no_atlas_view", None, ())
     assert view.actors_reason is not None
-    assert (view.method, view.limitations) == (direction.METHOD, direction.LIMITATIONS)
+    assert (view.method, view.limitations) == (
+        direction.METHOD,
+        (*direction.LIMITATIONS, TABLING_DAY_GROUPS, LATEST_SPELL_FALLBACK),
+    )
 
 
 def test_the_top_members_are_capped(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -480,7 +484,14 @@ def directions_world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         **mep_record(1, "Axel EXAMPLE"),
         "Groups": [{"groupid": "PPE", "start": "2019-07-02T00:00:00", "end": "9999-12-31"}],
     }
-    write_dump(world.inputs.meps, [conservative, mep_record(2, "Brando BENIFEI")])
+    benifei = {
+        **mep_record(2, "Brando BENIFEI"),
+        # The S&D spell covering the tabling day, which the shared record leaves out.
+        "Groups": [
+            {"groupid": "S&D", "start": "2019-07-02T00:00:00", "end": "2024-07-15T00:00:00"}
+        ],
+    }
+    write_dump(world.inputs.meps, [conservative, benifei])
     scripted_cli(monkeypatch, world)
 
 

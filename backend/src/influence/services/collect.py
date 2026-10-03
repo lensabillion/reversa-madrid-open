@@ -623,6 +623,8 @@ class _Asks:
     # Extraction failure code (`ocr_required`, `invalid_pdf`, ...) per unreadable file.
     attachments_unreadable: Counter[str] = field(default_factory=Counter[str])
     attachments_skipped: int = 0
+    # Attachments whose PDF fonts lost ligature glyphs, restored by guess or spaced.
+    attachments_glyph_repaired: int = 0
 
     def problems(self) -> list[str]:
         """Why the layer is incomplete, one clause per kind of gap."""
@@ -740,6 +742,8 @@ def _publication(run: _Run, publication_id: int, resolver: ActorResolver, found:
                 found.attachments_unreadable[code] += 1
                 found.documents.append(attached)
                 continue
+            if hys.GLYPH_REPAIR_MARK in (attached.extraction_method or ""):
+                found.attachments_glyph_repaired += 1
             found.add(
                 attached,
                 attached_text,
@@ -773,6 +777,11 @@ def _asks_coverage(found: _Asks, search: _Found, com: str) -> LayerCoverage:
     notes = [note for note in (search.note, search.failure) if note]
     if found.other_laws:
         notes.append(f"{found.other_laws} publication(s) of another law of the package skipped")
+    if found.attachments_glyph_repaired:
+        notes.append(
+            f"{found.attachments_glyph_repaired} attachment(s) had PDF ligature glyphs with no "
+            "character, restored by a word guess or replaced by a space (see extraction_method)"
+        )
     reasons = [*problems, *notes]
     if found.feedback == 0:
         reason = "; ".join(reasons) or f"No feedback on the initiatives carrying {com}"

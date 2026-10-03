@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -96,6 +96,32 @@ channels:  ## Count the channels one law was lobbied through: make channels LAW=
 directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
 	$(BACKEND) influence directions "$(LAW)" $(ARGS)
+# Atlas part 7, NEXT: reads every written atlas view; forecasts the named open laws' asks.
+# More laws go in ARGS, quoted one by one: ARGS="'2020/0361(COD)'".
+forecast:  ## Forecast the open asks of laws with an atlas view: make forecast LAW='2021/0106(COD)' [ARGS=...]
+	$(if $(LAW),,$(error LAW is required: make forecast LAW='2021/0106(COD)'))
+	$(BACKEND) influence forecast "$(LAW)" $(ARGS)
+
+# Gate 7, the blind audit: labels live under data/audit/ only, never in a law's view.
+audit-sample:  ## Draw two blind reader sheets from a view: make audit-sample LAW='2021/0106(COD)' SEED=<n> [SIZE=40] [ARGS='--status unconfirmed']
+	$(if $(LAW),,$(error LAW is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
+	$(if $(SEED),,$(error SEED is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
+	$(BACKEND) influence audit sample "$(LAW)" --seed $(SEED) $(if $(SIZE),--size $(SIZE)) $(ARGS)
+
+audit-score:  ## Score two filled sheets against the key: make audit-score DIR=data/audit/<slug>/<sample-id>
+	$(if $(DIR),,$(error DIR is required: make audit-score DIR=data/audit/<slug>/<sample-id>))
+	$(BACKEND) influence audit score "$(abspath $(DIR))"
+
+# Plan gate 9: many laws at once, resumable, with a coverage banner in data/laws/batch.json.
+batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 'AI Act,DSA'" or ARGS='--since 2019 --with-amendments'
+	$(if $(ARGS),,$(error ARGS is required: make batch ARGS='--since 2019 --with-amendments'))
+	$(BACKEND) influence batch $(ARGS)
+
+# Part 8: the public report, read from the files the commands above wrote; collects nothing.
+# Several laws are separated by commas: make report LAW='AI Act, 2022/0140(COD)'.
+report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
+	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
+	$(BACKEND) influence report "$(LAW)" $(ARGS)
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default

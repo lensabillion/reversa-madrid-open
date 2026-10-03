@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from math import sqrt
 from typing import Literal
 
-from influence.schemas.atlas import LinkAssessment
+from influence.schemas.atlas import LinkAssessment, LinkStatus
 
 type Verdict = Literal["correct", "incorrect"]
 Z_95 = 1.959963984540054
@@ -65,18 +65,19 @@ def wilson_interval(correct: int, total: int, z: float = Z_95) -> tuple[float, f
 
 
 def draw_sample(
-    links: Sequence[LinkAssessment], size: int, seed: int
+    links: Sequence[LinkAssessment], size: int, seed: int, status: LinkStatus = "published"
 ) -> tuple[LinkAssessment, ...]:
-    """Draw `size` published links, spread over (procedure, tier) in proportion to its size.
+    """Draw `size` links of `status`, spread over (procedure, tier) in proportion to its size.
 
     Seats go by largest remainder; then every stratum left without a seat takes one from the
     stratum most over its exact share, so no stratum is left out. The sample has exactly
-    `size` links, unless fewer are published (every published link is returned) or there
-    are more strata than seats (one link from each stratum). Never samples a link that is
-    not published. O(n log n) in the number of published links.
+    `size` links, unless fewer have `status` (every one is returned) or there are more
+    strata than seats (one link from each stratum). Never samples a link of another status:
+    "published" (the default) audits what we publish; "unconfirmed" is the proposed re-scope
+    that audits held-back prose links to set a threshold. O(n log n) in the number of links.
     """
     published = sorted(
-        (link for link in links if link.status == "published"), key=lambda link: link.link_id
+        (link for link in links if link.status == status), key=lambda link: link.link_id
     )
     if size >= len(published):
         return tuple(published)

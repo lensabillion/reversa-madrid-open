@@ -447,6 +447,162 @@ whoever tabled or asked for it, and counts are not causes. Tested offline
 (`tests/test_direction.py`, including a table of edits per rule); not yet run on real data,
 timed, or audited against human labels.
 
+## Blind Audit Commands (Gate 7)
+
+The audit measures how often the links we publish are right. Two people read the same
+links apart, without seeing what the pipeline concluded, and the score is reported with
+its uncertainty. Labels are stored under `data/audit/` only: nothing here writes to a
+law's bundle or `atlas.json`, and no threshold or link is changed by an audit result.
+
+1. `influence audit sample <law> --seed N [--size 40] [--status published|unconfirmed]
+   [--tier copied|reworded]` (`make audit-sample LAW='2021/0106(COD)' SEED=N`) reads the
+   law's `atlas.json` (name it by procedure number or slug; run `make atlas` first) and
+   draws a seeded sample with `services/audit.py`'s `draw_sample`: spread over (law, tier)
+   in proportion to size by largest remainder, every stratum given at least one seat, a
+   pure function of the links and the seed. It writes, under
+   `data/audit/<slug>/<status>[-<tier>]-seed<N>-n<size>/`:
+   - `reader-a.csv` and `reader-b.csv`, identical blind sheets with an opaque item ID
+     (numbered in a seeded shuffle), the actor, the ask's quote, date and source URL, the
+     amendment's ID, provision, old and new wording, tabling date and source URL, and
+     empty `verdict` and `note` columns. No link ID, score, tier or status.
+   - `key.json`, kept from the readers: each item's link record, tier, score, status and
+     stratum, the seed, the size and the population it was drawn from.
+
+   An existing sample directory is refused, so a rerun cannot overwrite filled sheets.
+2. Each reader fills `verdict` with `yes` (the ask's wording or request reached this
+   amendment), `no`, or `unsure`, plus an optional note, without talking to the other.
+3. `influence audit score <dir>` (`make audit-score DIR=data/audit/<slug>/<sample-id>`)
+   checks that each sheet lists exactly the key's items and only yes, no, unsure or blank,
+   then writes `audit-result.json` and `audit-summary.md` beside the sheets: per stratum
+   and overall, the links both readers marked correct, both marked incorrect, the splits
+   and the blanks, and precision with its Wilson 95% interval (`audit.summarise`). A link
+   is correct only when both readers say yes: `unsure` counts as no, a split counts as
+   incorrect, and a blank leaves the link unlabelled (counted in neither, and reported).
+   The result says whether the overall lower bound reaches the copied-like floor of 0.90.
+
+**Unconfirmed sample: the proposed re-scope.** Plan gate 7 audits published links; the
+last real AI Act run published none, so the plan carries a **proposed, not adopted**
+re-scope: audit a sample of *unconfirmed* prose links to set the prose threshold.
+`--status unconfirmed` supports it and every output says so. Its score adds, for support-
+score cuts 0.05 to 0.95 in steps of 0.05, the sampled links at or above each cut, their
+precision and Wilson lower bound, and the lowest cut whose lower bound reaches 0.90. That
+cut is a proposal only: a person decides whether the threshold moves (recorded in the
+plan), and the pipeline then rebuilds the graph. With 40 links the bound is wide: even
+30 of 30 correct bounds precision at about 0.886, so reaching 0.90 needs about 35 links,
+all correct, at or above the cut.
+
+**Limits.** Tested offline on the invented fixture (`tests/test_audit_sheets.py`:
+blindness, determinism by seed, agreements and splits, the threshold grid, invalid
+sheets). No real sample has been drawn or read yet; no precision is measured.
+
+## Forecast Command (Part 7, NEXT)
+
+`influence forecast <law> [<law> ...]` (`make forecast LAW='2021/0106(COD)'`, more laws in
+`ARGS`, each quoted) answers "which asks will land next?" from the views `make atlas` has
+already written; it fetches nothing. Each law is named by slug, procedure number, CELEX,
+COM reference, common name or title, and must have an `atlas.json`. It writes
+`data/laws/forecast.json` atomically (`schemas/forecast_view.py`, `ForecastView`):
+`laws` (per law: status, whether it is a target, asks, training examples, forecasts and
+excluded counts by reason), `validation`, `fallback_rule`, `forecasts` (`Forecast`
+records) and `limitations`.
+
+- **History** (`services/forecasting.py`): every ask of every completed law whose final-act
+  outcome is decided: full or partial is a win, not observed a loss, unknown is left out.
+  Features are the law's first subject, the asking actor's kind and how many amendments
+  carry the ask through a published or unconfirmed link. An example is kept only when the
+  ask and each of those amendments are dated before the law's completion date
+  (`Example` refuses any other).
+- **Targets**: the undecided asks of the named laws that are still open (`ongoing` or
+  `unknown`). A named completed law only adds history; a withdrawn one has nothing to
+  forecast.
+- **Validation** (`services/forecast.py`): rolling time splits ordered by completion date,
+  never one law on both sides, against the prevalence baseline. A probability is published
+  only with three tested splits, a hundred test asks and a Brier score at least 5% better
+  than prevalence. Otherwise every forecast is a scenario with no score, and its reasons
+  give the counts of laws, splits and test asks that fell short. With the few laws built
+  for the demo, that is the expected result.
+- **Fallback rule**: the plan's labelled fallback, "the rapporteur's draft includes the
+  ask", is reported as `computable: false`. Parltrack gives the rapporteurs' names, but
+  the collect step fetches no draft report text, so no rule score is computed rather than
+  one approximated from other data.
+
+**Limits.** The view keeps only asks with a link, so the history holds no ask that no
+amendment carried. Tested offline (`tests/test_forecasting.py`: scenario and probability
+paths, leakage refusal, every exclusion reason, law naming, the command end to end); not
+yet run on real laws or timed.
+
+## Batch Command (Plan Gate 9)
+
+`influence batch` (`make batch ARGS=...`) runs collect and the per-law steps over many
+laws, for the brief's "all of Europe from 2019". It adds no analysis of its own: each step
+is the service its own command calls, so a law's files are the same whichever command
+wrote them.
+
+```console
+make batch ARGS="--laws 'AI Act,DSA,2021/0106(COD)'"
+make batch ARGS='--since 2019 --with-amendments --limit 50'
+make batch ARGS="--laws 'AI Act' --steps atlas,coordinated,channels,lineage,directions --attachments"
+```
+
+- **Selection.** `--laws` takes comma-separated procedure numbers, CELEX, COM references,
+  common names or titles, resolved as `collect` resolves them; a name that resolves to
+  nothing is recorded as a failed law. `--since YEAR --with-amendments` scans the
+  committee and plenary amendment dumps once (about a minute) and selects every procedure
+  of the dossiers catalog with an amendment tabled on or after 1 January YEAR, most
+  amended first; `--limit N` keeps the first N.
+- **Steps.** Collect runs first, without attachments unless `--attachments` is given.
+  `--steps` picks from `atlas,coordinated,channels,lineage,directions` (default
+  `coordinated,channels,lineage,directions`, which read Parltrack and the bundle and take
+  seconds; `atlas` takes minutes a law and is opt-in). Steps run in that order, so
+  `directions` reads the atlas view built just before it.
+- **Resume.** A law with a published collect manifest is not collected again, and a step
+  whose output file names that manifest's `run_id` is skipped; `--refresh` collects again
+  and redoes every step. A law or step that fails is recorded with its error and the batch
+  goes on; the exit status is 1 unless every law completed.
+- **Output.** `data/laws/batch.json` is written atomically after every law, so an
+  interrupted batch keeps what it finished. It holds the selection, the steps, and per law
+  the query, procedure, title, status (`complete`, `partial`, `failed`), collect `run_id`,
+  error, seconds, amendments, each step's status (`done`, `reused`, `skipped`, `failed`)
+  with its seconds and error, and the collect coverage rows (layer, status, count). Its
+  `banner` counts laws selected, attempted, complete, partial and failed, the amendments
+  covered, how many laws lack each layer, how many each step failed on, the hardware, and
+  the start and finish times (`finished_at` is null until the last law is done).
+
+**Limits.** Collect scans the amendment dumps once per law (plan §5), so a batch over
+every procedure since 2019 takes hours; it has not yet been timed on real data. A law
+collected earlier is reused even when collected with other settings; use `--refresh`
+after a code or dump change. Tested offline (`tests/test_batch.py`).
+
+## Report Command (Part 8)
+
+`influence report <law> [<law> ...]` (`make report LAW='2021/0106(COD)'`; several laws are
+separated by commas, `LAW='AI Act, 2022/0140(COD)'`) writes the public report
+(`services/report.py`) to `data/laws/report.md`, atomically, and prints each section's
+headline, the link sample and the path. It collects and computes nothing: it reads the
+collected bundle (for actors' declared register spend and source URLs) and the files the
+other commands wrote, `atlas.json`, `coordinated.json`, `channels.json`, `directions.json`
+and `lineage.json` under `data/laws/<procedure>/`, plus `data/laws/forecast.json` when
+`influence forecast` has written it. A law is named by procedure number, slug, CELEX, COM
+reference, title or common name, matched only against laws already collected.
+
+The Markdown holds a coverage block (layers, gaps, run IDs, files not run, built from an
+older run or invalid), then WHO, WHAT, TOWARDS, HOW and NEXT, each with a headline in
+"N of M" form, a named actor or law, evidence (the file and field, record IDs) and one
+limitation; wins beside declared spend with ranks, for actors with at least 3 assessed asks
+and a declared cost (or the count saying none qualify); links side by side; and methods and
+limits (provisional thresholds, what is cut, the limitations the view recorded).
+
+**Links side by side.** `--links N --seed S` (defaults 3 and 20261003) draws a seeded uniform
+sample of published links, and prints for each the actor, the quoted ask span, the quoted
+amendment spans with the amendment ID, tabling Members and date, the final-act wording when
+traced through that same amendment, and every source URL. With no published link it says
+"0 published links" and shows instead a sample of lineage's verbatim adoptions (amendment to
+final article), labelled as not published links. The same seed draws the same links.
+
+A missing file is a line such as "Not run: `data/laws/2021-0106-COD/lineage.json` is missing;
+run `make lineage LAW='2021/0106(COD)'`", never a zero. `--out` is resolved from `backend/`
+when run through `make`. Tested offline (`tests/test_report.py`); not yet run on a real law.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
@@ -551,7 +707,15 @@ curl --fail http://127.0.0.1:8000/api/v1/compare \
 
 Send raw file bytes to `/documents/extract` with `Content-Type: application/pdf`,
 `text/plain`, or `text/markdown`. It returns `format`, numbered `pages` with extracted
-`text`, `warnings`, and `character_count`. Extraction does not guess which columns are
+`text`, `warnings`, `character_count`, `glyphs_guessed` and `glyphs_unresolved`. PDF
+ligature code points (U+FB00 to U+FB06) expand to their letters. A ligature glyph that
+the PDF font maps to no character comes out of pypdf as U+0000 (`signi\0cant`); it is
+restored as fi, fl, ff, ffi or ffl when the spelling appears elsewhere in the document or
+a known word part covers it, and otherwise replaced by a space. Both counts carry a
+warning, and Have Your Say attachments record them in `extraction_method`
+(`pypdf+glyph_repair:guessed=N,unresolved=M`) and in the asks coverage reason. The
+repair runs before passages are cut, so every span indexes the repaired text.
+Extraction does not guess which columns are
 original/proposed wording or select evidence passages. The same service can be called
 by a future batch adapter without HTTP. Files are processed in memory and are not saved.
 

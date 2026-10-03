@@ -12,6 +12,7 @@ from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS
 from influence.services import lineage
 from influence.services.lineage import COMMITTEE_TEXT, Rarity, adopt, adopt_records
 from influence.services.pipeline import Collected
+from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 PROCEDURE = "2099/0001(COD)"
 
@@ -417,6 +418,8 @@ def test_new_wording_made_of_the_laws_common_words_is_not_adopted_and_is_counted
     result = adopt_records([amendment(1, formula)], [*others, article("A", formula)], [])
     assert result.phrases == ()
     assert result.limitations == (
+        TABLING_DAY_GROUPS,
+        LATEST_SPELL_FALLBACK,
         f"1 run(s) of {MIN_ADOPTED_RUN_WORDS} or more words were not counted: they hold fewer "
         f"than {lineage.MIN_RARE_WORDS} of the law's rare words.",
     )

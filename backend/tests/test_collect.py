@@ -675,6 +675,40 @@ def test_an_unreadable_attachment_is_counted_and_kept_as_a_document(tmp_path: Pa
     assert attached.extraction_status == "failed"
 
 
+def test_lost_ligature_glyphs_are_restored_before_passages_and_noted(tmp_path: Path) -> None:
+    # pypdf returns U+0000 for a ligature glyph its font leaves unmapped (rev-obw8).
+    lost = make_pdf(("We ask that signi\x00cant changes are noti\x00ed in \x00 days.",))
+    script = [
+        (fragment, RawResponse(200, "application/pdf", lost))
+        if "download" in fragment
+        else (fragment, response)
+        for fragment, response in ai_act_script()
+    ]
+    world = make_world(tmp_path, script)
+
+    result = world.collect()
+
+    asks = row(result.law, "asks")
+    assert (asks.status, asks.reason) == (
+        "complete",
+        "1 attachment(s) had PDF ligature glyphs with no character, restored by a word "
+        "guess or replaced by a space (see extraction_method)",
+    )
+    receipt = result.manifest.stages[2]
+    documents = world.store().read_output(receipt, "documents.jsonl", SourceDocument)
+    (attached,) = (d for d in documents if d.source_kind == "hys_attachment")
+    assert attached.extraction_method == "pypdf+glyph_repair:guessed=2,unresolved=1"
+    texts = world.store().read_output(receipt, "document_texts.jsonl", DocumentText)
+    (text,) = (t for t in texts if t.document_id == attached.document_id)
+    assert text.text == "We ask that significant changes are notified in   days."
+    passages = world.store().read_output(receipt, "passages.jsonl", Passage)
+    quoted = [p for p in passages if p.document_id == attached.document_id]
+    assert quoted
+    assert all(span_matches(p.span, text.text) for p in quoted)
+    quotes = [text.text[p.span.start : p.span.end] for p in quoted]
+    assert any("significant" in quote for quote in quotes)
+
+
 def test_without_the_index_a_title_search_finds_the_initiative_and_says_so(
     tmp_path: Path,
 ) -> None:
@@ -823,7 +857,14 @@ def test_each_amendment_names_its_authors_groups_on_the_day_it_was_tabled(
 ) -> None:
     world = make_world(tmp_path)
     # 197721 sat with Renew until July 2024, then the EPP; the amendment is from 2022.
-    write_dump(world.inputs.meps, [switcher(197721), mep_record(125042, "Margrete AUKEN")])
+    # No spell covers the 2019-2024 term, so her group on the tabling day is unknown.
+    auken = {
+        **mep_record(125042, "Margrete AUKEN"),
+        "Groups": [
+            {"groupid": "S&D", "start": "2024-07-16T00:00:00", "end": "9999-12-31T00:00:00"}
+        ],
+    }
+    write_dump(world.inputs.meps, [switcher(197721), auken])
 
     result = world.collect()
 

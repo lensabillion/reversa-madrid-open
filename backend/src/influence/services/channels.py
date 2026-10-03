@@ -43,6 +43,12 @@ from influence.schemas.channels import (
     TimingChannel,
 )
 from influence.services.coordinated import find_coordinated
+from influence.services.tabling_groups import (
+    group_limitations,
+    known_groups,
+    latest_groups,
+    tabling_groups,
+)
 
 METHOD: ChannelsMethod = "channels-1"
 VIEW_FILE = "channels.json"
@@ -60,8 +66,6 @@ LIMITATIONS = (
     "type is the source's own code from the Have Your Say index.",
     "All private citizens are one aggregate submitter, so they count once among submitters "
     "however much feedback they sent.",
-    "A Member's political group is the one of their latest spell in Parltrack's dump, which "
-    "can differ from their group on the day the amendment was tabled.",
     "An amendment co-signed by Members of several groups counts once for each group, so the "
     "group counts can sum to more than the amendments with a known group.",
     "Organisations whose submissions share wording are not counted: comparing every pair of "
@@ -231,25 +235,17 @@ def consultation_channel(
     )
 
 
-def _author_groups(amendment: Amendment, groups: Mapping[str, str]) -> set[str]:
-    return {groups[author] for author in amendment.author_ids if author in groups}
-
-
-def _political_groups(actors: Iterable[Actor]) -> dict[str, str]:
-    return {
-        actor.actor_id: actor.political_group
-        for actor in actors
-        if actor.political_group is not None
-    }
-
-
 def mep_channel(amendments: Iterable[Amendment], actors: Iterable[Actor]) -> MepChannel:
     """Amendments by stage, committee and group, and the Members who tabled the most.
 
-    A Member absent from the MEP dump is named as the amendment names them.
+    A Member absent from the MEP dump is named as the amendment names them. Groups are
+    counted per amendment, from each author's group on its tabling day, so a Member who
+    changed group counts under each group they tabled in; a top Member shows every group
+    they tabled under, joined by "/".
     """
     actors = tuple(actors)
-    groups = _political_groups(actors)
+    latest = latest_groups(actors)
+    tabled_under: defaultdict[str, set[str]] = defaultdict(set)
     names = {actor.actor_id: actor.name for actor in actors}
     counts: Counter[str] = Counter()
     stages: Counter[str] = Counter()
@@ -265,7 +261,11 @@ def mep_channel(amendments: Iterable[Amendment], actors: Iterable[Actor]) -> Mep
             for author, name in zip(amendment.author_ids, amendment.author_names, strict=True):
                 names.setdefault(author, name or author)
         tabled.update(authors)
-        known = _author_groups(amendment, groups)
+        on_day = tabling_groups(amendment, latest)
+        for author, group in on_day.items():
+            if group is not None:
+                tabled_under[author].add(group)
+        known = {group for group in on_day.values() if group is not None}
         by_group.update(known)
         if not authors:
             counts["no_known_author"] += 1
@@ -287,7 +287,7 @@ def mep_channel(amendments: Iterable[Amendment], actors: Iterable[Actor]) -> Mep
             TablingMep(
                 actor_id=actor_id,
                 name=names.get(actor_id, actor_id),
-                political_group=groups.get(actor_id),
+                political_group="/".join(sorted(tabled_under[actor_id])) or None,
                 amendments=count,
             )
             for actor_id, count in top
@@ -299,14 +299,14 @@ def coalition_channel(amendments: Iterable[Amendment], actors: Iterable[Actor]) 
     """Open co-signing across groups, and part 3's coordinated wording across groups."""
     amendments = tuple(amendments)
     actors = tuple(actors)
-    groups = _political_groups(actors)
+    latest = latest_groups(actors)
     clusters, counts = find_coordinated(amendments, actors)
     crossing = [cluster for cluster in clusters if cluster.cross_group]
     return CoalitionChannel(
         amendments=len(amendments),
         cosigned=sum(len(set(amendment.author_ids)) > 1 for amendment in amendments),
         cosigned_across_groups=sum(
-            len(_author_groups(amendment, groups)) > 1 for amendment in amendments
+            len(known_groups(amendment, latest)) > 1 for amendment in amendments
         ),
         coordinated=counts,
         coordinated_clusters=len(clusters),
@@ -355,7 +355,7 @@ def build_channels(
         meps=mep_channel(amendments, actors),
         coalitions=coalition_channel(amendments, actors),
         votes_and_meetings=_coverage(law),
-        limitations=LIMITATIONS,
+        limitations=(*LIMITATIONS[:3], *group_limitations(amendments), *LIMITATIONS[3:]),
     )
 
 

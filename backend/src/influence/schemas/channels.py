@@ -94,6 +94,7 @@ class TimingChannel(FrozenModel):
 class TablingMep(FrozenModel):
     actor_id: ActorId
     name: NonEmpty
+    # Every group the Member tabled these amendments under, "/"-joined; None if unknown.
     political_group: str | None
     amendments: int = Field(ge=1)
 
