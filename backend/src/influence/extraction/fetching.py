@@ -19,9 +19,10 @@ from influence.extraction.cache import CachedResponse, HttpCache, ResponseMetada
 from influence.extraction.files import open_atomic
 
 # Identity and contact, so a provider can reach the team instead of blocking the address.
+# The contact is the public repository, not a personal address.
 USER_AGENT = (
     "InfluenceAtlas/0.1 (Madrid Open 2026 research prototype; "
-    "contact: estrellatrabancapineda@gmail.com)"
+    "contact: https://github.com/lensabillion/reversa-madrid-open)"
 )
 # Two requests a second. Cellar throttles a tight loop and Have Your Say is not faster.
 MIN_INTERVAL_SECONDS = 0.5

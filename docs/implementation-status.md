@@ -1,6 +1,6 @@
 # Implementation Status and Handoff
 
-Updated October 3, 2026, 11:55 CEST. Update this file when a capability or its
+Updated 3 October 2026, 17:00 CEST. Update this file when a capability or its
 verification changes. Issue ownership and PR state live in tbd; implementation contracts
 live in the [backend README](../backend/README.md). The
 [Influence Atlas brief](brief/influence-atlas-challenge-brief.pdf) defines the
@@ -8,7 +8,7 @@ competition. The [Atlas explainer](explainer/influence-atlas-primer.md) explains
 first principles: what changed, the architecture, the data, the models and the plan. The
 [technical design](design/influence-atlas-design.md) gives the record contracts and
 acceptance tests for the same eight parts. The [consolidated execution plan](plan.md)
-(`rev-f090`) settles where those documents and the uploaded
+(`rev-f090`, decided and on `main`) settles where those documents and the uploaded
 [technical plan](brief/PLAN.md) disagree, and orders the work as acceptance gates.
 `attic/` is not an implementation source.
 
@@ -180,6 +180,48 @@ LobbyPlag for BM25, dense and fused (PRs #35, #41, #48), and candidates for the 
 searches the delta query at 5 per amendment (0.82 recall@5 on LobbyPlag) instead of the
 union of the delta and whole-text queries (0.98 at about 6.5 candidates, PR #41).
 
+## Channels, Directions, Demo Fixes and Lineage — 3 October 2026, Afternoon
+
+Merged on `main` since the sections above (`9e1049b`):
+
+- **PR #62** (gate 7b minimum, bead `rev-rg6l`): `make channels` (HOW: consultation
+  stage, timing against the proposal, tabling Members and groups, co-signed and
+  coordinated amendments) and `make directions` (TOWARDS: a rule-based direction per
+  amendment, `direction-rules-1`, and per actor through published links only). Details:
+  [backend README](../backend/README.md#channels-command-part-7-how). Verified offline
+  (`measured` in the PR): `make check-backend` on `cf27ac1`, 1,142 tests, 100% branch
+  coverage, with unit, Hypothesis and fixture end-to-end tests. **Not verified:** no real
+  law has been run through either command (no counts, no timing); direction labels are
+  English-only and not audited against human labels; actor directions stay empty while
+  no link is published; public-voice cards are not started; neither file is in
+  `atlas.json` or the explorer.
+- **PR #67** (gate 6 demo blockers, beads `rev-48sd`, `rev-7lfp`, `rev-539s`): evidence
+  windows of 300 code points either side of each quoted span, with a toggle for the full
+  source; one badge per source layer on the graph view, and an empty-graph message that
+  says whether a layer failed or nothing passed the publication bar; rankings now count
+  every ask and actor (untraced asks as `unknown`), and only links that pass the
+  chronology check can be an origin. Verified offline (`measured` in the PR): `make check`
+  on `c330458`, 1,152 backend and 115 frontend tests, clean audits. **Not verified:** no
+  real law in the explorer, rendering of hundreds of ranking rows, and the size of
+  `atlas.json` at 29,000 asks. Direct tracing of unlinked asks stays off (about 130 ms per
+  ask, over an hour for the AI Act).
+- **Lineage PRs #58–#61 and #66**: an outcome-first path that starts from the final act.
+  #58 adds the `lineage-1` contracts (`schemas/lineage.py`); #59 and #66 trace runs of 12
+  or more words that stand in the final act, are absent from the proposal and were
+  inserted by an amendment, back to those amendments, and share each phrase's credit among
+  its tablers (`services/lineage.py`; PR #59 reports 3.3 s, 395 adopting amendments and
+  434 phrases on the AI Act); #61 finds which submitted documents contain that adopted
+  wording, with dates and citations flagged (`services/origin.py`; on the AI Act with
+  attachments and a stand-in for the adoption step, 42 matches from 16 organisations, which the author read as mostly the
+  Commission's own annex wording quoted back, not lobbyists' asks); #60 adds the human
+  review gate (a seeded sample, two readers' labels kept in a separate file, precision
+  with a Wilson lower bound). These figures are as reported in the PRs, not re-measured
+  here. **Not verified:** no lineage claim is audited, shared wording is not authorship,
+  and no `make` target runs the lineage steps yet (a `lineage` command is in progress).
+
+The last real AI Act run of `make atlas` (`rules-3`, below) published **0 links**, so
+gate 3 still fails and a blind audit of published links (gate 7) has nothing to sample.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
@@ -217,50 +259,55 @@ Open decisions are not settled until the project owner agrees.
 | The Influence Atlas brief replaces the first Challenge 03 brief | Reported by the owner 2026-10-03 | The new brief's rules ("We hand out nothing"), schedule (demos 19:30, no 19:00 inputs) and scoring leave no hidden test |
 | Architecture: eight parts plus a practice loop (Atlas) | Decided 2026-10-03: the owner merged PR [#21](https://github.com/lensabillion/reversa-madrid-open/pull/21) at 11:33 | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
-| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) |
-| Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | **Proposed** 2026-10-03; decided when the owner merges the PR that adds it | [docs/plan.md](plan.md), §3 for each choice and its reason; bead `rev-f090` | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
+| Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
 | Parsed tables are JSON Lines, not Parquet | Decided 2026-10-03 | The playbook asks for Parquet; pyarrow is a new dependency the 14-day cool-off and `no-build` policy have not cleared, and JSON Lines is equally safe against delimiters in legal text. The typed row models in `backend/src/influence/extraction/tables.py` are the contract, so the container can change without touching a parser |
-| Common-name aliases live in code (`LAW_ALIASES` in `backend/src/influence/services/law_query.py`, started by PR #49 in `collect.py`), not in `data/catalog/aliases.jsonl` as plan §5 proposed | **Proposed** 2026-10-03 with branch `feat/law-aliases`; decided when the owner merges it | `data/` is never committed, so a data file would need its own build script before anyone could rerun it; a reviewed table under `backend/src` is versioned with the code that reads it and checked by a test |
+| Common-name aliases live in code (`LAW_ALIASES` in `backend/src/influence/services/law_query.py`, started by PR #49 in `collect.py`), not in `data/catalog/aliases.jsonl` as plan §5 proposed | Decided 2026-10-03: PR #53 (`feat/law-aliases`) merged | `data/` is never committed, so a data file would need its own build script before anyone could rerun it; a reviewed table under `backend/src` is versioned with the code that reads it and checked by a test |
 | Probe before parse: no parser is written against an unverified response shape | Decided 2026-10-03 | The extraction playbook's own instruction. `python -m influence.extraction probe` records each source's real status, content type and first 200 characters; see the [backend README](../backend/README.md) |
 | D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on | The [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | Adopted = the requested wording survives in the final law, labelled automatically | Decided 2026-10-03 (owner, under `rev-e5xh`) | Carries over to part 5 (trace outcomes, `rev-uhpq`) |
 | D1: language-model judge | **Local evaluation authorized; no paid API** by the owner, 3 October 2026 | A pinned local DeBERTa NLI model scored 17/24 on a separate synthetic legal diagnostic. Evaluation is authorized; automatic publication is not validated. Raw outputs and labels stay separate. See [calculation handoff](design/calculation-handoff.md), `rev-jaig` and `rev-qs6i`. |
 | D4: team split | **Open**; teams may now be 3–4 | [Atlas explainer §12](explainer/influence-atlas-primer.md#12-todays-plan) |
-| D5: organizer questions of the first brief | **Superseded**; one question remains: may we use code written before today? | Bead `rev-qvmx` |
+| D5: organizer questions of the first brief | **Superseded**; the remaining question is answered: the organizers allow code written before today (3 October) | Bead `rev-qvmx`, closed |
+| No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
+| Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
 
 ## Next Work in Competition Order
 
-The beads below are children of the epic `rev-i2dl` and depend on each other in this
-order (`tbd ready` shows what is unblocked). Points are the brief's criteria each one
-carries. [Plan §8](plan.md#8-acceptance-gates-in-order) gives each step its completion
-test and target time.
+As of 17:00 on 3 October; code freeze 18:30, demos 19:30. Beads are children of the epic
+`rev-i2dl`; `tbd ready` shows what is unblocked, and the beads, not this list, hold
+ownership. [Plan §8](plan.md#8-acceptance-gates-in-order) gives each gate's test.
 
-1. `rev-pjk2` Part 1 · Collect one law from its procedure number; start the downloads
-   for the flagship laws now, in the background (every criterion depends on it).
-2. `rev-aapn` Part 3 · Find candidates; `rev-637f` coordinated amendments from Parltrack
-   alone (a first insight with no new downloads).
-3. `rev-nuk5` Part 4 · Verify links, with `rev-zzur` (threshold), `rev-sbrp` (legal
-   polarity) and `rev-jaig` (D1). Real links, 25.
-4. `rev-uhpq` Part 5 · Trace outcomes: heard, adopted by Parliament, won.
-5. `rev-1vxz` Part 2 · Resolve actors, and `rev-i006` Part 6 · Atlas graph.
-6. `rev-qn6b` Part 8 · Any-law command and explorer. Any law, 20.
-7. `rev-sn3u` Blind audit of published links: precision with a Wilson interval.
-8. `rev-5yy6` Rank; `rev-fod0` Report. Insight, 25; report, 15.
-9. `rev-0who` Batch over all 2019+ laws; `rev-104q` Forecast. Ambition, 15.
-10. `rev-rg6l` Explain: channels and public statements against asks.
-11. `rev-nzqr` D6 licence and public repository, before 19:30; `rev-p61s` rerun from a
-    fresh checkout.
+Done or merged: gate 1's collection (the AI Act with attachments; the Digital Services
+Act and Data Act without), gate 2 (candidates and coordinated amendments), the `make
+atlas` command and view API, the gate 7b commands (`make channels`, `make directions`, PR #62), the gate 6 demo fixes (PR #67) and
+the lineage steps (PRs #58–#61, #66).
 
-Cut lines and the hour-by-hour plan are in
-[explainer §12](explainer/influence-atlas-primer.md#12-todays-plan).
-Public-source coverage, the any-law runtime and forecast quality are unverified until
-those beads report measurements.
+1. **Real links (gates 3 and 7).** `rules-3` publishes 0 AI Act links. The **Proposed**
+   gate 7 re-scope (a seeded audit of unconfirmed prose links to set the prose threshold)
+   needs the owner's decision before anyone labels (`rev-nuk5`, `rev-zzur`, `rev-sn3u`).
+   Audit labels stay apart from model output.
+2. **Lineage command.** Join the merged lineage steps into one command and run it on the
+   AI Act (in progress in another session); no lineage claim is shown before PR #60's
+   review gate passes.
+3. **Real runs of gate 7b.** `make channels LAW='AI Act'` and `make directions LAW='AI
+   Act'` have never run on a real law (`rev-rg6l`); record counts and timings.
+4. **Report** (`rev-fod0`, `rev-5yy6`): every number from a recorded command output; text
+   until 18:30.
+5. **Release** (gate 11): D6 licence and public repository, owner only (`rev-nzqr`); a
+   rerun from a fresh checkout with `make setup && make atlas LAW='AI Act'` (`rev-p61s`).
+6. **Demo** without the live frontend (decided): the five-minute script against command
+   outputs.
+
+Cut for today unless time remains: the batch over all 2019+ laws (`rev-0who`), the
+forecast (`rev-104q`) and gate 10's full explanation. Public-source coverage, the uncached
+any-law runtime and forecast quality remain unverified.
 
 The initial extraction foundation had no parsers; PR #26 subsequently added the
 source connectors listed in the Agent 1 handoff below. The original playbook sequence was: probe every catalog URL and record the real response shapes, resolve one procedure

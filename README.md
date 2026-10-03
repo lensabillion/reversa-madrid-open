@@ -26,6 +26,33 @@ There is no hidden test and no supplied data. The jury scores 100 points live at
 We hand in a graph the jury can explore live, a short public report, and this repository,
 open source so anyone can rerun it.
 
+## Quickstart
+
+You need Python 3.14 and uv 0.12 or later (the Makefile's `UV_EXCLUDE_NEWER` setting needs
+it); the [backend README](backend/README.md) has the details. From the repository root:
+
+```sh
+make setup                        # once per machine, needs network: Parltrack dumps, the
+                                  # Transparency Register and the Have Your Say index
+make atlas LAW='AI Act'           # collect one law, then asks, links, outcomes, graph, counts
+make coordinated LAW='AI Act'     # near-identical amendments tabled across political groups
+make channels LAW='AI Act'        # how the law was lobbied: consultation, timing, MEPs, coalitions
+make directions LAW='AI Act'      # which way each amendment moves the law
+```
+
+`LAW` takes a procedure number (`2021/0106(COD)`), a CELEX or COM reference, a common
+name (`'AI Act'`, `'DSA'`) or a title. Every output is written under
+`data/laws/<procedure>/` (for the AI Act, `data/laws/2021-0106-COD/`): `atlas.json`,
+`coordinated.json`, `channels.json` and `directions.json`, beside the collected texts,
+amendments, submissions and a run manifest. `data/` is never committed; everything in it
+comes from public sources and is rebuilt by these commands. `make check` runs every gate.
+
+## Licence
+
+The licence is pending the project owner's decision (D6 in
+[implementation status](docs/implementation-status.md#decisions)). Until it is decided,
+the repository has no LICENSE file.
+
 ## Where to Start
 
 - [AGENTS.md](AGENTS.md): how we work, for humans and AI agents alike: the four project
