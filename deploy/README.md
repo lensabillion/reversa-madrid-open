@@ -9,7 +9,7 @@ from a local run. The backend reads it through `INFLUENCE_DATA_ROOT`, set on Ren
 
 | View | Built from | Command |
 | --- | --- | --- |
-| `2021-0106-COD` (AI Act) | `main` at `70ef667`, run `20261003T154842Z` | `influence lineage "AI Act"` |
+| `2021-0106-COD` (AI Act) | run `20261003T162147Z`, generated 2026-10-03 16:22 UTC; 589 verbatim and 45 reworded (Jev) origins | `influence lineage "AI Act"` with Jev reworded origins |
 
 To add a law: run `make lineage LAW='...'` locally, copy its `lineage.json` here under
 `views/laws/<slug>/`, commit and push; Render redeploys this branch.
