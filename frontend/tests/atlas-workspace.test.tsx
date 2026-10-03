@@ -59,6 +59,7 @@ function workspace(
     <AtlasWorkspace
       snapshot={snapshot}
       links={suppliedLinks}
+      coverage={[]}
       coverageNotes={["Synthetic source coverage"]}
       dataNotice={dataNotice}
       analysis={<p>Supplied outcome table</p>}

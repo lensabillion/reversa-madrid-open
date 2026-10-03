@@ -131,7 +131,7 @@ own:
 | Step | Connector | Writes |
 | --- | --- | --- |
 | Resolve the query | `services/law_query.py` (shapes, the common-name table `LAW_ALIASES`, title ranking) over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a name or title is unclear |
-| `texts` | `repositories/cellar.py`: identifiers by SPARQL, acts as XHTML, split into provisions | `documents`, `document_texts`, `articles` |
+| `texts` | `repositories/cellar.py`: identifiers by SPARQL, acts as XHTML, split into provisions; a proposal's annex streams are fetched too and split at their "ANNEX I" headings, one provision per annex as in the final act (a lost or unsplit annex stream leaves the proposal layer `partial`, naming the stream) | `documents`, `document_texts`, `articles` |
 | `amendments` | `repositories/parltrack.py`: committee and plenary dumps, then the MEPs who tabled them | `documents` (the dumps), `amendments`, `actors` |
 | `asks` | `repositories/hys.py` joined by COM reference only; `services/passages.py`; `services/actors.py` over `repositories/register.py` | `documents`, `document_texts`, `passages`, `actors` |
 | `law` | merges the stages | `laws.jsonl` (one `LawRecord` with ten typed coverage rows), `actors.jsonl` |

@@ -241,6 +241,10 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   expect(
     screen.getByText(/Atlas run 20991201T090000Z, generated 2099-12-01T09:00:00Z/),
   ).toBeDefined();
+  const layers = screen.getByRole("region", { name: "Source layers" });
+  expect(within(layers).getByText("Committee amendments")).toBeDefined();
+  expect(within(layers).getByText("1 of 5 submissions has no publication date")).toBeDefined();
+  expect(within(layers).queryByText(/No links can be shown|no link was published/)).toBeNull();
 
   // The backend snapshot drives the real graph, and its link opens the bundle's evidence.
   fireEvent.click(
@@ -298,6 +302,49 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
       "Forecast unavailable: no source-backed forecast supplied.",
     ),
   ).toBeDefined();
+});
+
+test("a failed consultation collection is explained on the opening graph, not only in other tabs", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  const reason =
+    "Have Your Say could not be reached: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed";
+  const failed: AtlasView = {
+    ...view,
+    coverage: view.coverage.map((row) =>
+      row.layer === "asks" ? { ...row, status: "missing", count: 0, reason } : row,
+    ),
+    bundle: { ...bundle, links: [], outcomes: [] },
+    // The pipeline's graph for a law without links: the law node alone.
+    snapshot: {
+      ...view.snapshot,
+      nodes: view.snapshot.nodes.filter((node) => node.kind === "procedure"),
+      edges: [],
+    },
+    rankings: [],
+  };
+  installFetch((path) => {
+    if (path === "/api/v1/atlas") {
+      return reply(laws);
+    }
+    return path === `/api/v1/atlas/${slug}` ? reply(failed) : unexpected(path);
+  });
+  render(<AtlasPage />);
+
+  const layers = await screen.findByRole("region", { name: "Source layers" });
+  expect(
+    screen.getByRole("button", { name: "Explore the graph" }).getAttribute("aria-pressed"),
+  ).toBe("true");
+  expect(within(layers).getAllByRole("listitem")).toHaveLength(view.coverage.length);
+  const asks = within(layers)
+    .getAllByRole("listitem")
+    .find((item) => item.textContent?.startsWith("Consultation feedback"));
+  expect(asks?.textContent).toBe(`Consultation feedback · missing · 0Reason: ${reason}`);
+  expect(
+    within(layers).getByText(
+      `No links can be shown because consultation feedback is missing: ${reason}.`,
+    ),
+  ).toBeDefined();
+  expect(screen.getByRole("region", { name: "Influence graph" })).toBeDefined();
 });
 
 test("a shared link reopens its law, and choosing it again adds no history entry", async () => {

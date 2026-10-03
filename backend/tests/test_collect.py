@@ -19,6 +19,7 @@ from test_cellar import (
     LISTING,
     OFFICIAL_JOURNAL,
     PROPOSAL,
+    PROPOSAL_ANNEXES,
     STREAM_BASE,
     XHTML,
     ScriptedFetcher,
@@ -90,6 +91,7 @@ def ai_act_script() -> Script:
         (CELEX_BASE + "32024R1689", RawResponse(200, XHTML, OFFICIAL_JOURNAL)),
         (CELEX_BASE + "52021PC0206", RawResponse(300, XHTML, LISTING)),
         (STREAM_BASE + "DOC_1", RawResponse(200, XHTML, PROPOSAL)),
+        (STREAM_BASE + "DOC_3", RawResponse(200, XHTML, PROPOSAL_ANNEXES)),
         (hys.feedback_url(14488, 0), as_json(feedback_page(FEEDBACK, last=True))),
         (hys.download_url(ATTACHMENT), RawResponse(200, "application/pdf", PDF)),
     ]
@@ -568,6 +570,42 @@ def test_each_way_an_act_can_fail_has_its_own_status(
 
     assert final.status == status
     assert (final.reason or "").startswith("32024R1689: ")
+
+
+def test_the_proposals_annexes_are_collected_as_annex_provisions(tmp_path: Path) -> None:
+    world = make_world(tmp_path)
+    result = world.collect()
+    receipts = {receipt.stage: receipt for receipt in result.manifest.stages}
+    articles = world.store().read_output(receipts["texts"], "articles.jsonl", ArticleVersion)
+    assert [a.provision for a in articles if a.stage == "proposal" and a.kind == "annex"] == [
+        "Annex I",
+        "Annex III",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("annex", "reason"),
+    [
+        (None, "52021PC0206: " + STREAM_BASE + "DOC_3: No response: unscripted"),
+        (
+            RawResponse(200, XHTML, b"<html><body><p>Cover page only</p></body></html>"),
+            "52021PC0206 annex stream 1: An annex stream with no 'ANNEX' heading line",
+        ),
+    ],
+)
+def test_a_lost_or_unsplit_annex_leaves_the_proposal_partial_and_says_which(
+    tmp_path: Path, annex: RawResponse | None, reason: str
+) -> None:
+    script = [item for item in ai_act_script() if item[0] != STREAM_BASE + "DOC_3"]
+    if annex is not None:
+        script.append((STREAM_BASE + "DOC_3", annex))
+    world = make_world(tmp_path, script)
+
+    proposal = row(world.collect().law, "proposal")
+
+    assert proposal.status == "partial"
+    assert (proposal.count or 0) > 0
+    assert (proposal.reason or "").startswith(reason)
 
 
 def test_several_final_acts_are_listed_and_none_is_fetched(tmp_path: Path) -> None:
