@@ -116,7 +116,6 @@ took 0.16 seconds per complete command on an Apple M5, including interpreter sta
 | `GET /api/v1/demo` | Snapshot counts and coverage caveat |
 | `GET /api/v1/amendments` | Stable, paginated summaries |
 | `GET /api/v1/amendments/{id}` | Old/new amendment text and up to 20 candidate sources |
-| `GET /api/v1/amendments/{id}/graph` | Organization, amendment and author nodes with typed edges |
 | `GET /api/v1/organizations` | Recorded proposal, verified-link and distinct amendment counts |
 | `POST /api/v1/score` | Deterministic changed-text similarity and source-offset evidence |
 | `POST /api/v1/compare` | Explicit edit or whole-passage comparison when originals may be unknown |
@@ -126,9 +125,8 @@ List parameters are `q` (committee, amendment number or author; at most 200 char
 `offset` (nonnegative), `limit` (1–100, default 20), and `verified_only` (default false).
 Multiple search words must all match. Detail sources sort verified first, then by stable
 candidate identifier; `total_sources` exposes truncation. They are historical candidates,
-not newly retrieved recommendations. Graph edges use only historically verified source
-links; author edges record authorship. Counts are observed coverage, not organization
-win rates or proof of causation.
+not newly retrieved recommendations. Counts are observed coverage, not organization win
+rates or proof of causation.
 
 Unknown entities return 404. Missing/unreadable files and invalid snapshots return 503
 with a structured `detail.code`; filesystem paths are not exposed. A candidate outside
@@ -256,9 +254,9 @@ uv run --directory backend --locked python tests/rehearse_demo.py /absolute/path
 ```
 
 The [recorded run](validation/rehearsal-2026-10-02.json) preserves input hashes, counts,
-timings and runtime details. On an Apple M5 (10 CPU cores), loading took 0.030 seconds,
-all 4,867 details and graphs took 0.866 seconds, and 60 repeated HTTP requests for one
-sample pair took 0.057 seconds. There were 1,933 computed scores, 24 non-English sources
+timings and runtime details. On an Apple M5 (10 CPU cores), loading took 0.029 seconds,
+all 4,867 details took 0.854 seconds, and 60 repeated HTTP requests for one sample pair
+took 0.072 seconds. There were 1,933 computed scores, 24 non-English sources
 with explicit unavailable scores, and no sources omitted by the detail limit. These are
 single-run smoke measurements, not an accuracy evaluation or the complete competition
 pipeline's timing. The five input files matched the pinned upstream snapshot byte for byte.

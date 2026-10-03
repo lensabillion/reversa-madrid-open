@@ -76,19 +76,17 @@ These come from the project owner and override any default habit.
 
 ## Commands
 
-`make check` verifies the default gates and changes no source files.
+`make check` is the one gate: it verifies everything and changes nothing.
 CI runs the same targets, so a local pass predicts a CI pass.
 Each area adds its targets to the root `Makefile` and to this table when it lands.
 
 | Command | What it does |
 | --- | --- |
-| `make check` | All default checks and audits; excludes fixes, dev servers and the optional model runtime check |
+| `make check` | Every gate below except the dev servers; changes nothing |
 | `make check-scripts` | Ruff format and lint check of `scripts/` |
 | `make check-docs` | Validates every research catalog against its schema |
 | `make check-backend` | Locked install, Ruff format and lint, basedpyright strict, tests with gate probes and 100% branch coverage |
-| `make audit-backend` | Audits production and isolated evaluation dependency locks against OSV (needs network) |
-| `make audit-evaluation-runtime` | Audits the isolated model runtime lock without installing model dependencies |
-| `make check-evaluation-runtime` | Optional frozen install, Ruff and strict basedpyright for the heavyweight model experiment; does not run inference |
+| `make audit-backend` | Looks up every package in `backend/uv.lock` in the OSV vulnerability database (needs network) |
 | `make check-frontend` | Clean `npm ci`, Biome, Next.js route types and `tsc`, Vitest with gate probes, production build |
 | `make audit-frontend` | `npm audit` of `frontend/package-lock.json`; moderate severity or higher fails (needs network) |
 | `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |
@@ -104,17 +102,21 @@ Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 1. **Find or create the bead.** `tbd ready` lists available work.
    Every piece of work, including discovered follow-ups, gets a bead.
 2. **Claim it.** `tbd sync --pull`, re-read the bead, `tbd start <id>`, `tbd sync`.
-3. **Load the guidelines** that match the change, in one call, before writing code:
+3. **Fit it into the architecture** before designing, with the
+   [influence-architecture skill](.agents/skills/influence-architecture/SKILL.md): name
+   the part of the seven-part design the work belongs to, and build on that part's
+   existing code. Code in `attic/` predates the architecture and is never a source.
+4. **Load the guidelines** that match the change, in one call, before writing code:
    always `general-eng-agent-principles`; then `python-rules python-modern-guidelines`
    for Python, `typescript-rules typescript-lint-format-rules` for TypeScript, and
    `ci-and-gates-rules supply-chain-hardening general-testing-rules` for tooling, gates,
    dependencies, or tests.
-4. **Branch per PR**, named `<type>/<short-topic>`, for example `feat/pair-scorer`.
-5. **Commit** with Conventional Commits (`tbd guidelines commit-conventions`): `feat`,
+5. **Branch per PR**, named `<type>/<short-topic>`, for example `feat/pair-scorer`.
+6. **Commit** with Conventional Commits (`tbd guidelines commit-conventions`): `feat`,
    `fix`, `test`, `refactor`, `chore`, `docs`, `plan`, `research`, `ops`, `process`.
-6. **Open the PR** with the template, then wait for every CI check to finish green.
+7. **Open the PR** with the template, then wait for every CI check to finish green.
    Absent CI is not passing CI.
-7. **Record the PR** on the bead (`tbd update <id> --notes`), close the bead when the PR
+8. **Record the PR** on the bead (`tbd update <id> --notes`), close the bead when the PR
    merges with the evidence in `--reason`, and `tbd sync`.
 
 When work naturally splits into layers that depend on each other, use a stack of PRs

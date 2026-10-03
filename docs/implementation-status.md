@@ -21,16 +21,16 @@ the demo and exposes reusable services; it does not replace the CSV deliverables
 | Capability | Evidence | Limit |
 | --- | --- | --- |
 | Public-data API and lexical baseline | Foundation PR [#10](https://github.com/lensabillion/reversa-madrid-open/pull/10) merged; 74 tests, 100% branch coverage | No trained or calibrated predictor |
-| LobbyPlag browsing and historical graph | All 4,867 amendment detail/graph records rehearsed; 1,957 unique candidate links, 172 verified | Historical verification is separate from computed similarity; unverified links are not negative labels |
+| LobbyPlag browsing | All 4,867 amendment detail records rehearsed; 1,957 unique candidate links, 172 verified | Historical verification is separate from computed similarity; unverified links are not negative labels |
 | PDF/text ingestion | 16-page organizers' PDF yields 10,569 characters; byte, page, text and expansion limits tested | No OCR, column reconstruction, automatic passage selection or hard parser process isolation |
 | Supplied-text comparison | Known originals select edit overlap; unknown originals select whole-passage overlap; explicit validation and Unicode evidence offsets | English lexical baseline, 12,000 characters and 800 tokens per supplied text; passage overlap can reward boilerplate |
 | Backend ingestion gate | `make check`: 106 backend tests, 100% coverage (475 statements, 104 branches); baseline frontend 19 tests; both audits clean | Tests establish behavior, not predictive accuracy |
 
 The frontend under `rev-oze0` and `rev-8mwe` implements a light analytical workspace,
-historical evidence/network views, pasted text and PDF/TXT/MD page review. Combined
+historical evidence views, pasted text and PDF/TXT/MD page review. Combined
 `make check` passes 106 backend and 38 frontend tests, the production build and audits.
 Browser verification covers actual PDF upload/page selection/comparison, historical
-evidence and a 390-pixel network layout; details are in the
+evidence and a 390-pixel layout; details are in the
 [frontend README](../frontend/README.md). Backend extraction belongs to `rev-i2v8`
 ([PR #11](https://github.com/lensabillion/reversa-madrid-open/pull/11), all nine CI checks
 passed). Do not infer merge status from files present in a worktree.
@@ -68,8 +68,8 @@ Open decisions are not settled until the project owner agrees.
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
 | `next` 16.3.6 inside the 14-day cool-off | Approved 2026-10-02; clears 2026-10-06 | [SUPPLY-CHAIN-SECURITY.md](../SUPPLY-CHAIN-SECURITY.md); follow-up `rev-h455` |
 | Project state lives in the repository, not in sessions | Decided 2026-10-02 | AGENTS.md, "Where the Project's State Lives" |
+| D3: the earlier prototype in `attic/` | Decided 2026-10-02: not built on; each part is built fresh from the architecture | It was written before the architecture was decided; the [influence-architecture skill](../.agents/skills/influence-architecture/SKILL.md) applies this |
 | D1: language-model judge (none, Jev, Claude or a local model) | **Open** | Explainer §12–13; no API keys on the machine |
-| D3: the earlier prototype in `attic/` | **Open**; not an implementation source | Explainer §10 and §13 |
 | D4: team split | **Open** | Explainer §13 |
 | D5: organizer questions: input format, recall threshold, use of the final law's text, advance preparation | **Open**; ask before the event | Bead `rev-qvmx` |
 
@@ -81,8 +81,9 @@ reranker does so in 8/10. The remaining deadline and obligation failures, and hi
 scores on contradictory submissions, prevent promotion to production. These are
 diagnostics, not held-out influence accuracy. See the [complete experiment and raw
 results](../backend/evaluation/README.md). The production API still uses the lexical
-baseline. The experiment is on `feat/pair-evaluation`; its heavyweight runtime is
-isolated and its dependency lock is audited by the normal gate.
+baseline. The experiment's heavyweight runtime was removed from the tree on 3 October
+because nothing in the pipeline uses it; the evaluation README links to its code in git
+history.
 
 Practice data needs independently justified negatives, including same-article proposals
 that ask for different changes. Unverified links remain unknown. Keep organizations,
