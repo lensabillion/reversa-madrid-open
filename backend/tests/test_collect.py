@@ -5,6 +5,7 @@ Have Your Say JSON, CELLAR XHTML) using the connector tests' own builders, and a
 a scripted fetcher: no test reaches the network.
 """
 
+import logging
 import urllib.parse
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -350,7 +351,15 @@ def test_skipping_attachments_is_a_labelled_partial_layer(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize(
-    "query", ["Artificial Intelligence Act", "32024R1689", "COM(2021) 206", "2021/106 (cod)"]
+    "query",
+    [
+        "Artificial Intelligence Act",
+        "AI Act",
+        "aia",
+        "32024R1689",
+        "COM(2021) 206",
+        "2021/106 (cod)",
+    ],
 )
 def test_a_title_celex_or_com_number_resolves_from_the_catalog(tmp_path: Path, query: str) -> None:
     world = make_world(tmp_path)
@@ -668,10 +677,12 @@ def test_the_command_prints_the_coverage_table_and_the_manifest(
     world = make_world(tmp_path)
     scripted_cli(monkeypatch, world)
 
+    logging.getLogger("pypdf").setLevel(logging.NOTSET)
     status = cli.main(["collect", "2021/0106(COD)", "--data-root", str(tmp_path)])
 
     output = capsys.readouterr().out
     assert status == 0
+    assert logging.getLogger("pypdf").level == logging.ERROR
     assert output.startswith("Collected 2021/0106(COD) Artificial Intelligence Act in ")
     rows = {line.split()[0]: line.split(maxsplit=2)[1:] for line in output.splitlines()[1:12]}
     assert rows["committee_amendments"] == ["complete", "1"]

@@ -18,7 +18,7 @@ published last, after every output re-verifies.
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -69,6 +69,19 @@ PARLIAMENT_POSITION_GAP = (
     "text, and the EP API adopted-texts connector is not built"
 )
 NOT_BUILT_GAP = "No connector for this layer is built yet"
+# Common names the title search cannot reach, because the name shares no word with the
+# official title ("AI Act" against "Artificial Intelligence Act"). An alias is used only
+# when its procedure is in the catalog; a law missing from this table still resolves by
+# title, procedure number, CELEX or COM reference.
+ALIASES: Mapping[str, str] = {
+    "ai act": "2021/0106(COD)",
+    "aia": "2021/0106(COD)",
+    "dsa": "2020/0361(COD)",
+    "dma": "2020/0374(COD)",
+    "csddd": "2022/0051(COD)",
+    "cs3d": "2022/0051(COD)",
+    "ehds": "2022/0140(COD)",
+}
 _COM = re.compile(r"COM\((\d{4})\)(\d+)")
 _MEP_PREFIX = "actor:mep:"
 _HASH_CHUNK_BYTES = 1 << 20
@@ -209,7 +222,9 @@ def resolve_law(
     if query.kind == "procedure":
         return ResolvedLaw(query.value, by_id.get(query.value))
     if query.kind == "title":
-        resolution = resolve_title(query.value, ((e.procedure_id, e.title) for e in catalog))
+        resolution = resolve_title(
+            query.value, ((e.procedure_id, e.title) for e in catalog), ALIASES
+        )
         if resolution.chosen is not None:
             return ResolvedLaw(
                 resolution.chosen.procedure_id, by_id[resolution.chosen.procedure_id]

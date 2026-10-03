@@ -8,6 +8,7 @@ was written, 1 on any input, source or output failure, 2 on a command-line usage
 """
 
 import argparse
+import logging
 import platform
 import sys
 from collections import Counter
@@ -106,6 +107,9 @@ def _build_view(result: CollectResult) -> int:
 def _collect(
     query: str, data_root: Path | None, *, refresh: bool, attachments: bool, view: bool = False
 ) -> int:
+    # pypdf warns about every unusual font in every attachment, hundreds of lines per law;
+    # none of it changes the extracted text, and it buries the result on the console.
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
     root = data_root if data_root is not None else default_data_root()
     settings = CollectSettings(
         data_root=root,
