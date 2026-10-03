@@ -5,7 +5,7 @@ title: "Challenge 03 Influence Atlas: design, build and demo our entry"
 kind: epic
 status: open
 priority: 1
-version: 38
+version: 50
 labels: []
 dependencies: []
 child_order_hints:
@@ -45,7 +45,19 @@ child_order_hints:
   - is-01m3zaf8nvtv026dc5mwqwg25w
   - is-01m3zaf8w0p6pzgwx6b4ztxxt5
   - is-01m40f68mtpm4dn13e8bz08agg
+  - is-01m40fgf4q7gr2b7rkmp5tx3ne
+  - is-01m40fgfbf2anx19zzzv3y9bqy
+  - is-01m40fgfhe8qaj6srfqh1r6ada
+  - is-01m40fgfqa8b905kamgqhmmsjd
+  - is-01m40fgfxhtzscc80t35zx2kg6
+  - is-01m40fgg3kvg514bax9q3zyhwy
+  - is-01m40fgg9kpb0xpqjmkwqp8pm9
+  - is-01m40fggfj56f94fph17m88zna
+  - is-01m40fggnpz42jjw1r8667w8z3
+  - is-01m40fggvqj3z3af5mm5y9bvcz
+  - is-01m40fgh1nsehehafndm6xy85d
+  - is-01m40fgh7rr8spaqfeat0v6qzm
 created_at: 2026-10-02T14:37:25.189Z
-updated_at: 2026-10-03T08:48:17.011Z
+updated_at: 2026-10-03T08:53:53.016Z
 ---
 Reversa Madrid Open, Sat 3 Oct 2026. The brief changed at kickoff on 3 October: 'The Influence Atlas' replaces the hidden-test brief (60 pairs, 20 proposals, CSVs). Deliver a graph the jury can explore live (actor -> ask -> amendment -> final article, every edge with its evidence), a short public report answering five questions (who, what, towards what, how, next) and an open-source repo anyone can rerun. Scored live at 19:30: real links 25 (3 random edges read side by side), any law 20 (a law named on the spot, no code changes, minutes), insight 25, report 15, ambition 15 (coverage since 2019 and forecast). Earlier children record the work done under the first brief.
