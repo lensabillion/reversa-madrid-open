@@ -371,3 +371,78 @@ export function drawLinks(
   }
   return items.slice(0, taken);
 }
+
+/** One step of the summary funnel: `part` of `whole`, or a lone count when `whole` is null. */
+export interface FunnelStep {
+  id: "proposal" | "final" | "traced" | "amendments" | "documents";
+  part: number | null;
+  /** `null` when the step has no total to compare with (the two texts' provision counts). */
+  whole: number | null;
+  /** Extra counts the step's sentence quotes, `null` when not counted. */
+  detail: number | null;
+  /**
+   * For the documents step: documents with a word-for-word origin, and documents whose only
+   * origins are reworded (Jev-judged), so the two add up to the documents with an origin.
+   */
+  split: { lexical: number; semantic: number } | null;
+}
+
+function provisions(view: LineageView, layer: "proposal" | "final_act"): number | null {
+  const row = view.coverage.find((item) => item.layer === layer);
+  return row === undefined || row.status !== "complete" ? null : row.count;
+}
+
+/**
+ * The law's lineage as five steps a newcomer reads top to bottom: the proposal's provisions,
+ * the final act's provisions and its new words, the new words traced to amendments (in how
+ * many adopted phrases), the amendments that carry them, and the consultation documents that
+ * said that wording first (from how many named organisations). Only counts already in the
+ * view; nothing is estimated.
+ */
+export function lineageFunnel(
+  view: LineageView,
+  ranking: OrganisationRanking,
+): readonly FunnelStep[] {
+  const { counts } = view;
+  const kinds = new Map<string, Set<OriginMatchRecord["kind"]>>();
+  for (const origin of view.origins) {
+    if (countsAsOrigin(origin)) {
+      const seen = kinds.get(origin.document_id) ?? new Set();
+      seen.add(origin.kind);
+      kinds.set(origin.document_id, seen);
+    }
+  }
+  const lexical = [...kinds.values()].filter((seen) => seen.has("verbatim")).length;
+  return [
+    { id: "proposal", part: provisions(view, "proposal"), whole: null, detail: null, split: null },
+    {
+      id: "final",
+      part: provisions(view, "final_act"),
+      whole: null,
+      detail: counts.changed_units,
+      split: null,
+    },
+    {
+      id: "traced",
+      part: counts.linked_units,
+      whole: counts.changed_units,
+      detail: counts.adopted_phrases,
+      split: null,
+    },
+    {
+      id: "amendments",
+      part: counts.amendments_adopting,
+      whole: counts.amendments,
+      detail: null,
+      split: null,
+    },
+    {
+      id: "documents",
+      part: counts.documents_with_origin,
+      whole: counts.documents_read,
+      detail: ranking.rows.filter((row) => row.adoptedFirst > 0).length,
+      split:
+        counts.documents_with_origin === null ? null : { lexical, semantic: kinds.size - lexical },
+    },
+  ];
+}

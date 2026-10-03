@@ -167,7 +167,7 @@ def built_from(path: Path) -> str | None:
     return run_id if isinstance(run_id, str) else None
 
 
-class _Steps:
+class StepRunner:
     """Each step as its own command runs it, minus the printing; one instance per batch."""
 
     def __init__(self, data_root: Path, index: Path, clock: Callable[[], datetime]) -> None:
@@ -236,7 +236,7 @@ class _Context:
     fetcher: CachedFetcher
     clock: Callable[[], datetime]
     timer: Callable[[], float]
-    steps: _Steps
+    steps: StepRunner
 
 
 def _run_law(planned: PlannedLaw, context: _Context) -> BatchLaw:
@@ -373,7 +373,7 @@ def run_batch(
     path = root / "laws" / BATCH_FILE
     hardware = settings.collect.hardware or platform.platform()
     context = _Context(
-        inputs, settings, fetcher, clock, timer, _Steps(root, inputs.hys_index, clock)
+        inputs, settings, fetcher, clock, timer, StepRunner(root, inputs.hys_index, clock)
     )
     started_at = clock()
     laws: list[BatchLaw] = []

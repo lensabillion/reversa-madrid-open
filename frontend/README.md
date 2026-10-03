@@ -126,11 +126,19 @@ credit) and shown as "N of M amendments adopted" with the rate, in the backend's
 count the view could not compute reads "unknown", and a view with `status: "unknown"`
 shows its reason. Limitations and coverage gaps sit in a disclosure.
 
-The law opens on a **Summary** tab (four key numbers and the five questions, one line each
-with "Explore →"); the detail lives in tabs the reader opens on demand: Who, How, Graph,
+The law opens on a **Summary** tab (a funnel from proposal to law, then the five questions,
+one line each with "Explore →"); the detail lives in tabs the reader opens on demand: Who, How, Graph,
 Evidence and Check 3 links. Everything comes from the same view only
 (`lib/lineage-insights.ts`, `lib/lineage-graph.ts`, linear in the view's records):
 
+- **From proposal to law** (`lineageFunnel`, `LineageFunnel`): the proposal's and the final
+  act's provisions (from coverage), the final act's words that are not in the proposal, then
+  three steps, each with its share as a 100-cell waffle beside the exact "N of M": new words
+  traced word for word to an amendment (and in how many phrases), amendments that got wording
+  in, and consultation documents that said that wording first, split into documents with a
+  word-for-word origin (teal) and documents found only by a reworded Jev match (violet). The
+  narrowing card width is the funnel's shape only. A count not computed reads "unknown" and
+  draws no waffle.
 - **The five questions**: WHO and HOW are answered from the view; WHAT and TOWARDS are
   marked "partly" (one law; direction labels come from `make directions`); NEXT is marked
   "not in this view", because no forecast is computed. Nothing is filled in to look complete.
@@ -140,10 +148,9 @@ Evidence and Check 3 links. Everything comes from the same view only
   counts once per organisation; citations and unnamed submitters are counted apart, never
   named. Searchable, 15 rows until "Show all".
 - **How it got there** (`lineageChannels`): adopting amendments by stage, committee and year
-  (each amendment once), the share tabled across political groups, the share of dated
-  matches where the submission came first, and reworded (Jev, `kind: "semantic"`) matches
-  apart from word-for-word ones. Only matches dated before the amendment count: wording
-  said after it, or undated, cannot have shaped it, and is counted apart.
+  (each amendment once), the share tabled across political groups, and reworded (Jev, `kind: "semantic"`) matches
+  apart from word-for-word ones. Only matches dated before the amendment count, and the view
+  keeps only those, so no tile repeats that constant 100%.
 - **Graph** (`buildLineageGraph`, `sliceGraph`, `components/lineage-graph.tsx`): organisation
   → who tabled the amendment (political groups, or Members) → final-act provision, drawn
   from adopted wording an organisation said first. The overview shows the 12 largest nodes

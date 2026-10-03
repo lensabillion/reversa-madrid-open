@@ -151,7 +151,7 @@ export function atlasViewUrl(slug: string): string {
 }
 
 /** FastAPI sends `detail` as a string, or as a list of validation issues for a 422. */
-async function errorDetail(response: Response): Promise<string> {
+export async function errorDetail(response: Response): Promise<string> {
   if (response.headers.get("Content-Type")?.includes("application/json")) {
     const body: unknown = await response.json();
     if (typeof body === "object" && body !== null && "detail" in body) {
