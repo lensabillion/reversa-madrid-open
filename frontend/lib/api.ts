@@ -68,17 +68,6 @@ export interface DatasetOverview {
   source_url: string;
   coverage_note: string;
 }
-export interface GraphNode {
-  id: string;
-  kind: "amendment" | "organization" | "author";
-  label: string;
-}
-export interface InfluenceGraph {
-  amendment_id: string;
-  nodes: GraphNode[];
-  edges: { source: string; target: string; kind: "historically_verified" | "authored" }[];
-  coverage_note: string;
-}
 
 /** Missing originals are explicit; the server selects passage or edit comparison. */
 export interface ComparisonResult {

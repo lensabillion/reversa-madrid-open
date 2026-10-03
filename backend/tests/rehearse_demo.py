@@ -42,15 +42,11 @@ def rehearse(directory: Path) -> dict[str, object]:
     if page.total != overview.amendments:
         raise RuntimeError("Amendment page total differs from dataset overview")
     organizations = service.organizations()
-    scored = unscorable = omitted = details = graphs = 0
+    scored = unscorable = omitted = details = 0
     sample: ScoreRequest | None = None
     for amendment_id in service.repository.amendments:
         detail = service.amendment(amendment_id)
-        graph = service.graph(amendment_id)
         details += 1
-        graphs += 1
-        if graph.amendment_id != amendment_id:
-            raise RuntimeError(f"Graph mismatch for amendment {amendment_id}")
         omitted += detail.total_sources - len(detail.sources)
         for source in detail.sources:
             if source.score is None:
@@ -91,7 +87,6 @@ def rehearse(directory: Path) -> dict[str, object]:
             "proposals": overview.proposals,
             "candidate_links": overview.candidate_links,
             "details_browsed": details,
-            "graphs_browsed": graphs,
             "organizations_browsed": len(organizations.items),
             "sources_scored": scored,
             "sources_unscorable": unscorable,

@@ -10,9 +10,6 @@ from influence.schemas.demo import (
     AmendmentPage,
     AmendmentSummary,
     DatasetOverview,
-    GraphEdge,
-    GraphNode,
-    InfluenceGraph,
     OrganizationPage,
     OrganizationSummary,
     SourceMatch,
@@ -150,40 +147,6 @@ class DemoService:
             text=_text(text),
             sources=tuple(sources),
             total_sources=len(candidates),
-            coverage_note=COVERAGE_NOTE,
-        )
-
-    def graph(self, amendment_id: str) -> InfluenceGraph:
-        """Return a local graph in O(C + N log N), at most the snapshot's 1,976 candidates."""
-        amendment = self.repository.amendment(amendment_id)
-        center = f"amendment:{amendment.uid}"
-        nodes = {
-            center: GraphNode(
-                id=center,
-                kind="amendment",
-                label=f"{amendment.committee.upper()} {amendment.number}",
-            )
-        }
-        edges: dict[tuple[str, str], GraphEdge] = {}
-        for author in amendment.authors:
-            node_id = f"author:{author}"
-            nodes[node_id] = GraphNode(id=node_id, kind="author", label=author)
-            edges[node_id, center] = GraphEdge(source=node_id, target=center, kind="authored")
-        for candidate in self._candidates.get(amendment_id, ()):
-            if candidate.verified:
-                proposal = self.repository.proposals[candidate.proposal]
-                organization = self.repository.organization_for(proposal)
-                node_id = f"organization:{organization.id}"
-                nodes[node_id] = GraphNode(
-                    id=node_id, kind="organization", label=organization.title
-                )
-                edges[node_id, center] = GraphEdge(
-                    source=node_id, target=center, kind="historically_verified"
-                )
-        return InfluenceGraph(
-            amendment_id=amendment_id,
-            nodes=tuple(nodes[key] for key in sorted(nodes)),
-            edges=tuple(edges[key] for key in sorted(edges)),
             coverage_note=COVERAGE_NOTE,
         )
 
