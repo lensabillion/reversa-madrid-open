@@ -38,6 +38,8 @@ make atlas LAW='AI Act'           # collect one law, then asks, links, outcomes,
 make coordinated LAW='AI Act'     # near-identical amendments tabled across political groups
 make channels LAW='AI Act'        # how the law was lobbied: consultation, timing, MEPs, coalitions
 make directions LAW='AI Act'      # which way each amendment moves the law
+make demo-prepare                 # all of the above, plus lineage, forecast and the report,
+                                  # for the flagship laws (FLAGSHIP='AI Act,DSA' to change)
 ```
 
 `LAW` takes a procedure number (`2021/0106(COD)`), a CELEX or COM reference, a common
@@ -46,6 +48,20 @@ name (`'AI Act'`, `'DSA'`) or a title. Every output is written under
 `coordinated.json`, `channels.json` and `directions.json`, beside the collected texts,
 amendments, submissions and a run manifest. `data/` is never committed; everything in it
 comes from public sources and is rebuilt by these commands. `make check` runs every gate.
+
+## Demo Checklist
+
+1. `git pull`, then `make setup` (once per machine; about 35 minutes uncached).
+2. `make demo-prepare`: warms the flagship laws (AI Act, DSA, DMA, Data Act, CSDDD, EHDS,
+   Cyber Resilience Act) so every view and `data/laws/report.md` exist and a law named
+   live reads from cache.
+3. `make dev-backend` and `make dev-frontend` in two terminals, then open
+   http://localhost:3000 (it lands on `/lineage`).
+4. The jury's three random links, side by side:
+   `make report LAW='AI Act' ARGS='--links 3 --seed 7'`.
+5. If a view says a layer is "not collected", that step has not run for that law yet; it
+   is not a finding of zero influence. Say so, and run the step live, for example
+   `make lineage LAW='<law>'`, or `make demo-prepare FLAGSHIP='<law>'` for all of them.
 
 ## Licence
 
