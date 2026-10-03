@@ -114,7 +114,7 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
     "Organisations whose wording reached the law first: Acme Unknown Lobby (1).",
   );
   expect(questions.closest("section")?.textContent).toContain("No forecast is computed.");
-  expect(screen.getByText("Political groups (verbatim)")).toBeDefined();
+  expect(screen.getByText("Political groups · lexical")).toBeDefined();
   expect(within(card).getByText(/joint: credited to several holders/)).toBeDefined();
   expect(within(card).getByText(/18 of 18 words in the final act/)).toBeDefined();
   const auken = screen.getByRole("row", { name: /Margrete AUKEN/ });

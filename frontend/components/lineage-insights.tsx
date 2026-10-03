@@ -11,6 +11,7 @@ import {
   type OrganisationRow,
 } from "../lib/lineage-insights";
 import { retryStyle } from "./atlas-law-browser";
+import { KindBadge, KindLegend, KindSplitBar } from "./lineage-kind";
 
 const count = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
@@ -25,7 +26,7 @@ function share(part: number, whole: number): string {
 }
 
 /**
- * A single-series magnitude bar: one hue, anchored at zero, with the value as text beside it
+ * A single-series magnitude bar in neutral gray (teal and violet mean the analysis method), anchored at zero, with the value as text beside it
  * so the number never depends on reading the bar. `title` gives the exact count on hover.
  */
 export function Bar({ value, max, label }: { value: number; max: number; label: string }) {
@@ -34,7 +35,7 @@ export function Bar({ value, max, label }: { value: number; max: number; label: 
     <span className="flex items-center gap-2" title={`${label}: ${count.format(value)}`}>
       <span aria-hidden="true" className="h-2 w-24 shrink-0 rounded-sm bg-stone-100">
         <span
-          className="block h-2 rounded-r-[4px] bg-teal-700"
+          className="block h-2 rounded-r-[4px] bg-stone-500"
           style={{ width: value === 0 ? 0 : `${width}%` }}
         />
       </span>
@@ -189,6 +190,7 @@ export function FiveQuestions({ questions }: { questions: readonly Question[] })
 
 function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
   const max = rows.reduce((top, row) => Math.max(top, row.adoptedFirst), 0);
+  const semantic = rows.some((row) => row.adoptedFirstSemantic > 0 || row.reworded > 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-left text-sm">
@@ -206,9 +208,11 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
             <th scope="col" className="py-1 text-right font-normal">
               Tabled, not adopted
             </th>
-            <th scope="col" className="py-1 text-right font-normal">
-              Reworded only
-            </th>
+            {semantic && (
+              <th scope="col" className="py-1 text-right font-normal">
+                <KindBadge kind="semantic" note="only" />
+              </th>
+            )}
             <th scope="col" className="py-1 text-right font-normal">
               First said
             </th>
@@ -219,11 +223,15 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
             <tr key={row.key} className="border-t border-stone-100">
               <td className="py-1.5 pr-3 text-stone-900">{row.name}</td>
               <td className="py-1.5 pr-3">
-                <Bar value={row.adoptedFirst} max={max} label="Adopted phrases said first" />
+                <KindSplitBar
+                  lexical={row.adoptedFirstLexical}
+                  semantic={row.adoptedFirstSemantic}
+                  max={max}
+                />
               </td>
               <td className="py-1.5 text-right">{count.format(row.adoptedOther)}</td>
               <td className="py-1.5 text-right">{count.format(row.tabledOnly)}</td>
-              <td className="py-1.5 text-right">{count.format(row.reworded)}</td>
+              {semantic && <td className="py-1.5 text-right">{count.format(row.reworded)}</td>}
               <td className="py-1.5 text-right text-stone-500">
                 {row.firstSaid === null ? "undated" : row.firstSaid.slice(0, 10)}
               </td>
@@ -258,6 +266,7 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
             them. Each phrase counts once per organisation, whatever the number of its documents.
             Shared wording is evidence of influence, not proof of authorship.
           </p>
+          <KindLegend />
         </div>
         <label className="flex flex-col gap-1 text-xs text-stone-600">
           Find an organisation
@@ -385,11 +394,16 @@ export function Channels({ channels }: { channels: LineageChannels }) {
           value={share(channels.crossGroup, channels.withGroup)}
           note={`${count.format(channels.crossGroup)} of ${count.format(channels.withGroup)} adopting amendments with a known group were tabled by Members of two or more groups`}
         />
-        <Tile
-          label="Reworded matches (Jev)"
-          value={count.format(channels.rewordedMatches)}
-          note={`beside ${count.format(channels.verbatimMatches)} word-for-word matches; reworded links are unconfirmed`}
-        />
+        <div className="rounded-sm border border-stone-200 bg-white px-4 py-3">
+          <dt className="text-xs text-stone-500">Matches by method</dt>
+          <dd className="mt-2 flex flex-wrap items-center gap-2 text-sm tabular-nums text-stone-900">
+            <KindBadge kind="verbatim" note={count.format(channels.verbatimMatches)} />
+            <KindBadge kind="semantic" note={count.format(channels.rewordedMatches)} />
+          </dd>
+          <dd className="mt-1 text-xs leading-5 text-stone-500">
+            submission matches found word for word, and reworded ones Jev judged (unconfirmed)
+          </dd>
+        </div>
         <Tile
           label="Citations set aside"
           value={count.format(timing.citation)}

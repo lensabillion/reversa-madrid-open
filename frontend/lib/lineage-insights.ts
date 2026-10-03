@@ -16,6 +16,9 @@ export interface OrganisationRow {
   name: string;
   /** Adopted phrases this organisation said before every amendment carrying them. */
   adoptedFirst: number;
+  /** Of `adoptedFirst`: found word for word (lexical), and found only reworded (semantic). */
+  adoptedFirstLexical: number;
+  adoptedFirstSemantic: number;
   /** Adopted phrases it said too, but after an amendment or with a date order unknown. */
   adoptedOther: number;
   /** Phrases it said that amendments inserted but the final act does not hold. */
@@ -38,6 +41,7 @@ export interface OrganisationRanking {
 interface OrganisationTally {
   name: string;
   adoptedFirst: Set<string>;
+  adoptedFirstLexical: Set<string>;
   adoptedAll: Set<string>;
   tabled: Set<string>;
   verbatim: Set<string>;
@@ -80,6 +84,7 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
     const tally = tallies.get(key) ?? {
       name: origin.organisation,
       adoptedFirst: new Set<string>(),
+      adoptedFirstLexical: new Set<string>(),
       adoptedAll: new Set<string>(),
       tabled: new Set<string>(),
       verbatim: new Set<string>(),
@@ -97,6 +102,9 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
       tally.adoptedAll.add(origin.phrase_id);
       if (countsAsOrigin(origin)) {
         tally.adoptedFirst.add(origin.phrase_id);
+        if (origin.kind === "verbatim") {
+          tally.adoptedFirstLexical.add(origin.phrase_id);
+        }
       }
     }
   }
@@ -105,6 +113,8 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
       key,
       name: tally.name,
       adoptedFirst: tally.adoptedFirst.size,
+      adoptedFirstLexical: tally.adoptedFirstLexical.size,
+      adoptedFirstSemantic: tally.adoptedFirst.size - tally.adoptedFirstLexical.size,
       adoptedOther: tally.adoptedAll.size - tally.adoptedFirst.size,
       tabledOnly: tally.tabled.size,
       reworded: [...tally.semantic].filter((id) => !tally.verbatim.has(id)).length,
@@ -212,8 +222,11 @@ export interface PhraseFilter {
   query: string;
   group: string;
   committee: string;
-  /** "first": a submission said it before the amendments; "reworded": a Jev-judged match. */
-  evidence: "" | "first" | "any-origin" | "reworded";
+  /**
+   * "first": a submission said it before the amendments; "lexical": a word-for-word match;
+   * "reworded": a semantic match judged by Jev.
+   */
+  evidence: "" | "first" | "any-origin" | "lexical" | "reworded";
 }
 
 export const anyPhrase: PhraseFilter = { query: "", group: "", committee: "", evidence: "" };
@@ -261,6 +274,9 @@ export function filterPhrases(
       return false;
     }
     if (filter.evidence === "any-origin" && phrase.origins.length === 0) {
+      return false;
+    }
+    if (filter.evidence === "lexical" && !phrase.origins.some((o) => o.kind === "verbatim")) {
       return false;
     }
     if (filter.evidence === "reworded" && !phrase.origins.some((o) => o.kind === "semantic")) {

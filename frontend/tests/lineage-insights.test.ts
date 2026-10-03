@@ -33,6 +33,8 @@ test("an organisation's phrase counts once however many of its documents say it"
       key: origin.actor_id,
       name: "Acme Unknown Lobby",
       adoptedFirst: 1,
+      adoptedFirstLexical: 1,
+      adoptedFirstSemantic: 0,
       adoptedOther: 0,
       tabledOnly: 0,
       reworded: 0,
@@ -72,7 +74,10 @@ test("organisations rank by wording said first, and citations and unnamed stay a
 
 test("a phrase found only reworded is counted as reworded; one also found verbatim is not", () => {
   const semantic: OriginMatchRecord = { ...origin, kind: "semantic", similarity: 0.8 };
-  expect(rankOrganisations(withOrigins([semantic])).rows[0]?.reworded).toBe(1);
+  const alone = rankOrganisations(withOrigins([semantic])).rows[0];
+  expect([alone?.reworded, alone?.adoptedFirstLexical, alone?.adoptedFirstSemantic]).toEqual([
+    1, 0, 1,
+  ]);
   expect(rankOrganisations(withOrigins([semantic, origin])).rows[0]?.reworded).toBe(0);
 });
 
@@ -142,6 +147,7 @@ test("search matches every word across quotes, Members and organisations, ignori
   expect(filterPhrases(adopted, { ...anyPhrase, committee: "ITRE" })).toHaveLength(0);
   expect(filterPhrases(adopted, { ...anyPhrase, evidence: "first" })).toHaveLength(1);
   expect(filterPhrases(adopted, { ...anyPhrase, evidence: "reworded" })).toHaveLength(0);
+  expect(filterPhrases(adopted, { ...anyPhrase, evidence: "lexical" })).toHaveLength(1);
   expect(phraseFacets(adopted)).toEqual({ groups: ["S&D"], committees: ["ENVI"] });
 });
 

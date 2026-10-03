@@ -15,6 +15,7 @@ import {
 } from "../lib/lineage";
 import {
   type LineageLawSummary,
+  type LineageMatchKind,
   type LineageView,
   lineageLawsUrl,
   lineageViewUrl,
@@ -35,6 +36,7 @@ import {
 import { useResource } from "../lib/use-resource";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
 import { Channels, FiveQuestions, LinkCheck, questionsFor, WhoShaped } from "./lineage-insights";
+import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
 /** Phrases shown before "Show more"; the AI Act has hundreds, and each card is tall. */
@@ -80,9 +82,20 @@ function day(value: string | null): string {
   return value === null ? "date unknown" : value.slice(0, 10);
 }
 
-function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
+/** The quote's left rule takes its method's color: teal lexical, violet semantic. */
+function Quote({
+  span,
+  label,
+  kind,
+}: {
+  span: AtlasSourceSpan;
+  label: string;
+  kind: LineageMatchKind;
+}) {
   return (
-    <blockquote className="border-l-2 border-teal-700 bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900">
+    <blockquote
+      className={`border-l-4 ${kindStyle[kind].border} bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900`}
+    >
       <span className="sr-only">{label}: </span>
       {span.text}
     </blockquote>
@@ -92,8 +105,8 @@ function Quote({ span, label }: { span: AtlasSourceSpan; label: string }) {
 function Timing({ origin }: { origin: LineageOriginRow }) {
   if (origin.countsAsOrigin) {
     return (
-      <span className="rounded-sm bg-[#e8efea] px-2 py-0.5 font-medium text-teal-900">
-        Said before the amendments
+      <span className="rounded-sm border border-stone-400 bg-white px-2 py-0.5 font-medium text-stone-900">
+        <span aria-hidden="true">✓ </span>Said before the amendments
       </span>
     );
   }
@@ -127,14 +140,6 @@ function Arrow() {
   );
 }
 
-function OriginKind({ origin }: { origin: LineageOriginRow }) {
-  return origin.kind === "semantic" ? (
-    <span className="rounded-sm bg-violet-50 px-2 py-0.5 text-violet-900">
-      Reworded · judged by Jev, unconfirmed
-    </span>
-  ) : null;
-}
-
 /**
  * One link in the brief's order, left to right: what the submission asked, the amendment
  * that carried it, and the wording of the final act (or, for tabled wording, its absence).
@@ -160,9 +165,9 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
                     {day(origin.publishedAt)} · {origin.documentId}
                   </span>
                   <Timing origin={origin} />
-                  <OriginKind origin={origin} />
+                  <KindBadge kind={origin.kind} />
                 </p>
-                <Quote span={origin.quote} label="Submission wording" />
+                <Quote span={origin.quote} label="Submission wording" kind={origin.kind} />
               </li>
             ))}
           </ul>
@@ -212,13 +217,15 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
                 key={`${span.record_id}:${span.start}`}
                 span={span}
                 label="Final act wording"
+                kind={phrase.kind}
               />
             ))
           ) : (
             <p className="font-serif text-[15px] leading-6 text-stone-900">{phrase.text}</p>
           )}
-          <p className="text-xs text-stone-500">
-            {plural(phrase.words, "word", "words")} · {phrase.kind}
+          <p className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+            <KindBadge kind={phrase.kind} note="adoption" />
+            {plural(phrase.words, "word", "words")}
             {phrase.joint ? " · joint: credited to several holders" : ""}
           </p>
         </section>
@@ -233,7 +240,8 @@ const evidenceChoices: readonly { value: PhraseFilter["evidence"]; label: string
   { value: "", label: "Any evidence" },
   { value: "first", label: "A submission said it first" },
   { value: "any-origin", label: "Any submission says it" },
-  { value: "reworded", label: "Reworded match (Jev)" },
+  { value: "lexical", label: "Lexical match (same words)" },
+  { value: "reworded", label: "Semantic match (Jev)" },
 ];
 
 const fieldStyle =
@@ -291,6 +299,7 @@ function Phrases({ lineage }: { lineage: PreparedLineage }) {
           ? "Each phrase stands in the final act, was not in the Commission's proposal, and was inserted by the amendments listed. Submissions that contain the same words, or that Jev judged to ask for it in other words, are shown with their dates."
           : "Wording that amendments inserted and a submission also says, but that did not reach the final act."}
       </p>
+      <KindLegend />
       <search className="flex flex-wrap items-end gap-3 rounded-sm border border-stone-200 bg-white p-3">
         <label className="flex min-w-64 flex-1 flex-col gap-1 text-xs text-stone-600">
           Search words, organisations, Members or amendments
@@ -454,9 +463,12 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
       ) : (
         tables.map((table) => (
           <div key={table.basis} className="grid gap-6 lg:grid-cols-2">
-            <CreditList title={`Political groups (${table.basis})`} rows={table.groups} />
             <CreditList
-              title={`Members and committee text (${table.basis})`}
+              title={`Political groups · ${kindStyle[table.basis].label.toLowerCase()}`}
+              rows={table.groups}
+            />
+            <CreditList
+              title={`Members and committee text · ${kindStyle[table.basis].label.toLowerCase()}`}
               rows={table.holders}
             />
           </div>
