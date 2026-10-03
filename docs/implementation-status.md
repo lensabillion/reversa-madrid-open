@@ -186,9 +186,15 @@ Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with at
   explorer renders it unchanged (6 verbatim links on the AI Act, checked in a browser).
 - `services/jev.py` and its offline tests come from `feat/jev-gate-three` (PR #63) unchanged.
 
-- **After merging main** (8-word runs holding the law's rare words, `5ff514c`): on the AI Act
-  512 amendments adopt wording, `lineage_view.py` writes 110 verbatim links (109 published),
-  and the Jev dry run has 2,550 pairs, 2,430 distinct requests, 11.95 MB, about 0.13 USD.
+- **On main after `7459f15`** (8-word runs holding the law's rare words; adopted wording
+  counted once): on the AI Act 838 amendments carry 631 adopted phrases. Before this fix,
+  `lineage_view.py` reported 110 verbatim links, over half of them the name "the High-Level
+  Expert Group on Artificial Intelligence", and the outcomes tab called adopted wording "not
+  reflected". It now leaves out phrases that 3+ submitters repeat (7 phrases) and writes 96
+  links (68 published) from 93 origin matches, with each published link's final-act outcome
+  quoting the adopted phrase (27 partial). Still shown: "been published in the Official
+  Journal of the European Union" (5 links) and the Commission's addressee formula (4 links).
+  The Jev dry run has 4,180 pairs, 3,943 distinct requests, 19.4 MB, about 0.20 USD.
 - **Practice set** (`backend/benchmarks/lineage_practice.py`, LobbyPlag 272 pairs, same folds
   and draws as the harness; `evaluation/lineage-practice.json`): the verbatim rule (8+ words,
   3+ rare) selects 97 pairs, 92 right (precision 0.949, Wilson 95% 0.885–0.978), recall
