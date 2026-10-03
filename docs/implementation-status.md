@@ -158,6 +158,49 @@ the delta query at 5 per amendment, which PR #41 measured at 0.82 recall@5 on Lo
 against 0.98 for the union of the delta and whole-text queries at about 6.5 candidates;
 adopting it is open.
 
+## Lineage on the AI Act and the Explorer Fed by Lineage — 3 October 2026
+
+Measured in a cloud session (4 CPUs, 15 GB) on 2021/0106(COD), collected with attachments in
+9 min 19 s (asks layer partial: one publication unread, Have Your Say index not built).
+
+- **Verbatim adoption** (`lineage.adopt`, 2.4 s): 363 of 5,660 amendments inserted 397
+  phrases (12+ words, absent from the proposal) that stand in the final act. Credit: the
+  committee's own text 232.7 phrase shares, PPE 53.3, S&D 44.2, RE 33.9. Only 22.6% of the
+  final act's 12-word windows are in the proposal (annexes 48.9%, now that CELLAR annex
+  streams are collected).
+- **Verbatim origin** (`origin.find_origins`, 4.0 s over 788 submissions): only 4 matches,
+  three of them boilerplate ("to the European Parliament, the Council and the European
+  Economic and Social Committee", the AI HLEG principles). The citation filter misses the
+  first formula. Organisations ask in their own words, so origins need a meaning judge.
+- **Local Qwen is too slow here**: embedding 4.5 passages/s (29,061 passages ≈ 2 h),
+  reranker 0.8 pairs/s.
+- **Jev for reworded origins** (`backend/benchmarks/lineage_jev.py`): BM25 (part 3's
+  `find_candidates`) shortlists 5 passages per adopting amendment; Jev answers the four Gate 3
+  questions unchanged. Dry run before the merge: 1,805 pairs, 1,724 distinct requests, 8.46 MB,
+  about 0.09 USD estimated at 4 bytes a token; the run stops before the cumulative charge could
+  pass `--max-cost-usd` (default 1). **Not executed yet**: the session had no
+  `TYPESAFE_API_KEY`.
+- **Explorer fed by lineage** (`backend/benchmarks/lineage_view.py`): writes the same
+  `atlas.json` from verbatim links (published when dated first and not a citation) and Jev
+  links (always unconfirmed), reusing `build_view` for outcomes, graph and rankings; the
+  explorer renders it unchanged (6 verbatim links on the AI Act, checked in a browser).
+- `services/jev.py` and its offline tests come from `feat/jev-gate-three` (PR #63) unchanged.
+
+- **After merging main** (8-word runs holding the law's rare words, `5ff514c`): on the AI Act
+  512 amendments adopt wording, `lineage_view.py` writes 110 verbatim links (109 published),
+  and the Jev dry run has 2,550 pairs, 2,430 distinct requests, 11.95 MB, about 0.13 USD.
+- **Practice set** (`backend/benchmarks/lineage_practice.py`, LobbyPlag 272 pairs, same folds
+  and draws as the harness; `evaluation/lineage-practice.json`): the verbatim rule (8+ words,
+  3+ rare) selects 97 pairs, 92 right (precision 0.949, Wilson 95% 0.885–0.978), recall
+  0.535; as a score its AUC is 0.746 and mean P@20 0.835 (lexical-delta-v1: AUC 0.862, P@20
+  0.980). BM25 recall@5 on the proposals' new wording is 0.663, so the Jev stage can reach at
+  most that share of verified pairs. Jev on the same pairs: 222 distinct requests, about
+  0.008 USD; not run yet (no key in the session). PR #63 measured `same_legal_change` alone at
+  AUC 0.904.
+
+Next: run `lineage_jev.py --execute`, rebuild the view, read a sample of the reworded links,
+and fix the citation filter for the institutional formula.
+
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
 `influence coordinated <law>` (`make coordinated LAW=...`, bead `rev-637f`) lists the
