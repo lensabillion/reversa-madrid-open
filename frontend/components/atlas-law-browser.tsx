@@ -197,20 +197,20 @@ function LawAtlasView({ view, onRetry }: { view: AtlasView; onRetry: () => void 
     <>
       <section
         aria-label="Law overview"
-        className="border-b border-stone-200 bg-white px-5 py-6 sm:px-8"
+        className="border-b border-stone-200 bg-white px-5 py-3 sm:px-8"
       >
-        <div className="mx-auto max-w-[1536px] space-y-4">
+        <div className="mx-auto max-w-[1536px] space-y-2">
           <div>
-            <h2 className="font-serif text-2xl leading-tight text-stone-900 sm:text-3xl">
+            <h2 className="font-serif text-xl leading-tight text-stone-900 sm:text-2xl">
               {view.title}
             </h2>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-0.5 text-xs text-stone-500">
               {view.procedure_id} · Atlas run {view.run_id}, generated {view.generated_at}
             </p>
           </div>
           <AtlasModes modes={atlasModes(view)} />
           {published === 0 && (
-            <p className="max-w-4xl rounded-md border border-stone-300 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
+            <p className="max-w-4xl rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700">
               This run published no link between a request and an amendment of this law; the graph
               view says why. Coordinated amendments need no request to be collected: open
               Coordinated amendments to see near-identical amendments tabled by different political
@@ -299,7 +299,7 @@ export function AtlasLawBrowser() {
   }
   return (
     <div className="min-h-dvh bg-stone-50 text-stone-900">
-      <header className="flex h-[76px] items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
+      <header className="flex h-14 items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
         <div className="flex items-center gap-4">
           <span className="text-xl font-semibold tracking-tight text-stone-900">Influence</span>
           <span className="hidden h-5 w-px bg-stone-300 sm:block" />
@@ -322,19 +322,19 @@ export function AtlasLawBrowser() {
       </header>
       <nav
         aria-label="Collected laws"
-        className="border-b border-stone-200 bg-white px-5 py-5 sm:px-8"
+        className="border-b border-stone-200 bg-white px-5 py-3 sm:px-8"
       >
-        <div className="mx-auto max-w-[1536px]">
+        <div className="mx-auto flex max-w-[1536px] flex-wrap items-center gap-x-4 gap-y-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
             Collected laws
           </h2>
           {laws.loading && (
-            <p role="status" className="mt-3 text-sm text-stone-500">
+            <p role="status" className="text-sm text-stone-500">
               Loading collected laws…
             </p>
           )}
           {laws.error !== null && (
-            <div role="alert" className="mt-3 space-y-2 text-sm leading-6 text-stone-600">
+            <div role="alert" className="basis-full space-y-2 text-sm leading-6 text-stone-600">
               <p>The list of collected laws could not be loaded. {laws.error}</p>
               <p>Check that the backend is running (make dev-backend), then retry.</p>
               <button type="button" onClick={laws.retry} className={retryStyle}>
@@ -343,24 +343,24 @@ export function AtlasLawBrowser() {
             </div>
           )}
           {collected?.length === 0 && (
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
+            <p className="max-w-3xl text-sm leading-6 text-stone-600">
               No law has an Atlas run yet. Build one from the repository root, for example{" "}
               <code className="font-mono text-xs text-stone-800">{buildCommand}</code>, then reload
               this page.
             </p>
           )}
           {collected !== null && collected.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-2">
+            <ul className="flex min-w-0 flex-wrap gap-2">
               {collected.map((law) => (
                 <li key={law.slug}>
                   <button
                     type="button"
                     aria-pressed={law.slug === selected}
                     onClick={() => select(law.slug)}
-                    className={`rounded-sm border px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${law.slug === selected ? "border-teal-800 bg-[#e8efea]" : "border-stone-300 bg-white hover:bg-stone-100"}`}
+                    className={`rounded-sm border px-3 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${law.slug === selected ? "border-teal-800 bg-[#e8efea]" : "border-stone-300 bg-white hover:bg-stone-100"}`}
                   >
                     <span className="block text-sm font-medium text-stone-900">{law.title}</span>
-                    <span className="mt-1 block text-xs tabular-nums text-stone-500">
+                    <span className="block text-xs tabular-nums text-stone-500">
                       {law.procedure_id} · {linkCount(law.published_links)}
                     </span>
                   </button>

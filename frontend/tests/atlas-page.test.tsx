@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import AtlasPage from "../app/atlas/page";
 import type { AtlasBundle } from "../lib/atlas";
@@ -323,7 +323,14 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   fireEvent.click(law);
   expect(window.location.search).toBe(`?law=${slug}`);
   expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
-  expect(requested(fetchMock)).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`, coordinatedPath]);
+  // The coordinated panel asks from an effect, which can land after the heading under load.
+  await waitFor(() =>
+    expect(requested(fetchMock)).toEqual([
+      "/api/v1/atlas",
+      `/api/v1/atlas/${slug}`,
+      coordinatedPath,
+    ]),
+  );
   expect(law.getAttribute("aria-pressed")).toBe("true");
   // A law with a published link opens on its graph and names no mode it was not given.
   expect(

@@ -43,14 +43,51 @@ const kinds: Record<string, string> = {
   procedure: "Law",
   topic: "Topic",
 };
+/** What a quote from a record of each kind is called in the selection panel. */
+const excerptKinds: Record<string, string> = {
+  ask: "Request",
+  amendment: "Amendment",
+  article: "Final text",
+};
 const width = 184;
-const step = 240;
+const step = 300;
 const height = 94;
+const rowStep = 140;
+const labelHeight = 18;
+const baseCanvasWidth = 48 + 3 * step + width;
+
+/** A rectangle on the canvas, in pixels. */
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** True when two boxes are closer than a 4 px gap. */
+export function overlaps(a: Box, b: Box): boolean {
+  const gap = 4;
+  return (
+    a.left < b.left + b.width + gap &&
+    b.left < a.left + a.width + gap &&
+    a.top < b.top + b.height + gap &&
+    b.top < a.top + a.height + gap
+  );
+}
+
+/** A generous estimate of a 10 px label's width, so a reserved box never undercounts. */
+function labelWidth(text: string): number {
+  return Math.ceil(text.length * 6) + 16;
+}
 
 function caption(node: AtlasGraphNode): string {
   return node.kind === "amendment" && node.label === node.record_id
     ? `Amendment ${node.record_id.split(":").at(-1) ?? ""}`
     : node.label;
+}
+
+function relationLabel(relation: string): string {
+  return relations[relation] ?? relation;
 }
 
 /** O(V log V + E) column layout for a law snapshot; positions never imply new edges. */
@@ -97,9 +134,85 @@ function positions(snapshot: AtlasGraphSnapshot) {
     const col = column(node);
     const row = rows[col] ?? 0;
     rows[col] = row + 1;
-    return { node, x: 24 + col * step, y: 94 + row * 140, member: members.has(node.node_id) };
+    return { node, x: 24 + col * step, y: 94 + row * rowStep, member: members.has(node.node_id) };
   });
-  return { nodes, canvasHeight: 128 + Math.max(1, ...rows) * 140 };
+  return { nodes, canvasHeight: 128 + Math.max(1, ...rows) * rowStep };
+}
+
+/**
+ * Lays out cards, edge paths and edge labels. Each label is centred on its curve (final-text
+ * edges on their lane between card rows), then nudged along one axis, down the column gap or
+ * along the lane, until it clears every card and every label placed before it.
+ * O(V log V + E · (V + E) · k) for k = 17 candidate offsets: designed for one law's published
+ * snapshot (tens of nodes and edges), not for whole-corpus graphs. Returns `null` when an edge
+ * references a missing node.
+ */
+export function graphLayout(snapshot: AtlasGraphSnapshot) {
+  const { nodes, canvasHeight } = positions(snapshot);
+  const byId = new Map(nodes.map((item) => [item.node.node_id, item]));
+  const cards: Box[] = nodes.map(({ x, y }) => ({ left: x, top: y, width, height }));
+  const placed: Box[] = [];
+  const paths: { edge: AtlasGraphEdge; d: string; name: string; text: string; label: Box }[] = [];
+  for (const edge of snapshot.edges) {
+    const from = byId.get(edge.source);
+    const to = byId.get(edge.target);
+    if (!from || !to) {
+      return null;
+    }
+    const startX = from.x + width;
+    const startY = from.y + height / 2;
+    const endY = to.y + height / 2;
+    const sameColumn = from.x === to.x;
+    const isFinal = edge.relation === "REALIZED_IN";
+    // The gap between card rows is 46 px; the lane runs through its middle.
+    const lane = Math.min(from.y, to.y) - 23;
+    const d = isFinal
+      ? `M ${startX} ${startY} H ${startX + 18} V ${lane} H ${to.x - 18} V ${endY} H ${to.x}`
+      : sameColumn
+        ? `M ${startX} ${startY} C ${startX + 38} ${startY}, ${startX + 38} ${endY}, ${startX} ${endY}`
+        : `M ${startX} ${startY} C ${startX + 28} ${startY}, ${to.x - 28} ${endY}, ${to.x} ${endY}`;
+    const text = relationLabel(edge.relation);
+    const labelW = labelWidth(text);
+    const centreX = sameColumn && !isFinal ? startX + 8 + labelW / 2 : (startX + to.x) / 2;
+    const centreY = isFinal ? lane : (startY + endY) / 2;
+    const origin: Box = {
+      left: Math.round(centreX - labelW / 2),
+      top: Math.round(centreY - labelHeight / 2),
+      width: labelW,
+      height: labelHeight,
+    };
+    let label = origin;
+    for (let attempt = 0; attempt <= 16; attempt += 1) {
+      const shift = Math.ceil(attempt / 2) * (attempt % 2 === 0 ? -1 : 1);
+      const candidate = isFinal
+        ? { ...origin, left: origin.left + shift * (labelW + 8) }
+        : { ...origin, top: origin.top + shift * (labelHeight + 6) };
+      if (
+        !cards.some((box) => overlaps(candidate, box)) &&
+        !placed.some((box) => overlaps(candidate, box))
+      ) {
+        label = candidate;
+        break;
+      }
+    }
+    placed.push(label);
+    paths.push({ edge, d, name: `${caption(from.node)} ${text} ${caption(to.node)}`, text, label });
+  }
+  const canvasWidth = Math.max(baseCanvasWidth, ...placed.map((box) => box.left + box.width + 12));
+  return { nodes, byId, paths, canvasWidth, canvasHeight };
+}
+
+/** Names whose words a quote holds: the record it cites, or the request's submission. */
+function excerptSource(
+  span: AtlasGraphEdge["spans"][number],
+  ends: readonly AtlasGraphNode[],
+): string {
+  const quoted = ends.find((node) => node.record_id === span.record_id);
+  if (quoted !== undefined) {
+    return excerptKinds[quoted.kind] ?? kinds[quoted.kind] ?? quoted.kind;
+  }
+  // A request is quoted from its submission (document or passage), never from the ask record.
+  return ends.some((node) => node.kind === "ask") ? "Request" : "Supplied excerpt";
 }
 
 /** Select supplied graph records and open their source excerpts, without inference. */
@@ -112,8 +225,15 @@ export function AtlasGraph({
 }) {
   const markerId = useId();
   const [selection, select] = useState<{ kind: "node" | "edge"; id: string } | null>(null);
-  const { nodes, canvasHeight } = positions(snapshot);
-  const byId = new Map(nodes.map((item) => [item.node.node_id, item]));
+  const layout = graphLayout(snapshot);
+  if (layout === null) {
+    return (
+      <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-5 text-amber-950">
+        Graph unavailable: a supplied connection references a missing node.
+      </p>
+    );
+  }
+  const { nodes, byId, paths, canvasWidth, canvasHeight } = layout;
   const selectedNode = selection?.kind === "node" ? byId.get(selection.id)?.node : undefined;
   const selectedEdge =
     selection?.kind === "edge"
@@ -124,50 +244,19 @@ export function AtlasGraph({
         (edge) => edge.source === selectedNode.node_id || edge.target === selectedNode.node_id,
       )
     : [];
-  const paths = snapshot.edges.map((edge) => {
-    const from = byId.get(edge.source);
-    const to = byId.get(edge.target);
-    if (!from || !to) {
-      return null;
-    }
-    const startX = from.x + width;
-    const startY = from.y + height / 2;
-    const endY = to.y + height / 2;
-    const sameColumn = from.x === to.x;
-    const isFinal = edge.relation === "REALIZED_IN";
-    const lane = Math.min(from.y, to.y) - 28;
-    const d = isFinal
-      ? `M ${startX} ${startY} H ${startX + 18} V ${lane} H ${to.x - 18} V ${endY} H ${to.x}`
-      : sameColumn
-        ? `M ${startX} ${startY} C ${startX + 38} ${startY}, ${startX + 38} ${endY}, ${startX} ${endY}`
-        : `M ${startX} ${startY} C ${startX + 28} ${startY}, ${to.x - 28} ${endY}, ${to.x} ${endY}`;
-    return {
-      edge,
-      d,
-      name: `${caption(from.node)} ${relations[edge.relation] ?? edge.relation} ${caption(to.node)}`,
-      x: sameColumn ? startX - 15 : (startX + to.x) / 2 - 34,
-      y: isFinal ? lane - 12 : (startY + endY) / 2 - 12,
-    };
-  });
-  if (paths.some((path) => path === null)) {
-    return (
-      <p role="alert" className="rounded-sm border border-amber-300 bg-amber-50 p-5 text-amber-950">
-        Graph unavailable: a supplied connection references a missing node.
-      </p>
-    );
-  }
+  const selectedEnds = selectedEdge
+    ? [byId.get(selectedEdge.source)?.node, byId.get(selectedEdge.target)?.node].filter(
+        (node) => node !== undefined,
+      )
+    : [];
   return (
-    <section aria-label="Influence graph" className="min-w-0 space-y-5">
-      <div className="max-w-3xl">
-        <h2 className="font-serif text-2xl text-stone-900">Follow a request into the law</h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          An organization makes a request. A published link connects that request to an amendment. A
-          separate branch shows whether the request is reflected in final text. Select a card or a
-          connection to read its evidence.
-        </p>
-        <p className="mt-2 text-xs text-stone-500">
-          Connections are supplied by the pipeline. Shared wording does not establish causal
-          authorship. Scroll sideways on smaller screens.
+    <section aria-label="Influence graph" className="min-w-0 space-y-3">
+      <div>
+        <h2 className="font-serif text-xl text-stone-900">Follow a request into the law</h2>
+        <p className="mt-1 text-xs leading-5 text-stone-500">
+          Select a card or a connection to read its evidence. Connections are supplied by the
+          pipeline; shared wording does not establish causal authorship. Scroll sideways on smaller
+          screens.
         </p>
       </div>
       {snapshot.nodes.length === 0 ? (
@@ -179,7 +268,7 @@ export function AtlasGraph({
           className="overflow-x-auto rounded-sm border border-stone-200 bg-stone-50"
           aria-label="Graph canvas"
         >
-          <div className="relative" style={{ width: 936, height: canvasHeight }}>
+          <div className="relative" style={{ width: canvasWidth, height: canvasHeight }}>
             {["Who asked", "What they requested", "Proposed amendment", "Final text / context"].map(
               (heading, index) => (
                 <p
@@ -194,7 +283,7 @@ export function AtlasGraph({
             <svg
               aria-hidden="true"
               className="pointer-events-none absolute inset-0"
-              width="936"
+              width={canvasWidth}
               height={canvasHeight}
             >
               <defs>
@@ -209,23 +298,18 @@ export function AtlasGraph({
                   <path d="M0 0 L8 4 L0 8 Z" fill="#0f766e" />
                 </marker>
               </defs>
-              {paths.map(
-                (path) =>
-                  path && (
-                    <path
-                      key={path.edge.edge_id}
-                      data-edge-id={path.edge.edge_id}
-                      d={path.d}
-                      fill="none"
-                      stroke="#0f766e"
-                      strokeWidth={selectedEdge?.edge_id === path.edge.edge_id ? 3 : 1.5}
-                      opacity={
-                        selectedEdge && selectedEdge.edge_id !== path.edge.edge_id ? 0.3 : 0.7
-                      }
-                      markerEnd={`url(#${markerId})`}
-                    />
-                  ),
-              )}
+              {paths.map((path) => (
+                <path
+                  key={path.edge.edge_id}
+                  data-edge-id={path.edge.edge_id}
+                  d={path.d}
+                  fill="none"
+                  stroke="#0f766e"
+                  strokeWidth={selectedEdge?.edge_id === path.edge.edge_id ? 3 : 1.5}
+                  opacity={selectedEdge && selectedEdge.edge_id !== path.edge.edge_id ? 0.3 : 0.7}
+                  markerEnd={`url(#${markerId})`}
+                />
+              ))}
             </svg>
             {nodes.map(({ node, x, y, member }) => (
               <button
@@ -245,22 +329,25 @@ export function AtlasGraph({
                 </span>
               </button>
             ))}
-            {paths.map(
-              (path) =>
-                path && (
-                  <button
-                    key={path.edge.edge_id}
-                    type="button"
-                    aria-label={path.name}
-                    aria-pressed={selectedEdge?.edge_id === path.edge.edge_id}
-                    onClick={() => select({ kind: "edge", id: path.edge.edge_id })}
-                    className="absolute max-w-40 rounded border border-teal-200 bg-teal-50 px-1.5 py-1 text-[10px] font-medium leading-3 text-teal-900 shadow-sm hover:bg-teal-100 focus-visible:outline-2 focus-visible:outline-teal-700"
-                    style={{ left: path.x, top: path.y }}
-                  >
-                    {relations[path.edge.relation] ?? path.edge.relation}
-                  </button>
-                ),
-            )}
+            {paths.map((path) => (
+              <button
+                key={path.edge.edge_id}
+                type="button"
+                data-edge-label={path.edge.edge_id}
+                aria-label={path.name}
+                aria-pressed={selectedEdge?.edge_id === path.edge.edge_id}
+                onClick={() => select({ kind: "edge", id: path.edge.edge_id })}
+                className={`absolute z-10 flex items-center justify-center whitespace-nowrap rounded border px-1.5 text-[10px] font-medium leading-none shadow-sm hover:bg-teal-100 focus-visible:z-20 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-teal-700 ${selectedEdge?.edge_id === path.edge.edge_id ? "border-teal-700 bg-teal-50 text-teal-950" : "border-teal-300 bg-white text-teal-900"}`}
+                style={{
+                  left: path.label.left,
+                  top: path.label.top,
+                  width: path.label.width,
+                  height: path.label.height,
+                }}
+              >
+                {path.text}
+              </button>
+            ))}
           </div>
         </section>
       )}
@@ -288,24 +375,20 @@ export function AtlasGraph({
                 {paths
                   .filter(
                     (path) =>
-                      path &&
-                      (path.edge.source === selectedNode.node_id ||
-                        path.edge.target === selectedNode.node_id),
+                      path.edge.source === selectedNode.node_id ||
+                      path.edge.target === selectedNode.node_id,
                   )
-                  .map(
-                    (path) =>
-                      path && (
-                        <li key={path.edge.edge_id}>
-                          <button
-                            type="button"
-                            onClick={() => select({ kind: "edge", id: path.edge.edge_id })}
-                            className="text-left text-sm text-teal-800 underline underline-offset-4"
-                          >
-                            {path.name}
-                          </button>
-                        </li>
-                      ),
-                  )}
+                  .map((path) => (
+                    <li key={path.edge.edge_id}>
+                      <button
+                        type="button"
+                        onClick={() => select({ kind: "edge", id: path.edge.edge_id })}
+                        className="text-left text-sm text-teal-800 underline underline-offset-4"
+                      >
+                        {path.name}
+                      </button>
+                    </li>
+                  ))}
               </ul>
             )}
             {selectedNode.kind === "ask" &&
@@ -320,9 +403,7 @@ export function AtlasGraph({
         )}
         {selectedEdge && (
           <div className="space-y-4">
-            <h3 className="font-serif text-xl">
-              {relations[selectedEdge.relation] ?? selectedEdge.relation}
-            </h3>
+            <h3 className="font-serif text-xl">{relationLabel(selectedEdge.relation)}</h3>
             <p className="text-xs text-stone-500">
               {selectedEdge.dated_on === null
                 ? "Connection date unavailable"
@@ -337,14 +418,23 @@ export function AtlasGraph({
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                   Supplied evidence excerpts
                 </p>
-                {selectedEdge.spans.map((span) => (
-                  <blockquote
-                    key={`${span.record_id}:${span.field}:${span.start}:${span.end}`}
-                    className="border-l-2 border-teal-300 pl-4 font-serif text-base leading-7 text-stone-800"
-                  >
-                    {span.text}
-                  </blockquote>
-                ))}
+                {selectedEdge.spans.map((span) => {
+                  const source = excerptSource(span, selectedEnds);
+                  return (
+                    <figure
+                      key={`${span.record_id}:${span.field}:${span.start}:${span.end}`}
+                      aria-label={`${source} excerpt`}
+                      className="space-y-1"
+                    >
+                      <figcaption className="text-[11px] font-semibold uppercase tracking-wide text-teal-800">
+                        {source}
+                      </figcaption>
+                      <blockquote className="border-l-2 border-teal-300 pl-4 font-serif text-base leading-7 text-stone-800">
+                        {span.text}
+                      </blockquote>
+                    </figure>
+                  );
+                })}
               </div>
             )}
             {selectedEdge.link_id !== null && onSelectLink && (
