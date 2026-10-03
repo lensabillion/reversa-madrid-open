@@ -36,7 +36,6 @@ test("an organisation's phrase counts once however many of its documents say it"
       adoptedFirst: 1,
       adoptedFirstLexical: 1,
       adoptedFirstSemantic: 0,
-      adoptedOther: 0,
       tabledOnly: 0,
       reworded: 0,
       documents: 2,
@@ -45,7 +44,7 @@ test("an organisation's phrase counts once however many of its documents say it"
   ]);
 });
 
-test("organisations rank by wording said first, and citations and unnamed stay apart", () => {
+test("only wording said first ranks; later, citing and unnamed matches stay apart", () => {
   const later: OriginMatchRecord = {
     ...origin,
     document_id: "doc:hys_feedback:5",
@@ -63,12 +62,11 @@ test("organisations rank by wording said first, and citations and unnamed stay a
       { ...origin, document_id: "doc:hys_feedback:7", is_citation: true },
     ]),
   );
-  expect(ranking.rows.map((row) => [row.name, row.adoptedFirst, row.adoptedOther])).toEqual([
-    ["Acme Unknown Lobby", 1, 0],
-    ["Beta Association", 0, 1],
+  // Beta said it after the amendment: that cannot show influence, so it is not ranked.
+  expect(ranking.rows.map((row) => [row.name, row.adoptedFirst])).toEqual([
+    ["Acme Unknown Lobby", 1],
   ]);
-  expect(ranking.rows[1]?.key).toBe("name:Beta Association");
-  expect(ranking.rows[1]?.firstSaid).toBeNull();
+  expect(ranking.notFirst).toBe(1);
   expect(ranking.unnamedDocuments).toBe(1);
   expect(ranking.citations).toBe(1);
 });
@@ -152,10 +150,12 @@ test("search matches every word across quotes, Members and organisations, ignori
   expect(phraseFacets(adopted)).toEqual({ groups: ["S&D"], committees: ["ENVI"] });
 });
 
-test("only adopted phrases a submission said first can be drawn", () => {
+test("only adopted phrases a submission said first, word for word, can be drawn", () => {
   const lineage = prepareLineage(withOrigins([]));
   expect(linkPool(lineage.adopted)).toHaveLength(0);
   expect(linkPool(prepareLineage(view).adopted)).toHaveLength(1);
+  const semanticOnly = withOrigins([{ ...origin, kind: "semantic", similarity: 0.8 }]);
+  expect(linkPool(prepareLineage(semanticOnly).adopted)).toHaveLength(0);
 });
 
 test("a draw is distinct, bounded by the pool, and repeated by its seed", () => {

@@ -53,6 +53,10 @@ function installFetch(route: (path: string) => Response | Promise<Response>) {
   return fetchMock;
 }
 
+async function openTab(name: string) {
+  fireEvent.click(await screen.findByRole("tab", { name }));
+}
+
 const unexpected = (path: string): never => {
   throw new Error(`Unexpected request: ${path}`);
 };
@@ -94,12 +98,26 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   fireEvent.click(law);
 
   expect(window.location.search).toBe(`?law=${slug}`);
+  const questions = await screen.findByRole("heading", {
+    name: "The five questions, for this law",
+  });
+  expect(questions.closest("section")?.textContent).toContain(
+    "Acme Unknown Lobby leads, with 1 adopted phrase said first.",
+  );
+  expect(questions.closest("section")?.textContent).toContain("No forecast yet");
+  const summary = screen.getByRole("region", { name: "From proposal to law" });
+  expect(within(summary).getByText("18 of 103 words")).toBeDefined();
+  expect(within(summary).getByText("1 of 3 amendments")).toBeDefined();
+  expect(within(summary).getByRole("img", { name: "17%: 18 of 103 words" })).toBeDefined();
+  expect(screen.queryByRole("article")).toBeNull();
+  await openTab("Evidence");
   const card = await screen.findByRole("article", { name: /Phrase phrase:/ });
   expect(within(card).getByText("In the final act")).toBeDefined();
   expect(within(card).getByText("am:2021-0106-COD:ENVI:PE7-7")).toBeDefined();
   expect(within(card).getByText("Acme Unknown Lobby")).toBeDefined();
   expect(within(card).getByText("Said before the amendments")).toBeDefined();
   expect(within(card).getAllByRole("blockquote")).toHaveLength(2);
+  await openTab("Who");
   expect(
     screen.getByRole("heading", { name: "Who gets their way: Members and political groups" }),
   ).toBeDefined();
@@ -109,11 +127,6 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
     throw new Error("Organisation section missing");
   }
   expect(within(orgSection).getByRole("row", { name: /Acme Unknown Lobby/ })).toBeDefined();
-  const questions = screen.getByRole("heading", { name: "The five questions, for this law" });
-  expect(questions.closest("section")?.textContent).toContain(
-    "Organisations whose wording reached the law first: Acme Unknown Lobby (1).",
-  );
-  expect(questions.closest("section")?.textContent).toContain("No forecast is computed.");
   expect(screen.getByText("Political groups · lexical")).toBeDefined();
   expect(within(card).getByText(/joint: credited to several holders/)).toBeDefined();
   expect(within(card).getByText(/18 of 18 words in the final act/)).toBeDefined();
@@ -121,10 +134,6 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(within(auken).getByText("1 of 2")).toBeDefined();
   expect(within(auken).getByText("50%")).toBeDefined();
   expect(within(auken).getByText("1 (1)")).toBeDefined();
-  const summary = screen.getByRole("region", { name: "From proposal to law" });
-  expect(within(summary).getByText("18 of 103 words")).toBeDefined();
-  expect(within(summary).getByText("1 of 3 amendments")).toBeDefined();
-  expect(within(summary).getByRole("img", { name: "17%: 18 of 103 words" })).toBeDefined();
   expect(screen.getByText(/Verbatim wording only/)).toBeDefined();
   expect(screen.getByText(/Meetings: not collected in this run/)).toBeDefined();
   expect(fetchMock.mock.calls.map(([input]) => String(input)).sort()).toEqual([
@@ -138,6 +147,7 @@ test("the tabled tab, the evidence filter and the search change which phrases ar
   serve(view);
   render(<LineagePage />);
 
+  await openTab("Evidence");
   await screen.findByRole("article", { name: /Phrase phrase:/ });
   fireEvent.click(screen.getByRole("button", { name: "Tabled, not adopted (0)" }));
   expect(screen.getByText("No phrase matches this selection.")).toBeDefined();
@@ -175,6 +185,7 @@ test("drawing three links shows the drawn link with its seed", async () => {
   });
   render(<LineagePage />);
 
+  await openTab("Check 3 links");
   const heading = await screen.findByRole("heading", { name: "Check three links at random" });
   const section = heading.closest("section");
   if (section === null) {
@@ -231,7 +242,9 @@ test("a long list is paged, and an undated or citing submission is labelled as s
   });
   render(<LineagePage />);
 
+  await openTab("Who");
   await screen.findByText("No adopted wording, so no credit.");
+  await openTab("Evidence");
   fireEvent.click(screen.getByRole("button", { name: `Tabled, not adopted (${total})` }));
   expect(screen.getAllByRole("article")).toHaveLength(PHRASES_PER_PAGE);
   expect(screen.getByText("Order unknown")).toBeDefined();
@@ -258,6 +271,7 @@ test("many credit holders are cut to the first rows until all are asked for", as
   serve({ ...view, credits });
   render(<LineagePage />);
 
+  await openTab("Who");
   await screen.findByText("Member 0");
   expect(screen.queryByText("Member 19")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show all 20" }));
@@ -400,6 +414,7 @@ test("an unreachable API fails the law list and the law explicitly, and Retry re
   ).toBeDefined();
   fireEvent.click(screen.getByRole("button", { name: "Retry laws" }));
   fireEvent.click(screen.getByRole("button", { name: "Retry law" }));
+  await openTab("Evidence");
   expect(await screen.findByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
   expect(screen.getByRole("link", { name: "Evidence workspace" }).getAttribute("href")).toBe("/");
 });
@@ -414,4 +429,23 @@ test("choosing the open law again adds no history entry", async () => {
     await within(selector).findByRole("button", { name: /Artificial Intelligence Act/ }),
   );
   expect(window.history.pushState).not.toHaveBeenCalled();
+});
+
+test("clicking a graph node follows its paths and lists their evidence", async () => {
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  serve(view);
+  render(<LineagePage />);
+
+  await openTab("Graph");
+  const heading = await screen.findByRole("heading", { name: /The graph: who/ });
+  const section = heading.closest("section");
+  if (section === null) {
+    throw new Error("Graph section missing");
+  }
+  expect(within(section).queryByRole("article")).toBeNull();
+  fireEvent.click(within(section).getByRole("button", { name: /Acme Unknown Lobby: 1 phrases/ }));
+  expect(within(section).getByText(/Following/).textContent).toContain("Acme Unknown Lobby");
+  expect(within(section).getAllByRole("article")).toHaveLength(1);
+  fireEvent.click(within(section).getByRole("button", { name: "Back to the overview" }));
+  expect(within(section).queryByRole("article")).toBeNull();
 });
