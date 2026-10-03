@@ -490,6 +490,7 @@ def mep_record(mep_id: object, name: object = "Brando BENIFEI") -> Record:
         "Groups": [
             {"groupid": "S&D", "start": "2024-07-16T00:00:00", "end": "9999-12-31T00:00:00"},
             {"groupid": "PSE", "start": "2014-07-01T00:00:00", "end": "2019-07-01T00:00:00"},
+            {"groupid": "S&D", "start": "2019-07-02T00:00:00", "end": "2024-07-15T00:00:00"},
             {"Organization": "No identifier", "start": "9999-01-01T00:00:00"},
         ],
         "Constituencies": [

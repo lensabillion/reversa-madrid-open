@@ -857,7 +857,14 @@ def test_each_amendment_names_its_authors_groups_on_the_day_it_was_tabled(
 ) -> None:
     world = make_world(tmp_path)
     # 197721 sat with Renew until July 2024, then the EPP; the amendment is from 2022.
-    write_dump(world.inputs.meps, [switcher(197721), mep_record(125042, "Margrete AUKEN")])
+    # No spell covers the 2019-2024 term, so her group on the tabling day is unknown.
+    auken = {
+        **mep_record(125042, "Margrete AUKEN"),
+        "Groups": [
+            {"groupid": "S&D", "start": "2024-07-16T00:00:00", "end": "9999-12-31T00:00:00"}
+        ],
+    }
+    write_dump(world.inputs.meps, [switcher(197721), auken])
 
     result = world.collect()
 
