@@ -46,7 +46,12 @@ from influence.schemas.atlas_view import (
     RankingRow,
 )
 from influence.schemas.retrieval import SourcePassage
-from influence.services.assessment import DEFAULT_PUBLISHABLE, METHOD_REVISION, assess_link
+from influence.services.assessment import (
+    DEFAULT_PUBLISHABLE,
+    METHOD_REVISION,
+    ask_limit_reason,
+    assess_link,
+)
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
 from influence.services.coordinated import cross_group_clusters
@@ -151,6 +156,8 @@ def find_candidates(
     amendments: Iterable[Amendment],
     asks: Sequence[Ask],
     unsearchable: list[str] | None = None,
+    *,
+    unsearchable_asks: dict[str, str] | None = None,
 ) -> tuple[Candidate, ...]:
     """The top BM25 asks for each amendment's changed words.
 
@@ -158,9 +165,19 @@ def find_candidates(
     be, or no text) has no candidates; its ID is appended to `unsearchable` so the view can
     say so, instead of one long amendment stopping a whole law.
 
+    Unsupported asks are excluded before indexing so they cannot consume the shortlist.
+    Their IDs/reasons are recorded in unsearchable_asks, never their truncated replacements.
+
     Building the index is linear in the asks' total length; each search costs the postings
     of the amendment's distinct changed words plus O(M log k) over M matching passages.
     """
+    searchable: list[Ask] = []
+    for ask in asks:
+        if reason := ask_limit_reason(ask):
+            if unsearchable_asks is not None:
+                unsearchable_asks[ask.ask_id] = reason
+        else:
+            searchable.append(ask)
     index = PassageIndex(
         tuple(
             SourcePassage(
@@ -169,10 +186,10 @@ def find_candidates(
                 end=ask.span.end,
                 text=ask.span.text,
             )
-            for ask in asks
+            for ask in searchable
         )
     )
-    by_slice = {(ask.document_id, ask.span.start, ask.span.end): ask for ask in asks}
+    by_slice = {(ask.document_id, ask.span.start, ask.span.end): ask for ask in searchable}
     found: list[Candidate] = []
     for amendment in amendments:
         try:
@@ -297,8 +314,11 @@ def build_view(
     asks_by_id = {ask.ask_id: ask for ask in asks}
     texts = {text.document_id: text.text for text in collected.document_texts}
     unsearchable: list[str] = []
+    unsearchable_asks: dict[str, str] = {}
     links = assess_candidates(
-        find_candidates(collected.amendments, asks, unsearchable),
+        find_candidates(
+            collected.amendments, asks, unsearchable, unsearchable_asks=unsearchable_asks
+        ),
         amendments,
         asks_by_id,
         texts,
@@ -368,13 +388,27 @@ def build_view(
         snapshot=snapshot,
         rankings=_rankings(law, bundle.actors, bundle.asks, bundle.outcomes),
         limitations=(
-            LIMITATIONS
-            if not unsearchable
-            else (
-                *LIMITATIONS,
-                f"{len(unsearchable)} amendment(s) were too long or empty to search and have no "
-                "candidates.",
-            )
+            *LIMITATIONS,
+            *(
+                (
+                    f"{len(unsearchable)} amendment(s) were too long or empty to search "
+                    "and have no candidates.",
+                )
+                if unsearchable
+                else ()
+            ),
+            *(
+                (
+                    f"{len(unsearchable_asks)} ask(s) could not be assessed and were excluded "
+                    "before retrieval; original records retained in the collected bundle. "
+                    + "; ".join(
+                        f"{identifier}: {reason}"
+                        for identifier, reason in sorted(unsearchable_asks.items())
+                    ),
+                )
+                if unsearchable_asks
+                else ()
+            ),
         ),
     )
 

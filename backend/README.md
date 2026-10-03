@@ -130,7 +130,7 @@ own:
 
 | Step | Connector | Writes |
 | --- | --- | --- |
-| Resolve the query | `services/law_query.py` over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a title is unclear |
+| Resolve the query | `services/law_query.py` (shapes, the common-name table `LAW_ALIASES`, title ranking) over a catalog built from Parltrack's dossiers; CELLAR only for a CELEX or COM number the catalog lacks | the procedure, or the choices when a name or title is unclear |
 | `texts` | `repositories/cellar.py`: identifiers by SPARQL, acts as XHTML, split into provisions | `documents`, `document_texts`, `articles` |
 | `amendments` | `repositories/parltrack.py`: committee and plenary dumps, then the MEPs who tabled them | `documents` (the dumps), `amendments`, `actors` |
 | `asks` | `repositories/hys.py` joined by COM reference only; `services/passages.py`; `services/actors.py` over `repositories/register.py` | `documents`, `document_texts`, `passages`, `actors` |
@@ -143,6 +143,40 @@ make collect LAW='2021/0106(COD)'
 make collect LAW='AI Act' ARGS=--no-attachments   # faster; the asks layer is then partial
 # equivalent: uv run --directory backend --locked influence collect "2021/0106(COD)"
 ```
+
+**Resolving the query.** What was typed is tried in this order, and the first that fits
+decides:
+
+1. A procedure number (`2021/0106(COD)`), CELEX number (`32024R1689`) or COM reference
+   (`COM(2021) 206`), recognised by shape.
+2. A common name from `LAW_ALIASES` in `services/law_query.py`: 84 names for 28
+   procedures, in English, German, French and Spanish, such as `AI Act`, `KI-Verordnung`,
+   `Ley de IA`, `DSA`, `GDPR`, `RGPD` and `CSDDD`. Case, accents, punctuation, spacing and
+   a surrounding "the" do not matter (`the ai act`, `AI-Act` and `Reglement sur l'IA` all
+   match), but the whole name must match: `AI` or `AI Acts` do not. The name stands for
+   its procedure number, and that procedure must be in the dossiers dump; if it is not,
+   the command stops and says so, because every listed law predates the dump. Two names
+   spelt alike for different procedures, or a name that is exactly another procedure's
+   title, print the choices instead of picking one.
+3. A title search over the catalog's titles. A close race prints the top three choices.
+
+The command prints the procedure it resolved and that dossier's title before any stage
+runs, for example
+`Resolved 'AI Act' to 2021/0106(COD), titled 'Artificial Intelligence Act' in the
+Parltrack dossiers dump`, so a wrong law can be stopped before it takes minutes.
+
+PR #49 started the table with seven names (`ai act`, `aia`, `dsa`, `dma`, `csddd`,
+`cs3d`, `ehds`), each resolved against the real Parltrack catalog. The others were checked
+against a public EUR-Lex or Legislative Observatory page or this repository's research
+tables, not against the real catalog or CELLAR. To add a name, check its procedure number
+on EUR-Lex or the Legislative Observatory first: a wrong entry analyses the wrong law under
+a name the reader trusts. A test checks that every procedure number has the form
+`2021/0106(COD)`, that no two names are spelt alike, and that every name reaches its own
+procedure. The table is in code rather than in `data/catalog/aliases.jsonl`, as
+`docs/plan.md` §5 proposed, because `data/` is never committed. Resolving a name against a
+synthetic catalog the size of the real one (23,886 titles) took 146 ms when every title
+was ASCII and 328 ms when most held an accent, against 169 to 182 ms for a title search
+(`measured`, median of seven runs, 4-core Xeon at 2.8 GHz, 3 October 2026).
 
 **Inputs.** Five files must exist under the data root (`INFLUENCE_DATA_ROOT`, default the
 repository's `data/`, or `--data-root`); the command stops before any request, naming the
@@ -177,13 +211,14 @@ register and index it read. A code edit therefore redoes the stages. `--refresh`
 every stage and refetches answers the HTTP cache holds.
 
 **Stops.** Exit 1, with no manifest published, when a required file is missing or
-unreadable, the query names no procedure or several (the choices are printed), or the
-law has neither amendments nor consultation submissions. An optional source that fails
+unreadable, the query names no procedure or several (the choices are printed), a common
+name's procedure is not in the dossiers dump, or the law has neither amendments nor
+consultation submissions. An optional source that fails
 (CELLAR, a publication the API does not serve, an attachment) becomes a labelled
 coverage gap instead.
 
 **Not verified.** The command is tested offline on a small world written in the real
-formats (`tests/test_collect.py`, 41 tests). It has not been run on real sources from the
+formats (`tests/test_collect.py`, 50 tests). It has not been run on real sources from the
 cloud session that wrote it, whose network policy blocks the EU hosts, so its real-data
 counts and timings are not measured yet.
 
@@ -241,6 +276,44 @@ on new laws is unaudited; the sentence is built from `assessment.py`'s revision 
 Outcomes are traced only for asks with a published or
 unconfirmed link. Tested offline (`tests/test_pipeline.py`, `tests/test_modes.py`, and
 `tests/test_coordinated.py` for the clusters route); not yet run on real data or timed.
+
+## Coordinated Amendments Command (Part 3)
+
+`influence coordinated <law>` (`make coordinated LAW='2021/0106(COD)'`) collects the law
+as `influence collect` does, then lists the amendments whose inserted wording is
+near-identical and which were tabled by Members of different political groups. Such a
+cluster is a candidate for a shared outside draft; it is not proof of one. It reads only
+what part 1 took from Parltrack: the law's amendments and their Members.
+
+| Step | Code | Rule |
+| --- | --- | --- |
+| The change | `services/scoring.changed_spans`, the diff parts 3 and 4 use | Only inserted wording is compared, quoted from `new_text` with exact offsets. An unknown original is read as empty |
+| Comparable | `MIN_INSERTED_WORDS = 12` | Shorter insertions and deletions are counted as `too_short`; amendments over the diff's bounds (800 tokens a side) as `not_comparable` |
+| Similar | `SHINGLE_WORDS = 5`, `SIMILARITY_THRESHOLD = 0.8` | Jaccard similarity of the two sets of five-word runs; pairs are found through an inverted index |
+| Cluster | union-find over similar pairs | A chain joins A to C through B; `min_similarity` reports the least similar pair |
+| Across groups | `cross_group` | Two members with no author in common and no political group in common, both groups known |
+
+The output is `data/laws/<procedure>/coordinated.json` (`schemas/coordinated.py`,
+`CoordinatedView`): the parameters, the counts, every cluster with its members, and the
+limitations. Clusters that span groups come first. The command prints the first ten.
+
+**Measured** (3 October 2026; Windows 11 laptop, Intel Core Ultra 7 258V, 8 logical CPUs
+and 15 GB in WSL2, Python 3.14.7; `--no-attachments`, HTTP answers cached, a fresh law
+folder). Wall time is the whole command, of which collect is the first figure:
+
+| Law | Amendments | Compared | Clusters | Span groups | Collect | Whole command | Peak memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| AI Act, 2021/0106(COD) | 5,660 | 2,967 | 269 | 83 | 25.4 s | 29.2 s | 228 MB |
+| Digital Services Act, 2020/0361(COD) | 6,476 | 3,299 | 508 | 80 | 23.8 s | 27.3 s | 236 MB |
+| Data Act, 2022/0047(COD) | 2,437 | 1,325 | 173 | 72 | 22.4 s | not kept | not kept |
+
+**Limits.** The three parameters are proposed, not calibrated: no labelled set of
+coordinated amendments exists, and nobody has audited a sample of these clusters. A
+Member's group is the one of their latest spell in Parltrack's dump, so a Member who
+changed group after tabling is listed under the later group (the AI Act's list shows
+"Patriots for Europe Group", founded in 2024, on 2022 amendments). Members also agree
+wording among themselves, so a cluster shows shared wording, not its author. The clusters
+are not yet in `atlas.json` or the explorer.
 
 ## Submission Command
 
