@@ -83,6 +83,30 @@ frontend audit found 0 vulnerabilities. These services are not wired into a real
 pipeline, API or live explorer yet. Any-law latency, real links and public report
 findings remain unverified. Tracking: `rev-i006` and `rev-5yy6`.
 
+## Collect Command (Atlas Part 1) — 3 October 2026
+
+`influence collect <query>` (`make collect LAW='...'`) joins the merged part 1 connectors
+into one run for any law (bead `rev-pjk2`, plan gate 1). The query resolves through a
+catalog built from Parltrack's dossiers (CELLAR only for an unknown CELEX or COM number;
+an unclear title returns its choices). Stages `texts` (CELLAR proposal and final act,
+split into provisions), `amendments` (Parltrack committee and plenary amendments, tabling
+MEPs) and `asks` (Have Your Say by COM reference, feedback and attachments split into
+passages, senders resolved against the register) save through `StageStore`, keyed by
+their inputs and a hash of the package source, and a `law` stage writes one `LawRecord`
+with ten typed coverage rows. The manifest is published last. Details: the
+[backend README](../backend/README.md#collect-command-atlas-part-1).
+
+Verified offline (`measured`, cloud container, Python 3.14.7): 41 tests in
+`tests/test_collect.py` on a small world in the real source formats, covering every
+coverage status and stop; `make check-backend` passes with 636 tests and 100% branch
+coverage (3,947 statements, 994 branches). **Not verified:** a run on real sources. The
+cloud session that wrote it cannot reach the EU hosts, so the AI Act counts and the
+cached and uncached timings must be measured on a laptop: `make collect
+LAW='2021/0106(COD)'`. No command yet downloads the Parltrack dumps and the register or
+builds the Have Your Say index (follow-up bead); without the index, the consultation is
+found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
+`not_collected`.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
@@ -206,3 +230,31 @@ technical design and plan); check `git status` before editing shared files. The 
 rebuilt it from the bead's notes: commit and push before a session ends. Load data and start services using README
 commands; never depend on a previous chat's running server, temporary log or browser
 state.
+
+## Agent 3 Graph Interface — 3 October 2026
+
+`feat/atlas-explorer` / PR #24 provides a graph-first workspace, source evidence,
+loaded-record search and individual topic/procedure-year filters, plus supplied outcome
+counts and report presentation. The `atlas-1` adapter consumes PR #25's shared fixtures;
+PR #27's candidate retrieval is merged into the branch. Graph selection opens its exact
+source comparison; absent or unpublished evidence IDs produce an explicit gap rather
+than showing another link. The opening view explains the investigation in plain language.
+
+`make check-frontend` passed: 83 tests across 11 files, Biome, TypeScript and production
+build; npm audit reported 0 vulnerabilities. The build included the LOCAL UNCOMMITTED
+synthetic `/atlas-preview` route, which is excluded from the PR. Browser inspection
+confirmed the graph and selected connection quotations. These are synthetic checks,
+not real findings or complete live integration. [Frontend handoff](../frontend/README.md#atlas-components-and-agent-3-handoff).
+
+The backend graph/count services are PR #28 (`rev-i006`, `rev-5yy6`), with all nine CI
+checks passing. Presentation is `rev-oodw` and `rev-1jc4`. Agent 3 is not complete:
+reproducible report generation (`rev-fod0`), dated position/channel enrichment
+(`rev-rg6l`), forecast-record presentation and complete analysis hydration remain.
+The evidence adapter currently rejects multiple final outcomes and multi-source or
+multi-field columns; expand that representation before integrating such records.
+Agent 1 owns shared route/CLI assembly (`rev-qn6b`); Agent 2 owns inference/forecasting.
+
+Completion needs a real bundle of source texts/provenance, resolved actors, all observed
+asks, published assessments, outcomes including unmatched/unknown asks, and coverage.
+Then rehearse three random published links and the five-minute presentation. No real
+any-law, model-quality, large-graph or final mobile-integration claim is made here.
