@@ -97,10 +97,31 @@ def test_a_phrase_counts_its_own_words_and_a_minimum_length() -> None:
         AdoptedPhrase(
             phrase_id=PHRASE_ID, text=WORDS, words=MIN_ADOPTED_RUN_WORDS + 1, final_spans=(SPAN,)
         )
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValidationError, match="MIN_ADOPTED_RUN_WORDS"):
         phrase(text="too short")
     with pytest.raises(ValidationError):
         phrase(phrase_id="phrase:nothex")
+
+
+def test_a_semantic_phrase_may_be_short_but_carries_its_similarity() -> None:
+    short = AdoptedPhrase(
+        phrase_id="phrase:aaaaaaaaaaaaaaaa",
+        kind="semantic",
+        text="providers keep logs",
+        words=3,
+        final_spans=(SPAN,),
+        similarity=0.83,
+        judge_probability=0.9,
+    )
+    assert short.kind == "semantic"
+    with pytest.raises(ValidationError, match="its similarity"):
+        AdoptedPhrase(
+            phrase_id="phrase:aaaaaaaaaaaaaaaa",
+            kind="semantic",
+            text="providers keep logs",
+            words=3,
+            final_spans=(SPAN,),
+        )
 
 
 def test_an_adoption_cannot_adopt_more_than_it_inserted() -> None:
@@ -111,6 +132,7 @@ def test_an_adoption_cannot_adopt_more_than_it_inserted() -> None:
         AmendmentAdoption.model_validate(
             base | {"longest_run": MIN_ADOPTED_RUN_WORDS + 5, "adopted_words": 13}
         )
+    assert AmendmentAdoption.model_validate(base | {"kind": "semantic"}).kind == "semantic"
 
 
 def test_references_must_resolve() -> None:
@@ -128,4 +150,6 @@ def test_references_must_resolve() -> None:
 def test_credits_are_listed_from_most_to_least() -> None:
     with pytest.raises(ValidationError, match="most to least"):
         view(credits=(credit(0.5), credit(1.0)))
+    semantic = credit(0.2).model_copy(update={"basis": "semantic"})
+    assert view(credits=(credit(1.0), credit(0.5), semantic)).credits[-1].basis == "semantic"
     assert view(credits=()).credits == ()
