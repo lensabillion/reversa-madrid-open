@@ -6,7 +6,9 @@ view says "unknown" with the reason and searches no origins. Origins
 (`services/origin.py`) are searched only in the law's consultation documents that have
 text: adopted phrases first, then inserted wording whether or not it was adopted. A
 document counts toward `documents_with_origin` only through a match that counts as an
-origin (dated before every carrying amendment, and not a citation).
+origin (dated before every carrying amendment, and not a citation). With a Jev `judge`,
+reworded origins (`services/lineage_jev.py`) are added for the adopting amendments: BM25
+shortlists passages and Jev judges each pair.
 
 The cost is that of the pieces: adoption is linear in the law's words plus one diff per
 amendment, and each origin search is linear in the documents' words.
@@ -18,7 +20,9 @@ from pathlib import Path
 from influence.extraction.files import write_bytes_atomic
 from influence.extraction.layout import procedure_slug
 from influence.schemas.lineage import LineageView, OriginMatch, TabledPhrase
+from influence.services.jev_judge import JevJudge
 from influence.services.lineage import Rarity, adopt
+from influence.services.lineage_jev import reworded_origins
 from influence.services.origin import (
     CONSULTATION_KINDS,
     find_origins,
@@ -30,8 +34,9 @@ from influence.services.pipeline import Collected
 VIEW_FILE = "lineage.json"
 METHOD = "verbatim-adopted-phrases"
 METHOD_REVISION = "lineage-1.1"
+VERBATIM_ONLY = "Verbatim wording only: a request the final act says in other words is not traced."
 LIMITATIONS = (
-    "Verbatim wording only: a request the final act says in other words is not traced.",
+    VERBATIM_ONLY,
     "Shared wording is evidence, not proof of authorship: the Council, the trilogues, a "
     "common draft or a coalition can explain the same words.",
     "Every holder of a phrase is credited with the whole phrase (no fractional credit); a "
@@ -40,7 +45,16 @@ LIMITATIONS = (
 )
 
 
-def build_lineage(collected: Collected, *, generated_at: datetime) -> LineageView:
+REWORDED = (
+    "Reworded origins are Jev's judgement on BM25's shortlist of passages per adopting "
+    "amendment: a request that shares none of the amendment's rare words is not judged, and "
+    "adoption itself (amendment to final act) is still traced word for word."
+)
+
+
+def build_lineage(
+    collected: Collected, *, generated_at: datetime, judge: JevJudge | None = None
+) -> LineageView:
     """Adoption, then origins in the law's consultation documents, as one `LineageView`."""
     adoption = adopt(collected)
     texts = {text.document_id: text for text in collected.document_texts}
@@ -78,6 +92,18 @@ def build_lineage(collected: Collected, *, generated_at: datetime) -> LineageVie
             proposal_texts=[a.text for a in collected.articles if a.stage == "proposal"],
         )
         origins = (*adopted, *others.origins)
+        if judge is not None:
+            known = frozenset(
+                (origin.document_id, amendment_id)
+                for origin in adopted
+                for amendment_id in origin.amendment_ids
+            )
+            reworded, note = reworded_origins(
+                collected, adoption.adoptions, judge, submitters=submitters, known=known
+            )
+            origins = (*origins, *reworded)
+            notes[notes.index(VERBATIM_ONLY)] = REWORDED
+            notes.append(note)
         tabled = others.phrases
         read = len(documents)
         with_origin = len({origin.document_id for origin in origins if origin.counts_as_origin})
