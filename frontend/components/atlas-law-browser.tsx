@@ -17,7 +17,7 @@ import {
 import { useResource } from "../lib/use-resource";
 import { AtlasAnalysis, type AtlasAnalysisProps, type AtlasRankingRow } from "./atlas-analysis";
 import type { AtlasLinkView } from "./atlas-explorer";
-import { AtlasWorkspace } from "./atlas-workspace";
+import { type AtlasDataNotice, AtlasWorkspace } from "./atlas-workspace";
 
 const buildCommand = "make atlas LAW='2021/0106(COD)'";
 const noFindings: AtlasAnalysisProps["findings"] = {
@@ -81,7 +81,7 @@ function coverageNote(row: AtlasLayerCoverage): string | null {
 interface LawAtlas {
   links: AtlasLinkView[];
   coverageNotes: string[];
-  dataNotice: string;
+  dataNotice: AtlasDataNotice;
   rankings: AtlasRankingRow[];
 }
 
@@ -102,12 +102,18 @@ function prepareLawAtlas(view: AtlasView): LawAtlas {
   return {
     links,
     coverageNotes: complete ? ["Every source layer recorded for this law is complete."] : gaps,
-    dataNotice: [
-      `Ask extraction method: ${view.ask_method}.`,
-      ...(view.limitations.length > 0
-        ? view.limitations.map(sentence)
-        : ["The pipeline supplied no limitations for this run."]),
-    ].join(" "),
+    dataNotice: {
+      summary:
+        view.ask_method === "passage-v0"
+          ? "Counts represent submission passages, not distinct requests."
+          : "Results reflect the recorded method and available source material.",
+      details: [
+        `Ask extraction method: ${view.ask_method}.`,
+        ...(view.limitations.length > 0
+          ? view.limitations.map(sentence)
+          : ["The pipeline supplied no limitations for this run."]),
+      ],
+    },
     // The backend orders rankings; this view must not re-rank them.
     rankings: view.rankings.map((row) => ({
       actorId: row.actor_id,

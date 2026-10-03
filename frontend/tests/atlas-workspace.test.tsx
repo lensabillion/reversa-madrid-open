@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, expect, test, vi } from "vitest";
 import { AtlasExplorer } from "../components/atlas-explorer";
 import type { AtlasGraphSnapshot } from "../components/atlas-graph";
-import { AtlasWorkspace } from "../components/atlas-workspace";
+import { type AtlasDataNotice, AtlasWorkspace } from "../components/atlas-workspace";
 import { type AtlasBundle, atlasLinkViews } from "../lib/atlas";
 
 // Isolate the graph renderer while exercising the real workspace-to-evidence handoff.
@@ -48,13 +48,19 @@ const links = atlasLinkViews(bundle);
 const snapshot: AtlasGraphSnapshot = { snapshot_id: "workspace-test", nodes: [], edges: [] };
 const notice = "Invented contract fixtures only; no real influence findings.";
 
-function workspace(suppliedLinks = links) {
+function workspace(
+  suppliedLinks = links,
+  dataNotice: AtlasDataNotice = {
+    summary: "Demonstration data only; no real findings.",
+    details: [notice],
+  },
+) {
   return (
     <AtlasWorkspace
       snapshot={snapshot}
       links={suppliedLinks}
       coverageNotes={["Synthetic source coverage"]}
-      dataNotice={notice}
+      dataNotice={dataNotice}
       analysis={<p>Supplied outcome table</p>}
     />
   );
@@ -88,6 +94,31 @@ test("switches to supplied outcomes and back without claiming unknown outcomes a
   fireEvent.click(screen.getByRole("button", { name: "Explore the graph" }));
   expect(screen.getByRole("region", { name: "Graph display" })).toBeDefined();
   expect(screen.queryByText("Supplied outcome table")).toBeNull();
+});
+
+test("keeps long warnings inside collapsed details and lets readers expand and close them", () => {
+  const identifier = `ask:passage-doc-hys_attachment-${"a".repeat(160)}-14`;
+  const warning = `5 asks were excluded before retrieval. ${identifier}: at most 800 tokens.`;
+  const summary = "Counts represent submission passages, not distinct requests.";
+  render(workspace(links, { summary, details: [notice, warning] }));
+
+  const section = screen.getByRole("region", { name: "About these results" });
+  const details = section.querySelector("details");
+  if (details === null) {
+    throw new Error("Data details disclosure missing");
+  }
+  expect(details.open).toBe(false);
+  expect(within(section).getByText(summary).closest("details")).toBeNull();
+  expect(within(section).getByText(warning).closest("details")).toBe(details);
+  expect(within(section).getByText(notice).closest("details")).toBe(details);
+  expect(screen.getByRole("region", { name: "Graph display" })).toBeDefined();
+
+  const toggle = within(section).getByText("Coverage, methods and excluded records");
+  fireEvent.click(toggle);
+  expect(details.open).toBe(true);
+  expect(within(details).getByText(warning).textContent).toContain(identifier);
+  fireEvent.click(toggle);
+  expect(details.open).toBe(false);
 });
 
 test("graph callbacks open the exact link and a later graph selection replaces evidence selection", () => {

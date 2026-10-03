@@ -492,3 +492,21 @@ Diagnostic wrappers recorded phase times and fetch counts without changing algor
 the source fingerprint and assessor/pipeline/matcher hashes were captured before the run.
 Artifacts remain under ignored `data/laws/2021-0106-COD/`; earlier view/audit artifacts
 are preserved separately under `gate3-runs/rules-2-0741e0e3d9fb/`.
+
+## Frontend Coverage Notice — 3 October 2026
+
+`rev-jc78` fixes the oversized diagnostic wall in the Atlas header (part 8). The visible
+notice now explains passage-based counts in one sentence. A native collapsed disclosure
+retains the exact method and every supplied limitation; its content scrolls within a
+bounded area and long record IDs wrap. Future extraction methods receive neutral wording,
+and an empty limitations list does not imply that all data were processed. Scoring,
+exclusions, API records and graph publication are unchanged.
+
+The corrected preview at `http://localhost:3015/atlas?law=2021-0106-COD` uses the same
+real backend as the previous page. Browser inspection confirms the short notice and
+collapsed details above the graph navigation. The existing saved AI Act run still reports
+five excluded passages and nine unsearchable amendments; this UI change preserves those
+facts instead of presenting raw diagnostics as the main page content. `make check` passed:
+1,150 backend tests with 100% branch coverage, 96 frontend tests, production build,
+and both dependency audits. Browser expansion and collapse preserved all diagnostics.
+PR CI is recorded on the bead.
