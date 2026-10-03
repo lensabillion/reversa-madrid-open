@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect atlas \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend
 
@@ -66,6 +66,10 @@ dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ ch
 
 # The 19:00 command. $(BACKEND) runs inside backend/, so paths are made absolute here.
 # EXPECTED_PAIRS is passed only when set, so the command's own default (60) stays the one copy.
+atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
+	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
+	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
+
 collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make collect LAW='2021/0106(COD)'))
 	$(BACKEND) influence collect "$(LAW)" $(ARGS)

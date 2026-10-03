@@ -371,14 +371,21 @@ def _location(value: object) -> str | None:
 
 
 def _amendment(
-    record: Record, procedure_id: str, stage: AmendmentStage, source_id: str
+    record: Record,
+    procedure_id: str,
+    stage: AmendmentStage,
+    source_id: str,
+    dump_document_id: str,
 ) -> Amendment:
     committee = "/".join(_strings(record.get("committee"))) or None
     label = "PLENARY" if stage == "plenary" else id_part(committee or "UNKNOWN")
     return Amendment(
         amendment_id=f"am:{id_part(procedure_id)}:{label}:{id_part(source_id)}",
         procedure_id=procedure_id,
-        document_id=document_id("parltrack", _text(record.get("peid")) or source_id),
+        # The dump is the file this connector retrieves and hashes, so it is the source an
+        # amendment can cite (`dump_source_document`). The Parliament document is not
+        # downloaded; its number stays in the amendment's own identifier.
+        document_id=dump_document_id,
         stage=stage,
         committee=committee,
         number=_number(record.get("seq")),
@@ -400,6 +407,7 @@ def _amendments(
 ) -> Iterator[Amendment]:
     """One pass over the dump; memory grows only with the identifiers of the matches."""
     seen: set[str] = set()
+    dump_document_id = document_id("parltrack", path.name.removesuffix(DUMP_SUFFIX))
     for record in iter_dump(path, containing=procedure_id):
         if record.get("reference") != procedure_id:
             continue
@@ -416,7 +424,7 @@ def _amendments(
         try:
             # ValueError covers both a failed validation and an identifier with no
             # characters an Atlas ID accepts.
-            amendment = _amendment(record, procedure_id, stage, source_id)
+            amendment = _amendment(record, procedure_id, stage, source_id, dump_document_id)
         except ValueError:
             _count(skipped, SKIP_INVALID)
             continue
