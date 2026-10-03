@@ -6,7 +6,11 @@ Parltrack dumps, the register export and the Have Your Say index.
 `data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
 writes the view the explorer serves (`atlas.json`). `influence coordinated <law>` collects,
 then lists the near-identical amendments tabled by different political groups
-(`coordinated.json`). `influence submit` is the first brief's pairs command, kept until
+(`coordinated.json`). `influence channels <law>` collects, then counts the channels the law
+was lobbied through: consultation stages, timing, tabling Members and coalitions
+(`channels.json`). `influence directions <law>` collects, then counts which way the
+amendments move the law and, through the atlas view's published links, each actor's asks
+(`directions.json`). `influence submit` is the first brief's pairs command, kept until
 part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
 or output failure, 2 on a command-line usage error.
 """
@@ -27,7 +31,9 @@ from influence.extraction.cache import CacheError, HttpCache
 from influence.extraction.cli import default_data_root
 from influence.extraction.fetching import CachedFetcher, UrllibFetcher
 from influence.extraction.records import RecordError
+from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
+from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
     CollectError,
@@ -39,7 +45,14 @@ from influence.services.collect import (
     source_revision,
 )
 from influence.services.coordinated import build_coordination, write_coordination
-from influence.services.pipeline import PipelineError, build_view, load_collected, write_view
+from influence.services.direction import build_directions, write_directions
+from influence.services.pipeline import (
+    PipelineError,
+    build_view,
+    load_collected,
+    read_view,
+    write_view,
+)
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
 from influence.services.submission import SubmissionError, run_submission
 
@@ -47,6 +60,8 @@ from influence.services.submission import SubmissionError, run_submission
 EXPECTED_PAIRS = 60
 # Clusters `influence coordinated` prints; the file holds all of them.
 CLUSTERS_SHOWN = 10
+# Political groups and actors `influence directions` prints; the file holds all of them.
+GROUPS_SHOWN = 10
 QUOTE_CHARACTERS = 200
 # The index crawl asks about 4,170 pages over about 35 minutes; a line per 250 shows it
 # is moving without flooding the terminal.
@@ -213,6 +228,103 @@ def _list_coordinated(result: CollectResult) -> int:
     return 0
 
 
+def _list_channels(result: CollectResult, index: Path) -> int:
+    try:
+        collected = load_collected(result.bundle)
+        types = publication_types(read_index(index)) if index.is_file() else None
+        view = build_channels(
+            collected.law,
+            collected.manifest.run_id,
+            documents=collected.documents,
+            passages=collected.passages,
+            actors=collected.actors,
+            amendments=collected.amendments,
+            types=types,
+            generated_at=datetime.now(UTC),
+        )
+        path = write_channels(view, result.bundle)
+    except (PipelineError, RecordError, HysError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no channels file was written.", file=sys.stderr)
+        return 1
+    consultation, timing, meps, coalitions = (
+        view.consultation,
+        view.timing.feedback_vs_proposal,
+        view.meps,
+        view.coalitions,
+    )
+    print(
+        f"Consultation: {consultation.feedback} feedback from {consultation.submitters} "
+        f"submitters on {len(consultation.by_publication)} publication(s); "
+        f"{consultation.organisations_with_register_id} of {consultation.organisations} "
+        "organisations carry a register ID"
+    )
+    for publication in consultation.by_publication:
+        print(
+            f"  publication {publication.publication_id or 'unknown'} "
+            f"({publication.publication_type or 'type unknown'}): {publication.feedback} feedback"
+        )
+    print(
+        f"Timing: of {timing.total} feedback, {timing.before} before the proposal, "
+        f"{timing.on_or_after} on or after, {timing.undated} undated, "
+        f"{timing.unplaced} with no proposal date to place them"
+    )
+    groups = ", ".join(f"{item.key} {item.count}" for item in meps.by_political_group)
+    print(
+        f"Members: {meps.amendments} amendments by {meps.tabling_meps} Members "
+        f"({meps.no_known_author} with no known author); by group: {groups or 'none known'}"
+    )
+    print(
+        f"Coalitions: {coalitions.cosigned_across_groups} of {coalitions.amendments} amendments "
+        f"co-signed across groups; {coalitions.cross_group_clusters} coordinated clusters "
+        f"across groups hold {coalitions.amendments_in_cross_group_clusters} amendments"
+    )
+    for row in view.votes_and_meetings:
+        print(f"{row.layer.capitalize()}: {row.status} ({row.reason})")
+    print(f"channels: {path.absolute()}")
+    return 0
+
+
+def _counted(pairs: Sequence[tuple[str, int]]) -> str:
+    return ", ".join(f"{name} {count}" for name, count in pairs if count) or "none"
+
+
+def _list_directions(result: CollectResult) -> int:
+    try:
+        collected = load_collected(result.bundle)
+        view = build_directions(
+            collected.law,
+            collected.manifest.run_id,
+            collected.amendments,
+            collected.actors,
+            # The collect bundle is `<data root>/laws/<slug>`, where `atlas` writes its view.
+            read_view(result.bundle.parent.parent, result.bundle.name),
+            generated_at=datetime.now(UTC),
+        )
+        path = write_directions(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no directions file was written.", file=sys.stderr)
+        return 1
+    print(f"Directions of {view.amendments} amendments: {_counted(view.counts.pairs())}")
+    for stage in view.by_stage:
+        print(f"  {stage.stage}: {_counted(stage.counts.pairs())}")
+    for group in view.by_group[:GROUPS_SHOWN]:
+        print(f"  {group.group} ({group.amendments}): {_counted(group.counts.pairs())}")
+    if view.actors_reason is not None:
+        print(f"Actors: {view.actors_status}: {view.actors_reason}")
+    for actor in view.actors[:GROUPS_SHOWN]:
+        print(
+            f"  {actor.name} ({actor.published_links} published links): "
+            f"{_counted(actor.counts.pairs())}"
+        )
+    for example in view.examples:
+        quote = " ".join(example.span.text.split())[:QUOTE_CHARACTERS]
+        print(f'  {example.direction:<9}{example.amendment_id}  "{quote}"')
+    print(f"directions: {path.absolute()}")
+    return 0
+
+
 def _collect(
     query: str,
     data_root: Path | None,
@@ -292,6 +404,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "collect one law, then list near-identical amendments tabled by different "
             "political groups",
         ),
+        ("channels", "collect one law, then count the channels it was lobbied through"),
+        (
+            "directions",
+            "collect one law, then count which way its amendments and, through published "
+            "links, each actor's asks move it",
+        ),
     ):
         command = commands.add_parser(
             name,
@@ -346,6 +464,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "collect": None,
         "atlas": _build_view,
         "coordinated": _list_coordinated,
+        "channels": lambda result: _list_channels(
+            result,
+            CollectInputs.under(
+                cast("Path | None", args.data_root) or default_data_root()
+            ).hys_index,
+        ),
+        "directions": _list_directions,
     }
     if args.command in after:
         return _collect(
