@@ -13,7 +13,7 @@ from extraction_fixtures import FETCHED_AT, FakeUrlResponse, RecordingFetcher
 from pydantic import ValidationError
 
 from influence.extraction import catalog, probe, pull
-from influence.extraction.cache import HttpCache
+from influence.extraction.cache import HttpCache, request_key
 from influence.extraction.catalog import SourceSpec
 from influence.extraction.fetching import (
     USER_AGENT,
@@ -78,6 +78,44 @@ def test_urllib_fetcher_sends_a_contact_address_and_returns_status_type_and_body
     assert "contact:" in USER_AGENT
 
 
+def test_urllib_fetcher_sends_caller_headers_but_never_lets_them_replace_the_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[urllib.request.Request] = []
+
+    def fake_urlopen(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        seen.append(request)
+        return FakeUrlResponse(200, b"<html/>", "application/xhtml+xml")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    UrllibFetcher()(
+        "http://publications.europa.eu/resource/celex/32024R1689",
+        {"Accept": "application/xhtml+xml", "Accept-Language": "eng", "User-Agent": "anonymous"},
+    )
+    assert seen[0].get_header("Accept") == "application/xhtml+xml"
+    assert seen[0].get_header("Accept-language") == "eng"
+    assert seen[0].get_header("User-agent") == USER_AGENT
+
+
+def test_urllib_fetcher_returns_the_body_of_a_multiple_choices_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = "http://publications.europa.eu/resource/celex/52021PC0206"
+    answer_headers = Message()
+    answer_headers["Content-Type"] = "application/xhtml+xml"
+    choices = urllib.error.HTTPError(
+        url, 300, "Multiple Choices", answer_headers, BytesIO(b"<ul>streams</ul>")
+    )
+
+    def choose(request: urllib.request.Request, timeout: float) -> FakeUrlResponse:
+        raise choices
+
+    monkeypatch.setattr(urllib.request, "urlopen", choose)
+    response = UrllibFetcher()(url)
+    assert response == RawResponse(300, "application/xhtml+xml", b"<ul>streams</ul>")
+    assert choices.closed
+
+
 def test_urllib_fetcher_refuses_a_scheme_it_was_not_asked_to_support() -> None:
     with pytest.raises(FetchError, match="Only http and https"):
         UrllibFetcher()("file:///etc/passwd")
@@ -134,6 +172,63 @@ def test_a_server_error_is_raised_rather_than_cached(tmp_path: Path) -> None:
     with pytest.raises(FetchError):
         fetcher.get(url)
     assert recording.calls == [url, url]
+
+
+def test_request_headers_reach_the_fetcher_and_separate_cache_entries(tmp_path: Path) -> None:
+    url = "http://publications.europa.eu/resource/celex/32024R1689"
+    fetcher, recording = fetcher_for(tmp_path, {url: RawResponse(200, "text/html", b"page")})
+    xhtml = {"Accept": "application/xhtml+xml", "Accept-Language": "eng"}
+    plain = fetcher.get(url)
+    negotiated = fetcher.get(url, headers=xhtml)
+    assert recording.headers == [None, xhtml]
+    assert negotiated.metadata.key != plain.metadata.key
+    # Header names are case-insensitive and unordered, so neither changes the entry.
+    fetcher.get(url, headers={"accept-language": "eng", "ACCEPT": "application/xhtml+xml"})
+    assert len(recording.calls) == 2
+    fetcher.get(url, headers={"Accept": "application/rdf+xml", "Accept-Language": "eng"})
+    assert len(recording.calls) == 3
+
+
+def test_a_request_without_headers_keeps_the_cache_key_it_had_before_headers_existed(
+    tmp_path: Path,
+) -> None:
+    url = "https://transparency-register.europa.eu/"
+    fetcher, _ = fetcher_for(tmp_path, {url: RawResponse(200, "text/html", b"page")})
+    assert fetcher.get(url).metadata.key == request_key("GET", url, b"")
+    assert fetcher.get(url, headers={}).metadata.key != request_key("GET", url, b"")
+
+
+def test_a_fetcher_written_before_headers_existed_still_serves_plain_requests(
+    tmp_path: Path,
+) -> None:
+    def one_argument(url: str) -> RawResponse:
+        return RawResponse(200, None, url.encode())
+
+    fetcher = CachedFetcher(
+        cache=HttpCache(tmp_path),
+        fetcher=one_argument,  # pyright: ignore[reportArgumentType]
+        limiter=RateLimiter(monotonic=lambda: 0.0, sleep=lambda _: None),
+        clock=lambda: FETCHED_AT,
+    )
+    assert fetcher.get("https://a.eu/").body == b"https://a.eu/"
+
+
+def test_a_multiple_choices_answer_is_usable_only_by_a_caller_that_asks_for_it(
+    tmp_path: Path,
+) -> None:
+    url = "http://publications.europa.eu/resource/celex/52021PC0206"
+    fetcher, recording = fetcher_for(tmp_path, {url: RawResponse(300, "text/html", b"streams")})
+    with pytest.raises(FetchError, match="HTTP 300") as refused:
+        fetcher.get(url)
+    assert refused.value.status == 300
+    listed = fetcher.get(url, accept_status=(300,))
+    assert (listed.metadata.status, listed.body) == (300, b"streams")
+    assert fetcher.get(url, accept_status=(300,)).body == b"streams"
+    assert recording.calls == [url, url]
+    # The stored 300 is not an answer for a caller that expects a document.
+    with pytest.raises(FetchError, match="HTTP 300"):
+        fetcher.get(url)
+    assert recording.calls == [url, url, url]
 
 
 def test_cached_fetcher_defaults_to_the_standard_library_and_a_real_clock(

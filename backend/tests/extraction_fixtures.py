@@ -1,6 +1,7 @@
 """Row and response builders shared by the extraction tests."""
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import Message
 from typing import TypedDict
@@ -67,11 +68,17 @@ class FakeUrlResponse:
 
 @dataclass
 class RecordingFetcher:
-    """A Fetcher that answers from a script and records the URLs it was asked for."""
+    """A Fetcher that answers from a script and records the URLs it was asked for.
+
+    `headers` records, call by call, the request headers that came with each URL (None
+    when the caller sent none), so a test can assert on content negotiation.
+    """
 
     responses: dict[str, RawResponse]
     calls: list[str]
+    headers: list[Mapping[str, str] | None] = field(default_factory=list[Mapping[str, str] | None])
 
-    def __call__(self, url: str) -> RawResponse:
+    def __call__(self, url: str, headers: Mapping[str, str] | None = None) -> RawResponse:
         self.calls.append(url)
+        self.headers.append(headers)
         return self.responses[url]

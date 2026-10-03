@@ -145,65 +145,21 @@ the step it depends on has a recorded response shape. Create a bead per step.
 
 ## Agent 1 Handoff: Data and Integration
 
-State of [the Agent 1 assignment](agents/agent-1-data-and-integration.md) at 13:50 CEST on
-3 October, written so another session can take over. Update it whenever a step lands.
+The full handoff is [docs/agents/agent-1-handoff.md](agents/agent-1-handoff.md): branches,
+what is done and measured, what was unfinished, the gate's exact failures, the next
+steps in order and how to run things on the Windows laptop. In short, at 14:15 CEST on
+3 October:
 
-**Branches and pull requests**
-
-| Branch | Holds | State |
-| --- | --- | --- |
-| `feat/atlas-contracts` | `schemas/atlas.py` (schema `atlas-1`) and `backend/tests/fixtures/atlas/` | PR [#25](https://github.com/lensabillion/reversa-madrid-open/pull/25), open. **Agents 2 and 3 build against commit `f1525db`.** All backend gates pass: 222 tests, 100% branch coverage |
-| `feat/extraction-foundations` | Fetcher, HTTP cache, layout, name matching, probe CLI, with `main` merged in | Pushed, no PR yet. 256 tests, 100% branch coverage after the merge (`measured`) |
-| `feat/collect-law` | The two above merged, plus the collection work below | Draft PR; **not** gate-clean until the connectors land |
-
-**Done on `feat/collect-law`** (each with tests, 100% branch coverage of its module):
-
-- `services/law_query.py`: recognises a procedure reference, CELEX or COM number by
-  shape and normalises it; ranks catalog titles for free text; returns up to three
-  choices when the best two are within 3% of each other; an exact alias wins outright.
-- `extraction/records.py`: Atlas records as JSON Lines; `StageStore` keeps each stage's
-  output under `data/laws/<slug>/stages/<stage>/<input hash>/` with a receipt, reuses a
-  stage only when its files still match their hashes, and publishes `manifest.json` last.
-
-**In progress** (four sub-agents, one file set each, same checkout; treat as unfinished
-until its test file passes with 100% branch coverage of its module):
-
-| Files | Job |
-| --- | --- |
-| `repositories/parltrack.py`, `tests/test_parltrack.py` | Stream the Parltrack dumps: procedure catalog, committee and plenary amendments, MEP actors |
-| `repositories/cellar.py`, `tests/test_cellar.py`; request headers in `extraction/fetching.py` | Procedure to CELEX by SPARQL; fetch proposal and final act; split into provisions |
-| `repositories/hys.py`, `services/passages.py`, their tests | Have Your Say index by COM reference, feedback, attachments, passages with offsets |
-| `repositories/register.py`, `services/actors.py`, their tests | Transparency Register export to actors; identity resolution (`rev-1vxz`) |
-
-**Not started, in order:**
-
-1. `services/collect.py`: resolve the query, run the connectors as stages through
-   `StageStore`, fill `LawRecord.coverage` (plan §6), publish the `RunManifest`.
-2. `influence collect <query>` on the existing CLI (`cli.py`), then thin atlas routers.
-3. Gate 1 of the plan on real sources: AI Act `2021/0106(COD)` counts (4,852 amendments;
-   304 feedback items, 259 with attachments), then DSA and an unseen procedure with no
-   code change; cached and uncached timings with hardware.
-4. An alias table for common names ("AI Act", "DSA"), each checked against the catalog.
-5. Retire the row models in `extraction/tables.py` and `extraction/manifest.py` that
-   `schemas/atlas.py` replaces, so one contract remains.
-6. `rev-0who` batch, `rev-p61s` fresh-checkout rerun, `rev-nzqr` release preparation.
-
-**Data on disk** (git-ignored `data/`, downloaded 3 October about 12:20 CEST):
-`data/raw/parltrack/{ep_dossiers,ep_meps,ep_plenary_amendments,ep_amendments}.json.zst`
-(55.3 MB, 9.4 MB, 7.0 MB, 120.0 MB) and `data/raw/registry/register.xml`. The Have Your
-Say index crawl (`data/catalog/hys-index.jsonl`) is started by the Have Your Say sub-agent.
-
-**This laptop** (Windows 11, Intel Core Ultra 7 258V, 32 GB): an Application Control
-policy blocks `uv.exe`, so Python runs in WSL Ubuntu (uv 0.12.8 in `~/.local/bin`,
-environment in `~/venvs/influence` via `UV_PROJECT_ENVIRONMENT`). `make` is not
-installed: run the Makefile targets' commands directly, for example
-`uv run --directory backend --locked pytest --cov`. `tbd` 0.9.0 is installed through npm
-and takes one to two minutes per command here.
-
-**Beads:** `rev-pjk2` is taken over from the earlier cloud session. Creating the contracts
-bead and the CLI/API and UI child beads of `rev-qn6b` was started but not confirmed:
-check `tbd list` before creating them again, then record the child IDs in the Agent 1
-and Agent 3 assignment files.
+- PR [#25](https://github.com/lensabillion/reversa-madrid-open/pull/25) holds the shared
+  contracts (`schemas/atlas.py`, schema `atlas-1`) and fixtures; all nine CI checks are
+  green; Agents 2 and 3 build against commit `f1525db`. It awaits the owner's merge.
+- Draft PR [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)
+  (`feat/collect-law`) holds the law-query parser, the resumable stage store, and the
+  Parltrack, Transparency Register and actor-resolution connectors (each at 100% branch
+  coverage), plus unfinished CELLAR and Have Your Say connectors. Its gate does not pass
+  yet: 458 tests pass, 1 fails, coverage is 90% (`measured`).
+- Not started: the collect service, `influence collect <query>`, the run on real sources
+  for the AI Act and its timings. No link, score or graph exists yet.
 
 ## Continuing in Another Chat
 
