@@ -243,11 +243,11 @@ def test_failure_at_final_rename_keeps_pairs_csv_and_removes_staged_files(tmp_pa
     """Only this rename failure separates the two files: new evidence, unchanged pairs.csv."""
     (tmp_path / PAIRS_CSV).mkdir()
     scored = scored_pairs("A")
-    with pytest.raises(IsADirectoryError):
+    with pytest.raises((IsADirectoryError, PermissionError)):  # Windows raises PermissionError
         write_submission(tmp_path, scored)
     assert sorted(path.name for path in tmp_path.iterdir()) == [PAIRS_CSV, EVIDENCE_JSONL]
     assert (tmp_path / PAIRS_CSV).is_dir()
-    assert (tmp_path / EVIDENCE_JSONL).read_text().count("\n") == 1
+    assert (tmp_path / EVIDENCE_JSONL).read_text(encoding="utf-8").count("\n") == 1
 
 
 WORDS = ("data", "shall", "not", "retain", "30", "days", "consent", "may", ",", ".", "Ä")

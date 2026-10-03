@@ -45,7 +45,7 @@ def test_submit_writes_golden_pairs_csv_and_matching_evidence(
     assert (out / "pairs.csv").read_bytes() == (GOLDEN / "pairs.csv").read_bytes()
     evidence = [
         PairEvidence.model_validate_json(line)
-        for line in (out / "pairs.evidence.jsonl").read_text().splitlines()
+        for line in (out / "pairs.evidence.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert [item.pair_id for item in evidence] == ["P01", 'P,02 "quoted"', "Ä-03", "P04"]
     assert [item.influence_score for item in evidence] == [4 / 7, 1.0, 0.0, 1 / 3]
@@ -57,10 +57,12 @@ def test_invalid_input_exits_nonzero_and_keeps_previous_output(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     pairs = tmp_path / "pairs.jsonl"
-    pairs.write_text((GOLDEN / "input.jsonl").read_text() + "not json\n")
+    pairs.write_text(
+        (GOLDEN / "input.jsonl").read_text(encoding="utf-8") + "not json\n", encoding="utf-8"
+    )
     out = tmp_path / "out"
     out.mkdir()
-    (out / "pairs.csv").write_text("pair_id,influence_score\nOLD,0.5\n")
+    (out / "pairs.csv").write_text("pair_id,influence_score\nOLD,0.5\n", encoding="utf-8")
     status = main(["submit", "--pairs", str(pairs), "--out", str(out), "--expected-pairs", "4"])
     captured = capsys.readouterr()
     assert status == 1
@@ -72,14 +74,14 @@ def test_invalid_input_exits_nonzero_and_keeps_previous_output(
         "Nothing was written. Fix the input (or its adapter) and rerun.\n"
     )
     assert [path.name for path in out.iterdir()] == ["pairs.csv"]
-    assert (out / "pairs.csv").read_text() == "pair_id,influence_score\nOLD,0.5\n"
+    assert (out / "pairs.csv").read_text(encoding="utf-8") == "pair_id,influence_score\nOLD,0.5\n"
 
 
 def test_unwritable_output_exits_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     out = tmp_path / "a-file"
-    out.write_text("")
+    out.write_text("", encoding="utf-8")
     pairs = str(GOLDEN / "input.jsonl")
     status = main(["submit", "--pairs", pairs, "--out", str(out), "--expected-pairs", "4"])
     captured = capsys.readouterr()
