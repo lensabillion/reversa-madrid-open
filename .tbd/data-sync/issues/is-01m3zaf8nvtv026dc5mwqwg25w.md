@@ -5,7 +5,7 @@ title: "Remove research code outside the pipeline: Qwen experiment runtime and c
 kind: chore
 status: in_progress
 priority: 2
-version: 2
+version: 3
 delegate: unknown@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,7 +13,11 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T22:06:34.170Z
-updated_at: 2026-10-02T22:06:42.034Z
+updated_at: 2026-10-03T08:12:35.667Z
 started_at: 2026-10-02T22:06:42.033Z
 ---
 Owner-approved 2026-10-03. Remove backend/evaluation/runtime (run_qwen.py, pyproject.toml, 55-package uv.lock audited by every make check) with its Makefile targets and AGENTS.md rows, and the 7 Python scripts in docs/research/reversa-2026-10/evidence (outside every gate, 148 Ruff findings, R12 rev-4sh8). Keep generated results and text outputs; point their documentation at the code in git history by permalink.
+
+## Notes
+
+PR #18 https://github.com/lensabillion/reversa-madrid-open/pull/18 opened 2026-10-03; make check exit 0 (audit now 29 packages). Close when #18 merges.
