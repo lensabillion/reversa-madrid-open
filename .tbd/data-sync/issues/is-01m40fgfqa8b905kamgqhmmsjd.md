@@ -5,7 +5,7 @@ title: "Part 8 · Any-law command and explorer: a law's name or procedure number
 kind: feature
 status: open
 priority: 0
-version: 5
+version: 6
 labels: []
 dependencies:
   - type: blocks
@@ -15,10 +15,12 @@ child_order_hints:
   - is-01m40nw41zbvnpsq0zexzfhx42
   - is-01m40nw6ndb84q46r7gq1kyknj
 created_at: 2026-10-03T08:53:51.465Z
-updated_at: 2026-10-03T11:23:09.071Z
+updated_at: 2026-10-03T12:13:31.037Z
 ---
 Atlas part 8; the live 'any law' check (20 points) and the 'real links' check (25). Command: influence atlas <procedure|name> runs parts 1-6 for one law (from cache when precomputed) and the explorer shows actors, links and the three-column evidence (ask | amendment | final article). Name lookup over procedure titles and common names. Honest empty states per layer (no consultation, no amendments, not yet adopted, non-English paper not analysed). Time it from cache and from download on the demo laptop.
 
 ## Notes
 
 2026-10-03 13:25 CEST, state of main at bdb0c61 (recorded by cloud session claude/eloquent-allen-jbxbmy): PR #24 (feat/atlas-explorer: explorer, graph and evidence components on fixtures; CI green) and PR #28 (graph projection and outcome rankings services; CI green) are open. CLI/API not started. Child beads rev-k9rm (CLI/API, Agent 1) and rev-ifao (UI, Agent 3) are named in docs/agents/agent-1-handoff.md but not present in the shared tracker.
+
+2026-10-03 14:15 CEST: PR #45 merged (127d3f5). CLI/API half done (rev-k9rm closed): make atlas LAW=... writes data/laws/<procedure>/atlas.json; GET /api/v1/atlas/{slug} serves it. Graph break fixed (amendments cite their Parltrack dump). Open on this bead: the /atlas page that reads the API (rev-ifao), the alias table for common names ('AI Act'), and timing on the demo laptop from download and from cache.
