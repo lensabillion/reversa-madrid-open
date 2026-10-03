@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag
 
@@ -78,6 +78,11 @@ setup:  ## Download collect's global inputs and build the Have Your Say index: m
 collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make collect LAW='2021/0106(COD)'))
 	$(BACKEND) influence collect "$(LAW)" $(ARGS)
+
+# Atlas part 3, from Parltrack alone: the amendments and Members collect already read.
+coordinated:  ## List near-identical amendments tabled across political groups: make coordinated LAW='2021/0106(COD)' [ARGS=--no-attachments]
+	$(if $(LAW),,$(error LAW is required: make coordinated LAW='2021/0106(COD)'))
+	$(BACKEND) influence coordinated "$(LAW)" $(ARGS)
 
 submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
 	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))

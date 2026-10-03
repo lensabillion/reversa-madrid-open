@@ -4,9 +4,11 @@
 Parltrack dumps, the register export and the Have Your Say index.
 `influence collect <law>` is Atlas part 1: it writes one law's public record under
 `data/laws/<procedure>/`. `influence atlas <law>` collects, then runs parts 3 to 7 and
-writes the view the explorer serves (`atlas.json`). `influence submit` is the first
-brief's pairs command, kept until part 4 replaces it. Exit status: 0 when every output
-was written, 1 on any input, source or output failure, 2 on a command-line usage error.
+writes the view the explorer serves (`atlas.json`). `influence coordinated <law>` collects,
+then lists the near-identical amendments tabled by different political groups
+(`coordinated.json`). `influence submit` is the first brief's pairs command, kept until
+part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
+or output failure, 2 on a command-line usage error.
 """
 
 import argparse
@@ -14,7 +16,7 @@ import logging
 import platform
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -35,12 +37,16 @@ from influence.services.collect import (
     collect_law,
     source_revision,
 )
+from influence.services.coordinated import build_coordination, write_coordination
 from influence.services.pipeline import PipelineError, build_view, load_collected, write_view
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
 from influence.services.submission import SubmissionError, run_submission
 
 # The brief's hidden test supplies 60 amendment-submission pairs.
 EXPECTED_PAIRS = 60
+# Clusters `influence coordinated` prints; the file holds all of them.
+CLUSTERS_SHOWN = 10
+QUOTE_CHARACTERS = 200
 # The index crawl asks about 4,170 pages over about 35 minutes; a line per 250 shows it
 # is moving without flooding the terminal.
 CRAWL_REPORT_EVERY = 250
@@ -157,8 +163,53 @@ def _build_view(result: CollectResult) -> int:
     return 0
 
 
+def _list_coordinated(result: CollectResult) -> int:
+    try:
+        collected = load_collected(result.bundle)
+        view = build_coordination(
+            collected.law,
+            collected.manifest.run_id,
+            collected.amendments,
+            collected.actors,
+            generated_at=datetime.now(UTC),
+        )
+        path = write_coordination(view, result.bundle)
+    except (PipelineError, RecordError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("The collected bundle is kept; no cluster file was written.", file=sys.stderr)
+        return 1
+    counts = view.counts
+    crossing = [cluster for cluster in view.clusters if cluster.cross_group]
+    print(
+        f"Coordinated amendments: {len(crossing)} of {len(view.clusters)} clusters span "
+        f"political groups ({counts.amendments} amendments: {counts.compared} compared, "
+        f"{counts.too_short} too short, {counts.not_comparable} not comparable)"
+    )
+    for position, cluster in enumerate(crossing[:CLUSTERS_SHOWN], start=1):
+        print(
+            f"  {position}. {len(cluster.members)} amendments, "
+            f"{'/'.join(cluster.political_groups)}, at least {cluster.inserted_words} "
+            f"inserted words, least similar pair {cluster.min_similarity:.2f}"
+        )
+        for member in cluster.members:
+            groups = "/".join(member.political_groups) or "group unknown"
+            print(
+                f"     {member.amendment_id}  {member.tabled_on or 'undated'}  [{groups}]  "
+                f"{member.target_provision or 'provision unknown'}"
+            )
+        quote = " ... ".join(span.text for span in cluster.members[0].inserted)
+        print(f'     "{" ".join(quote.split())[:QUOTE_CHARACTERS]}"')
+    print(f"clusters: {path.absolute()}")
+    return 0
+
+
 def _collect(
-    query: str, data_root: Path | None, *, refresh: bool, attachments: bool, view: bool = False
+    query: str,
+    data_root: Path | None,
+    *,
+    refresh: bool,
+    attachments: bool,
+    then: Callable[[CollectResult], int] | None = None,
 ) -> int:
     # pypdf warns about every unusual font in every attachment, hundreds of lines per law;
     # none of it changes the extracted text, and it buries the result on the console.
@@ -192,7 +243,7 @@ def _collect(
         print("No manifest was published for this run.", file=sys.stderr)
         return 1
     _print_collected(result, perf_counter() - started)
-    return _build_view(result) if view else 0
+    return then(result) if then is not None else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -225,6 +276,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name, summary in (
         ("collect", "collect one law's public record into data/laws/<procedure>/"),
         ("atlas", "collect one law, then build the explorer's view of it (parts 1 to 7)"),
+        (
+            "coordinated",
+            "collect one law, then list near-identical amendments tabled by different "
+            "political groups",
+        ),
     ):
         command = commands.add_parser(
             name,
@@ -273,13 +329,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("tuple[SetupGroup, ...]", args.only),
             refresh=cast("bool", args.refresh),
         )
-    if args.command in ("collect", "atlas"):
+    after: dict[str, Callable[[CollectResult], int] | None] = {
+        "collect": None,
+        "atlas": _build_view,
+        "coordinated": _list_coordinated,
+    }
+    if args.command in after:
         return _collect(
             " ".join(cast("list[str]", args.query)),
             cast("Path | None", args.data_root),
             refresh=cast("bool", args.refresh),
             attachments=not cast("bool", args.no_attachments),
-            view=args.command == "atlas",
+            then=after[cast("str", args.command)],
         )
     return _submit(
         cast("Path", args.pairs), cast("Path", args.out), cast("int", args.expected_pairs)
