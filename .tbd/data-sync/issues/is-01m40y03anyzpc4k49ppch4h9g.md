@@ -3,14 +3,18 @@ type: is
 id: is-01m40y03anyzpc4k49ppch4h9g
 title: Focus Atlas evidence on cited context so long documents remain comparable
 kind: bug
-status: open
+status: in_progress
 priority: 1
-version: 1
+version: 2
+delegate: claude-code@vm
 labels: []
 dependencies: []
 parent_id: is-01m40nw6ndb84q46r7gq1kyknj
+hold: null
+hold_until: null
 created_at: 2026-10-03T13:07:03.125Z
-updated_at: 2026-10-03T13:07:03.125Z
+updated_at: 2026-10-03T14:16:24.754Z
+started_at: 2026-10-03T14:16:24.749Z
 ---
 Architecture part 8 (Publish), using part 4 source spans and the shared Atlas evidence adapter; no scoring or source-text changes.
 
