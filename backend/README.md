@@ -358,3 +358,56 @@ pipeline's timing. The five input files matched the pinned upstream snapshot byt
 The implementation and validation evidence are tracked in **rev-ic1h**. The remaining
 competition evaluation and adoption work is tracked in **rev-p2rd**, **rev-zzur** and
 **rev-104q**. This README describes the delivered backend; tbd remains the work tracker.
+
+## Atlas Graph and Outcome Consumers
+
+The Atlas consumers use the merged `atlas-1` records in `schemas/atlas.py` and run
+without HTTP. Collection, identity resolution, link assessment and outcome inference
+remain upstream responsibilities.
+
+- `services.atlas_graph.build_graph` projects published actor → request → amendment
+  paths and supported request → final article relations into `GraphSnapshot`. Pass
+  explicit snapshot/run IDs and a timezone-aware generation time for deterministic
+  replay. The service retains coverage and supporting source spans; it rejects invalid
+  joins, mismatched quotations, inconsistent chronology and contradictory outcomes.
+  Missing final outcomes add no realization edge. Audit candidates never create public
+  paths. It does not use historical LobbyPlag labels.
+- `services.atlas_analysis.aggregate_outcomes` consumes laws, actors, requests and
+  outcomes, including requests with no published link. It reports distinct requests,
+  full/partial/not-observed/unknown outcomes and assessed counts for each actor and
+  each stage (`heard`, `parliament_position`, `final_act`). The full-win rate is
+  `full / assessed`, or `None` when no outcome is assessed. Partial outcomes receive no
+  fractional full-win credit. Missing outcomes remain unknown. This measures observed
+  fulfillment, not causal influence.
+
+Requests are deduplicated by canonical `ask_id`, supplied by extraction; these services
+do not infer semantic equivalence between different IDs. Equal outcome classifications
+from repeated amendments count once while preserving their evidence IDs. Conflicting
+classifications for the same request and stage fail explicitly. Joint requests count
+once for each attributed actor; actor rows overlap, so use sample totals rather than
+summing rows. An undated request may have an observed final outcome without supporting
+an origin link in the public graph.
+
+Rankings are ordered within each stage by raw full-win rate descending, then assessed
+count descending and actor ID. They carry counts and gaps; a small sample such as 1/1 is
+not evidence of reliable superiority. Topic filters match supplied subjects exactly;
+year means the first four digits of the procedure reference. No smoothing, spend-adjusted
+ranking or forecast is computed. A reported request inventory count that differs from
+the supplied distinct requests produces an explicit coverage gap, including empty input.
+
+Rehearse and benchmark the committed, invented two-law bundle:
+
+```sh
+uv run --directory backend --locked python benchmarks/atlas_consumers.py
+```
+
+The fixture has 6 requests, 6 assessments and 9 stage outcomes. It produces 11 graph
+nodes and 9 edges, including 2 published origin links and 1 final realization. Final
+outcomes total 2 full, 1 partial, 2 not observed and 1 unknown: 2/5 = 0.4 across assessed
+requests. Only one of the two full outcomes has a published origin link, illustrating
+why fulfillment and attributed influence are separate.
+
+Measured on Apple M5, Python 3.14.7, 3 October 2026: 1,000 cached fixture projections and
+aggregations took 0.1062 seconds (0.1062 ms per run). This tiny in-memory benchmark
+excludes ingestion, scoring, network and disk loading; it does not establish full-pipeline
+runtime or real-world accuracy. The script retains the inputs and measurement procedure.

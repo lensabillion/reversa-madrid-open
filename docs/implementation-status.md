@@ -55,6 +55,34 @@ procedure references, streamed in 6 s with the standard library. The Have Your S
 EUR-Lex folders hold only GDPR samples: the consultation papers and final texts for
 2019–2026 are not downloaded yet. That is the first schedule risk.
 
+## Atlas Graph and Outcome Consumers — 3 October 2026
+
+Agent 3 implemented graph projection and descriptive outcome aggregation against the
+merged `atlas-1` contracts. `services/atlas_graph.py` builds published actor → request
+→ amendment paths and supported request → final article relations, preserving source
+spans, joint attribution and coverage. Invalid joins, inexact quotations, inconsistent
+chronology and contradictory outcomes fail explicitly. Audit candidates create no
+public paths; unknown final outcomes create no realization edge.
+
+`services/atlas_analysis.py` counts every supplied canonical request, including requests
+without published links. Full, partial, not-observed and unknown outcomes stay separate
+at each stage; the full-win rate is full outcomes divided by assessed requests. Repeated
+amendments cannot multiply wins. Coalition rows overlap, so sample totals cannot be
+computed by summing actor rows. Known inventory-count mismatches produce coverage gaps.
+The invented two-law fixture produces 11 nodes, 9 edges, 2 published origin links and
+1 final realization. Its 6 requests have 2 full, 1 partial, 2 not-observed and 1 unknown
+final outcome: 2/5 = 0.4 across assessed requests. These are synthetic contract results,
+not accuracy or causal claims. The [backend handoff](../backend/README.md#atlas-graph-and-outcome-consumers)
+documents interfaces, limitations and the reproducible fixture benchmark.
+
+`make check` passed on 3 October after integrating main through PR #26 (`bdb0c61`):
+538 backend tests; 100% coverage (3,349 statements, 844 branches); Ruff and strict
+basedpyright; 6/6 research catalogs; 37 frontend tests, Biome, TypeScript and production
+build. Backend audit found no known vulnerabilities or adverse statuses in 31 packages;
+frontend audit found 0 vulnerabilities. These services are not wired into a real-data
+pipeline, API or live explorer yet. Any-law latency, real links and public report
+findings remain unverified. Tracking: `rev-i006` and `rev-5yy6`.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
@@ -136,8 +164,8 @@ Cut lines and the hour-by-hour plan are in
 Public-source coverage, the any-law runtime and forecast quality are unverified until
 those beads report measurements.
 
-Extraction has foundations but no parsers. The order the playbook sets, and the order to
-keep: probe every catalog URL and record the real response shapes, resolve one procedure
+The initial extraction foundation had no parsers; PR #26 subsequently added the
+source connectors listed in the Agent 1 handoff below. The original playbook sequence was: probe every catalog URL and record the real response shapes, resolve one procedure
 identifier into a manifest, split the proposal and final act into units and diff them,
 chunk consultation submissions into one ask per passage, parse committee amendment PDFs,
 then write the per-law coverage report. Nothing in that sequence should be written before
@@ -147,20 +175,23 @@ the step it depends on has a recorded response shape. Create a bead per step.
 
 The full handoff is [docs/agents/agent-1-handoff.md](agents/agent-1-handoff.md): branches,
 what is done and measured, what is unfinished, the gate's state, the next
-steps in order and how to run things on the Windows laptop. In short, at 14:15 CEST on
-3 October:
+steps in order and how to run things on the Windows laptop. Its branch and PR states
+are historical: PRs #25 and #26 are now merged, through `bdb0c61`. The summary below
+preserves the handoff observations; the Agent 3 section above records the newer graph
+and analysis consumer work.
 
 - PR [#25](https://github.com/lensabillion/reversa-madrid-open/pull/25) holds the shared
   contracts (`schemas/atlas.py`, schema `atlas-1`) and fixtures; all nine CI checks are
-  green; Agents 2 and 3 build against commit `f1525db`. It awaits the owner's merge.
-- Draft PR [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)
+  green; Agents 2 and 3 build against commit `f1525db`. It is now merged.
+- Merged PR [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)
   (`feat/collect-law`) holds the law-query parser, the resumable stage store, and the
   Parltrack, Transparency Register and actor-resolution connectors (each at 100% branch
   coverage), the CELLAR law-text connector, and the Have Your Say connector with passage
   splitting (its real-data check is not reported yet). The backend gate passes at 14:35:
   486 tests, 100% branch coverage (`measured`).
 - Not started: the collect service, `influence collect <query>`, the run on real sources
-  for the AI Act and its timings. No link, score or graph exists yet.
+  for the AI Act and its timings. No real-data link, score or graph is produced by a
+  collect service yet; Agent 3's graph consumer is verified on synthetic inputs.
 
 ## Continuing in Another Chat
 
