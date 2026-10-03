@@ -6,12 +6,13 @@ import type { LineageView } from "../lib/lineage-api";
 import {
   type ChannelCount,
   drawLinks,
+  type FunnelStep,
   type LineageChannels,
   type OrganisationRanking,
   type OrganisationRow,
 } from "../lib/lineage-insights";
 import { retryStyle } from "./atlas-law-browser";
-import { KindBadge, KindLegend, KindSplitBar } from "./lineage-kind";
+import { KindBadge, KindLegend, KindSplitBar, kindStyle } from "./lineage-kind";
 import type { LawTab } from "./lineage-law-browser";
 
 const count = new Intl.NumberFormat("en-US");
@@ -288,9 +289,7 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
       <p className="text-xs text-stone-500">
         {count.format(ranking.rows.length)} organisations · {count.format(ranking.unnamedDocuments)}{" "}
         matching documents without an organisation name (citizens or unnamed attachments) ·{" "}
-        {count.format(ranking.citations)} matches left out as citations of other acts ·{" "}
-        {count.format(ranking.notFirst)} matches dated after the amendment or undated, which cannot
-        show influence
+        {count.format(ranking.citations)} matches left out as citations of other acts
       </p>
       {matching.length > ORGANISATIONS_SHOWN && (
         <button type="button" onClick={() => setAll((value) => !value)} className={retryStyle}>
@@ -364,6 +363,197 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
+function ratioOf(step: FunnelStep): number | null {
+  return step.part === null || step.whole === null || step.whole === 0
+    ? null
+    : step.part / step.whole;
+}
+
+/**
+ * One hundred cells, the share of them filled: "N of every 100" without reading a scale. With
+ * a `split`, filled cells take the method colours (teal lexical first, then violet semantic).
+ */
+function Waffle({
+  ratio,
+  label,
+  semanticRatio,
+}: {
+  ratio: number;
+  label: string;
+  /** Of `ratio`, the share found only by a reworded match; `null` when not split by method. */
+  semanticRatio: number | null;
+}) {
+  const filled = ratio > 0 ? Math.max(1, Math.round(ratio * 100)) : 0;
+  const semantic =
+    semanticRatio === null || semanticRatio === 0
+      ? 0
+      : Math.min(filled, Math.max(1, Math.round(semanticRatio * 100)));
+  const lexical = filled - semantic;
+  const fill = (cell: number): string => {
+    if (cell >= filled) {
+      return "bg-stone-200";
+    }
+    if (semanticRatio === null) {
+      return "bg-stone-800";
+    }
+    return cell < lexical ? kindStyle.verbatim.mark : kindStyle.semantic.mark;
+  };
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className="grid w-fit shrink-0 grid-cols-10 gap-[3px]"
+    >
+      {Array.from({ length: 100 }, (_, cell) => (
+        <span key={cell} className={`size-2.5 rounded-[2px] ${fill(cell)}`} />
+      ))}
+    </span>
+  );
+}
+
+interface FunnelCopy {
+  /** Completes "N% …" (or "unknown …") as a plain sentence. */
+  headline: string;
+  unit: string;
+  note: string;
+}
+
+function funnelCopy(step: FunnelStep): FunnelCopy {
+  const detail = step.detail === null ? "an unknown number of" : count.format(step.detail);
+  switch (step.id) {
+    case "proposal":
+    case "final":
+      return { headline: "", unit: "provisions", note: "" };
+    case "traced":
+      return {
+        headline: "of the new words came word for word from a Parliament amendment",
+        unit: "words",
+        note: `In ${detail} phrases. For the rest no amendment has the same words: it may come from the Council, the trilogue, or reworded amendments.`,
+      };
+    case "amendments":
+      return {
+        headline: "of the amendments tabled got wording into the law",
+        unit: "amendments",
+        note: "Committee and plenary amendments holding at least one adopted phrase.",
+      };
+    case "documents":
+      return {
+        headline: "of the consultation documents said that wording first",
+        unit: "documents",
+        note: `Before any amendment carried it, from ${detail} named organisations. Shared wording is evidence, not proof of authorship.`,
+      };
+    default: {
+      const unreachable: never = step.id;
+      return unreachable;
+    }
+  }
+}
+
+function TextCard({ label, step }: { label: string; step: FunnelStep | undefined }) {
+  return (
+    <div className="flex-1 rounded-md border border-stone-200 bg-white px-5 py-4 text-center">
+      <p className={eyebrow}>{label}</p>
+      <p className="mt-1 font-serif text-4xl tabular-nums text-stone-900">
+        {step?.part == null ? "unknown" : count.format(step.part)}
+      </p>
+      <p className="text-sm text-stone-600">provisions</p>
+    </div>
+  );
+}
+
+/**
+ * The summary as a funnel: the two texts side by side, then the new wording narrowed step
+ * by step to the amendments and documents that carry it. The narrowing width is the funnel's
+ * shape only; each step's waffle and numbers carry its real share.
+ */
+export function LineageFunnel({ steps }: { steps: readonly FunnelStep[] }) {
+  const [proposal, final, ...stages] = steps;
+  const newWords = final?.detail ?? null;
+  return (
+    <section
+      aria-labelledby="lineage-summary"
+      className="space-y-6 rounded-lg border border-stone-200 bg-gradient-to-b from-white to-stone-100/70 p-5 sm:p-8"
+    >
+      <header className="space-y-1 text-center">
+        <p className={eyebrow}>Summary</p>
+        <h3 id="lineage-summary" className="font-serif text-2xl text-stone-900">
+          From proposal to law
+        </h3>
+      </header>
+      <div className="mx-auto flex max-w-3xl flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+        <TextCard label="Commission proposal" step={proposal} />
+        <span aria-hidden="true" className="text-center text-2xl text-stone-400">
+          →
+        </span>
+        <TextCard label="Law as adopted" step={final} />
+      </div>
+      <p className="mx-auto max-w-3xl rounded-md bg-stone-900 px-5 py-4 text-center text-base leading-7 text-white">
+        <span className="font-serif text-2xl tabular-nums">
+          {newWords === null ? "Unknown" : count.format(newWords)}
+        </span>{" "}
+        words of the final law were not in the proposal. Where did they come from?
+      </p>
+      <ol className="space-y-0">
+        {stages.map((step, index) => {
+          const copy = funnelCopy(step);
+          const ratio = ratioOf(step);
+          const share = ratio === null ? "unknown" : percent.format(ratio);
+          const exact =
+            step.part === null || step.whole === null
+              ? "Not counted in this run"
+              : `${count.format(step.part)} of ${count.format(step.whole)} ${copy.unit}`;
+          return (
+            <li key={step.id} className="flex flex-col items-center">
+              <span aria-hidden="true" className="py-1 text-lg leading-none text-stone-400">
+                ▼
+              </span>
+              <div
+                className="w-full rounded-md border border-stone-200 bg-white p-5 shadow-sm"
+                style={{ maxWidth: `${100 - index * 8}%` }}
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-stone-900">
+                      <span className="mr-2 font-serif text-4xl tabular-nums">{share}</span>
+                      <span className="text-base">{copy.headline}</span>
+                    </p>
+                    <p className="text-sm font-medium tabular-nums text-stone-700">{exact}</p>
+                    {step.split !== null && (
+                      <p className="flex flex-wrap gap-2 pt-1 text-sm">
+                        <KindBadge
+                          kind="verbatim"
+                          note={`${count.format(step.split.lexical)} same words`}
+                        />
+                        <KindBadge
+                          kind="semantic"
+                          note={`${count.format(step.split.semantic)} other words only`}
+                        />
+                      </p>
+                    )}
+                    <p className="max-w-xl text-sm leading-6 text-stone-600">{copy.note}</p>
+                  </div>
+                  {ratio !== null && (
+                    <Waffle
+                      ratio={ratio}
+                      label={`${share}: ${exact}`}
+                      semanticRatio={
+                        step.split === null || step.whole === null || step.whole === 0
+                          ? null
+                          : step.split.semantic / step.whole
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 /** HOW: stage, committee, coalition and timing of the wording that reached the law. */
 export function Channels({ channels }: { channels: LineageChannels }) {
   const { timing } = channels;
@@ -378,12 +568,7 @@ export function Channels({ channels }: { channels: LineageChannels }) {
           final act.
         </p>
       </div>
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile
-          label="Submission said it before the amendment"
-          value={share(timing.askFirst, timing.askFirst + timing.amendmentFirst)}
-          note={`${count.format(timing.askFirst)} of ${count.format(timing.askFirst + timing.amendmentFirst)} dated matches; ${count.format(timing.unknownDate)} undated`}
-        />
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Tile
           label="Cross-group coalitions"
           value={share(channels.crossGroup, channels.withGroup)}

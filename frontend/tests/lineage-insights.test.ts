@@ -6,6 +6,7 @@ import {
   drawLinks,
   filterPhrases,
   lineageChannels,
+  lineageFunnel,
   linkPool,
   phraseFacets,
   rankOrganisations,
@@ -172,4 +173,49 @@ test("a draw is distinct, bounded by the pool, and repeated by its seed", () => 
   );
   // Not a fixed pick: 200 seeds reach most of the 50 phrases.
   expect(seen.size).toBeGreaterThan(40);
+});
+
+test("the funnel quotes the view's counts and provision coverage, never a stand-in", () => {
+  const steps = lineageFunnel(view, rankOrganisations(view));
+  const { counts } = view;
+  expect(steps.map((step) => step.id)).toEqual([
+    "proposal",
+    "final",
+    "traced",
+    "amendments",
+    "documents",
+  ]);
+  const proposal = view.coverage.find((row) => row.layer === "proposal");
+  expect(steps[0]?.part).toBe(proposal?.count);
+  expect(steps[1]?.detail).toBe(counts.changed_units);
+  expect(steps[2]).toMatchObject({
+    part: counts.linked_units,
+    whole: counts.changed_units,
+    detail: counts.adopted_phrases,
+  });
+  expect(steps[3]).toMatchObject({ part: counts.amendments_adopting, whole: counts.amendments });
+  expect(steps[4]).toMatchObject({
+    part: counts.documents_with_origin,
+    whole: counts.documents_read,
+  });
+  const split = steps[4]?.split;
+  expect((split?.lexical ?? 0) + (split?.semantic ?? 0)).toBe(counts.documents_with_origin);
+});
+
+test("the funnel counts a document reworded-only when it has no word-for-word origin", () => {
+  const reworded = { ...origin, document_id: "doc:hys_feedback:77", kind: "semantic" as const };
+  const both = { ...origin, document_id: "doc:hys_feedback:78" };
+  const steps = lineageFunnel(
+    withOrigins([origin, reworded, both, { ...both, kind: "semantic" }]),
+    rankOrganisations(view),
+  );
+  expect(steps[4]?.split).toEqual({ lexical: 2, semantic: 1 });
+});
+
+test("a funnel step reads unknown when its text was not fully collected", () => {
+  const coverage = view.coverage.map((row) =>
+    row.layer === "final_act" ? { ...row, status: "partial" as const, reason: "cut" } : row,
+  );
+  const steps = lineageFunnel({ ...view, coverage }, rankOrganisations(view));
+  expect(steps[1]?.part).toBeNull();
 });

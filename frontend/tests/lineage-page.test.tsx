@@ -105,7 +105,10 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
     "Acme Unknown Lobby leads, with 1 adopted phrase said first.",
   );
   expect(questions.closest("section")?.textContent).toContain("No forecast yet");
-  expect(screen.getByText("18 of 103")).toBeDefined();
+  const summary = screen.getByRole("region", { name: "From proposal to law" });
+  expect(within(summary).getByText("18 of 103 words")).toBeDefined();
+  expect(within(summary).getByText("1 of 3 amendments")).toBeDefined();
+  expect(within(summary).getByRole("img", { name: "17%: 18 of 103 words" })).toBeDefined();
   expect(screen.queryByRole("article")).toBeNull();
   await openTab("Evidence");
   const card = await screen.findByRole("article", { name: /Phrase phrase:/ });
@@ -349,7 +352,10 @@ test("an unknown adoption shows its reason and unknown counts, never zeros", asy
 
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toContain(`Adoption could not be computed for this law. ${reason}.`);
-  expect(screen.getAllByText("unknown")).toHaveLength(4);
+  const summary = screen.getByRole("region", { name: "From proposal to law" });
+  expect(within(summary).getAllByText("unknown")).toHaveLength(3);
+  expect(within(summary).getAllByText("Not counted in this run")).toHaveLength(3);
+  expect(within(summary).queryByRole("img")).toBeNull();
   expect(await screen.findByText(/adoption unknown/)).toBeDefined();
 });
 
