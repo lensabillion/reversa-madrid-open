@@ -5,7 +5,7 @@ title: "Part 1 · Collect: influence collect <procedure> downloads and normalize
 kind: feature
 status: in_progress
 priority: 0
-version: 14
+version: 15
 delegate: claude-code@vm
 labels: []
 dependencies:
@@ -17,7 +17,7 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-02T18:21:17.677Z
-updated_at: 2026-10-03T12:13:31.967Z
+updated_at: 2026-10-03T12:26:56.925Z
 started_at: 2026-10-02T18:21:17.985Z
 ---
 CLI: influence load <law>. Sources: Have Your Say API (feedback + attachment PDFs as text), Parltrack committee amendments dump, Publications Office (CELLAR) texts of Parliament's position and the final act. Output under data/laws/<law>/ as JSONL + text with provenance. Start with the AI Act (2021/0106(COD)).
@@ -35,3 +35,5 @@ CLI: influence load <law>. Sources: Have Your Say API (feedback + attachment PDF
 2026-10-03 13:51 CEST: PR #34 merged by the owner (all 9 CI checks green on 2f246f6, backend tests completed 11:49:40Z). Open item before closing: the real-data gate-1 run on a laptop with the data - make collect LAW='2021/0106(COD)' - recording counts against the research (4,852 committee amendments; 304 HYS items, 259 with attachments) and cached/uncached timings with hardware; then a second law (DSA 2020/0361(COD)) with no code change. Setup command tracked in rev-6c1o.
 
 2026-10-03 14:15 CEST: PR #45 merged: amendments now cite their Parltrack dump SourceDocument (graph join fixed); MEPs missing from the MEP dump get placeholder actors (counts.meps_not_in_dump). Still open until the real-data run of make collect LAW='2021/0106(COD)' on a laptop, with counts and timings recorded.
+
+2026-10-03 Agent 2, real run of the collect stage on the AI Act: 18.5 s from cache (39.4 s first time), 376 proposal / 712 final-act provisions, 4852 committee and 808 plenary amendments, 437 asks (352 attachments skipped), 583 actors. Two crashes found and fixed in PR #47: JSON Lines readers used str.splitlines() which splits at U+2028 (one submission holds a raw U+2028), and an amendment over 800 tokens stopped retrieval for the whole law. Whole atlas command: 2 min 10 s. CELLAR article-kind counts (19 final, 22 proposal) differ from the handoff's (113, 85); totals match, probably a classification difference, unchecked.
