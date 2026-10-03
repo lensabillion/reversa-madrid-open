@@ -129,8 +129,11 @@ run: it never renders partial or repaired evidence.
 - `lib/atlas-api.ts`: endpoint types and readers; a non-2xx answer throws `AtlasApiError`
 
 `tests/atlas-page.test.tsx` feeds the page the committed `atlas-1` fixtures through a mocked
-`fetch`, with a stand-in for Next.js's search-params hook. Not verified: the page against
-the real backend endpoints (built in parallel), a real law's run, and a browser session.
+`fetch`, with a stand-in for Next.js's search-params hook. Checked once by hand in headless
+Chromium: the production build against the real backend serving a view that
+`services/pipeline.py` built from the backend's offline test world. The law opened, its
+graph and quoted phrase rendered, a law without a view showed the 404 detail, and Back
+returned to the law. Not verified: a real law's run.
 
 ## Atlas Components and Agent 3 Handoff
 
