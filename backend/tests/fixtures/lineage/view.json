@@ -89,7 +89,9 @@
     "documents_read": 5,
     "documents_with_origin": 1,
     "changed_units": 103,
-    "linked_units": 18
+    "linked_units": 18,
+    "proposal_units": 119,
+    "final_units": 117
   },
   "adopted_phrases": [
     {

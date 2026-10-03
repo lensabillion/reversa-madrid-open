@@ -266,6 +266,10 @@ def test_coverage_counts_cannot_link_more_than_changed() -> None:
         LineageCounts.model_validate(fields | {"linked_units": 11})
     with pytest.raises(ValidationError, match="Documents with an origin cannot exceed"):
         LineageCounts.model_validate(fields | {"documents_with_origin": 5})
+    sized = fields | {"proposal_units": 40, "final_units": 12}
+    assert LineageCounts.model_validate(sized).final_units == 12
+    with pytest.raises(ValidationError, match="Changed units cannot exceed"):
+        LineageCounts.model_validate(sized | {"final_units": 9})
 
 
 def test_a_count_not_computed_is_none_never_zero() -> None:
@@ -278,5 +282,7 @@ def test_a_count_not_computed_is_none_never_zero() -> None:
         counts.documents_with_origin,
         counts.changed_units,
         counts.linked_units,
-    ) == (None, None, None, None, None, None, None)
+        counts.proposal_units,
+        counts.final_units,
+    ) == (None, None, None, None, None, None, None, None, None)
     assert LineageCounts(amendments=5, linked_units=3).linked_units == 3

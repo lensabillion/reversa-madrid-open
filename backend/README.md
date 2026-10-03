@@ -382,7 +382,10 @@ author. An author whose group is unknown credits no group (`phrases_without_grou
 document counts as an origin only when it is dated before every carrying amendment
 (`eligibility` "ask_first") and is not a citation. Without the proposal or the final act the
 view is `status: "unknown"` with its reason, and every count that could not be computed is
-null, never zero. `python -m influence.practice.lineage_review` draws a seeded uniform
+null, never zero. `counts.proposal_units` and `counts.final_units` are the words of the whole
+proposal and final act, counted like `changed_units`: the explorer compares the two texts in
+words because CELLAR's provisions are split differently (a proposal by article, a final act
+mostly by paragraph), so provision counts do not measure size. `python -m influence.practice.lineage_review` draws a seeded uniform
 sample of phrases for two readers to label. Nothing in this view has been audited yet.
 
 ## Channels Command (Part 7, HOW)

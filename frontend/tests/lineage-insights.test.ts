@@ -175,7 +175,7 @@ test("a draw is distinct, bounded by the pool, and repeated by its seed", () => 
   expect(seen.size).toBeGreaterThan(40);
 });
 
-test("the funnel quotes the view's counts and provision coverage, never a stand-in", () => {
+test("the funnel quotes the view's counts, never a stand-in", () => {
   const steps = lineageFunnel(view, rankOrganisations(view));
   const { counts } = view;
   expect(steps.map((step) => step.id)).toEqual([
@@ -185,9 +185,8 @@ test("the funnel quotes the view's counts and provision coverage, never a stand-
     "amendments",
     "documents",
   ]);
-  const proposal = view.coverage.find((row) => row.layer === "proposal");
-  expect(steps[0]?.part).toBe(proposal?.count);
-  expect(steps[1]?.detail).toBe(counts.changed_units);
+  expect(steps[0]?.part).toBe(counts.proposal_units);
+  expect(steps[1]).toMatchObject({ part: counts.final_units, detail: counts.changed_units });
   expect(steps[2]).toMatchObject({
     part: counts.linked_units,
     whole: counts.changed_units,
@@ -212,10 +211,8 @@ test("the funnel counts a document reworded-only when it has no word-for-word or
   expect(steps[4]?.split).toEqual({ lexical: 2, semantic: 1 });
 });
 
-test("a funnel step reads unknown when its text was not fully collected", () => {
-  const coverage = view.coverage.map((row) =>
-    row.layer === "final_act" ? { ...row, status: "partial" as const, reason: "cut" } : row,
-  );
-  const steps = lineageFunnel({ ...view, coverage }, rankOrganisations(view));
-  expect(steps[1]?.part).toBeNull();
+test("a funnel step reads unknown when its text's size was not computed", () => {
+  const counts = { ...view.counts, proposal_units: null, final_units: null };
+  const steps = lineageFunnel({ ...view, counts }, rankOrganisations(view));
+  expect([steps[0]?.part, steps[1]?.part]).toEqual([null, null]);
 });

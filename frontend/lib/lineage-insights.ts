@@ -376,7 +376,7 @@ export function drawLinks(
 export interface FunnelStep {
   id: "proposal" | "final" | "traced" | "amendments" | "documents";
   part: number | null;
-  /** `null` when the step has no total to compare with (the two texts' provision counts). */
+  /** `null` when the step has no total to compare with (the two texts' word counts). */
   whole: number | null;
   /** Extra counts the step's sentence quotes, `null` when not counted. */
   detail: number | null;
@@ -387,14 +387,9 @@ export interface FunnelStep {
   split: { lexical: number; semantic: number } | null;
 }
 
-function provisions(view: LineageView, layer: "proposal" | "final_act"): number | null {
-  const row = view.coverage.find((item) => item.layer === layer);
-  return row === undefined || row.status !== "complete" ? null : row.count;
-}
-
 /**
- * The law's lineage as five steps a newcomer reads top to bottom: the proposal's provisions,
- * the final act's provisions and its new words, the new words traced to amendments (in how
+ * The law's lineage as five steps a newcomer reads top to bottom: the proposal's words, the
+ * final act's words and how many of them are new, the new words traced to amendments (in how
  * many adopted phrases), the amendments that carry them, and the consultation documents that
  * said that wording first (from how many named organisations). Only counts already in the
  * view; nothing is estimated.
@@ -414,10 +409,10 @@ export function lineageFunnel(
   }
   const lexical = [...kinds.values()].filter((seen) => seen.has("verbatim")).length;
   return [
-    { id: "proposal", part: provisions(view, "proposal"), whole: null, detail: null, split: null },
+    { id: "proposal", part: counts.proposal_units, whole: null, detail: null, split: null },
     {
       id: "final",
-      part: provisions(view, "final_act"),
+      part: counts.final_units,
       whole: null,
       detail: counts.changed_units,
       split: null,

@@ -1,5 +1,5 @@
 import type { AtlasLayer, AtlasLayerCoverage, AtlasLayerStatus } from "../lib/atlas-api";
-import type { LineageView } from "../lib/lineage-api";
+import type { LineageCounts, LineageView } from "../lib/lineage-api";
 import { KindBadge } from "./lineage-kind";
 
 const count = new Intl.NumberFormat("en-US");
@@ -27,7 +27,7 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
         "Any 8 words in a row in the final law that the proposal does not have are new.",
         "Capitals and punctuation are ignored.",
       ],
-      result: `${known(counts.changed_units)} new words`,
+      result: `${known(counts.changed_units)} of ${known(counts.final_units)} words are new`,
     },
     {
       id: "amendment",
@@ -70,8 +70,16 @@ interface DataSource {
   publisher: string;
   url: string;
   gives: string;
-  /** The coverage rows this source fills, each with the unit its count is in. */
-  layers: readonly { layer: AtlasLayer; unit: string }[];
+  /**
+   * The coverage rows this source fills, each with the unit its count is in. A row with
+   * `words` shows that word total from `counts` instead of the row's provision count, since
+   * provisions are split differently in the proposal and the final act.
+   */
+  layers: readonly {
+    layer: AtlasLayer;
+    unit: string;
+    words?: "proposal_units" | "final_units";
+  }[];
 }
 
 const SOURCES: readonly DataSource[] = [
@@ -81,10 +89,10 @@ const SOURCES: readonly DataSource[] = [
     publisher: "EU Publications Office (EUR-Lex / CELLAR)",
     url: "https://eur-lex.europa.eu",
     gives:
-      "The two official texts compared in step 1, split into recitals, articles, paragraphs, points and annexes.",
+      "The two official texts compared in step 1, word by word, whatever their division into articles and paragraphs.",
     layers: [
-      { layer: "proposal", unit: "proposal provisions" },
-      { layer: "final_act", unit: "final-law provisions" },
+      { layer: "proposal", unit: "words in the proposal", words: "proposal_units" },
+      { layer: "final_act", unit: "words in the final law", words: "final_units" },
     ],
   },
   {
@@ -131,12 +139,14 @@ function coverageLine(
   coverage: readonly AtlasLayerCoverage[],
   layer: AtlasLayer,
   unit: string,
+  words: number | null | undefined,
 ): { text: string; complete: boolean; reason: string | null } {
   const row = coverage.find((item) => item.layer === layer);
   if (row === undefined) {
     return { text: `${unit}: not recorded`, complete: false, reason: null };
   }
-  const amount = row.count === null ? "" : `${count.format(row.count)} `;
+  const shown = words === undefined ? row.count : words;
+  const amount = shown === null ? "" : `${count.format(shown)} `;
   return {
     text: `${amount}${unit}${row.status === "complete" ? "" : ` (${statusText[row.status]})`}`,
     complete: row.status === "complete",
@@ -145,7 +155,13 @@ function coverageLine(
 }
 
 /** The public sources behind the steps, with what this law's run took from each. */
-function Sources({ coverage }: { coverage: readonly AtlasLayerCoverage[] }) {
+function Sources({
+  coverage,
+  counts,
+}: {
+  coverage: readonly AtlasLayerCoverage[];
+  counts: LineageCounts;
+}) {
   return (
     <section aria-labelledby="lineage-sources" className="space-y-3">
       <div className="max-w-3xl space-y-1">
@@ -174,8 +190,13 @@ function Sources({ coverage }: { coverage: readonly AtlasLayerCoverage[] }) {
             </a>
             <p className="text-sm leading-6 text-stone-700">{source.gives}</p>
             <ul className="mt-auto space-y-1 rounded-sm bg-stone-100 px-3 py-2 text-sm">
-              {source.layers.map(({ layer, unit }) => {
-                const line = coverageLine(coverage, layer, unit);
+              {source.layers.map(({ layer, unit, words }) => {
+                const line = coverageLine(
+                  coverage,
+                  layer,
+                  unit,
+                  words === undefined ? undefined : counts[words],
+                );
                 return (
                   <li key={layer} className="tabular-nums text-stone-900">
                     {line.text}
@@ -261,7 +282,7 @@ export function LineageMethod({ view }: { view: LineageView }) {
           </li>
         ))}
       </ol>
-      <Sources coverage={view.coverage} />
+      <Sources coverage={view.coverage} counts={view.counts} />
       <div className="max-w-3xl rounded-md border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <p className="font-medium">What this does not prove</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">

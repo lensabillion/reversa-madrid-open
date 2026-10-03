@@ -117,6 +117,12 @@ export interface LineageCounts {
   /** Words of the final act in a window the proposal lacks, and those inside adopted phrases. */
   changed_units: number | null;
   linked_units: number | null;
+  /**
+   * Words of the whole proposal and final act, counted like `changed_units`, so the two texts
+   * compare in size whatever provisions each is split into.
+   */
+  proposal_units: number | null;
+  final_units: number | null;
 }
 
 /** Everything the explorer shows for one law's lineage, from one run. */

@@ -104,6 +104,8 @@ class Adoption:
     changed_units: int | None = None
     linked_units: int | None = None
     phrases_without_group: int | None = None
+    proposal_units: int | None = None
+    final_units: int | None = None
 
     @property
     def amendments_adopting(self) -> int | None:
@@ -121,6 +123,8 @@ class Adoption:
             documents_with_origin=documents_with_origin,
             changed_units=self.changed_units,
             linked_units=self.linked_units,
+            proposal_units=self.proposal_units,
+            final_units=self.final_units,
         )
 
 
@@ -434,6 +438,8 @@ def adopt_records(
         changed_units=len(changed),
         linked_units=len(phrase_of),
         phrases_without_group=ungrouped,
+        proposal_units=sum(len(words_of(article.text)) for article in proposal_articles),
+        final_units=sum(len(words) for words in final_words),
     )
 
 

@@ -424,7 +424,7 @@ function funnelCopy(step: FunnelStep): FunnelCopy {
   switch (step.id) {
     case "proposal":
     case "final":
-      return { headline: "", unit: "provisions", note: "" };
+      return { headline: "", unit: "words", note: "" };
     case "traced":
       return {
         headline: "of the new words came word for word from a Parliament amendment",
@@ -457,7 +457,7 @@ function TextCard({ label, step }: { label: string; step: FunnelStep | undefined
       <p className="mt-1 font-serif text-4xl tabular-nums text-stone-900">
         {step?.part == null ? "unknown" : count.format(step.part)}
       </p>
-      <p className="text-sm text-stone-600">provisions</p>
+      <p className="text-sm text-stone-600">words</p>
     </div>
   );
 }
@@ -493,7 +493,10 @@ export function LineageFunnel({ steps }: { steps: readonly FunnelStep[] }) {
         <span className="font-serif text-2xl tabular-nums">
           {newWords === null ? "Unknown" : count.format(newWords)}
         </span>{" "}
-        words of the final law were not in the proposal. Where did they come from?
+        {final?.part == null
+          ? "words of the final law"
+          : `of the final law's ${count.format(final.part)} words`}{" "}
+        were not in the proposal. Where did they come from?
       </p>
       <ol className="space-y-0">
         {stages.map((step, index) => {

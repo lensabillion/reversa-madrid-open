@@ -264,6 +264,10 @@ class LineageCounts(FrozenModel):
     `changed_units` counts the words of the final act that stand in a window the proposal
     lacks and `linked_units` those of them inside an adopted phrase, so coverage is linked
     over changed and a law that barely changed says so instead of looking like a failure.
+    `proposal_units` and `final_units` are the words of the whole proposal and final act,
+    counted the same way, so the two texts compare in size whatever the provisions they are
+    split into (a proposal split by article and a final act split by paragraph count
+    differently).
     A count is None until it has been computed (no proposal or final act, no documents
     read), never zero. `phrases_without_group` counts adopted phrases none of whose holders
     has a known political group: they are left out of the group credits and counted here.
@@ -279,11 +283,14 @@ class LineageCounts(FrozenModel):
     documents_with_origin: int | None = Field(default=None, ge=0)
     changed_units: int | None = Field(default=None, ge=0)
     linked_units: int | None = Field(default=None, ge=0)
+    proposal_units: int | None = Field(default=None, ge=0)
+    final_units: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def parts_fit_inside_their_wholes(self) -> Self:
         pairs = (
             (self.linked_units, self.changed_units, "Linked units", "the units that changed"),
+            (self.changed_units, self.final_units, "Changed units", "the final act's units"),
             (
                 self.documents_with_origin,
                 self.documents_read,

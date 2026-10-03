@@ -12,6 +12,7 @@ from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS
 from influence.services import lineage
 from influence.services.lineage import COMMITTEE_TEXT, Rarity, adopt, adopt_records
 from influence.services.pipeline import Collected
+from influence.services.prose_match import words_of
 from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 PROCEDURE = "2099/0001(COD)"
@@ -97,6 +98,11 @@ def test_wording_new_in_the_final_act_is_adopted_with_exact_quotations() -> None
     )
     # "The" also stands in a new window of the final act, but no amendment carried it.
     assert (counts.changed_units, counts.linked_units) == (25, 24)
+    # Whole texts in words, whatever their provisions: the proposal's 5 + 24, the final's 5 + 24.
+    assert (counts.proposal_units, counts.final_units) == (
+        len(words_of(PROPOSAL.text)),
+        len(words_of(FINAL.text)),
+    )
     assert result.counts().documents_read is None
 
 
@@ -318,6 +324,7 @@ def test_a_law_without_a_final_act_or_a_proposal_is_unknown_not_empty() -> None:
     assert (counts.amendments, counts.amendments_adopting) == (1, None)
     assert counts.adopted_phrases is None
     assert (counts.changed_units, counts.linked_units) == (None, None)
+    assert (counts.proposal_units, counts.final_units) == (None, None)
     # Regression: without the proposal, the proposal's own wording re-tabled counted as adopted.
     old = sentence("old")
     no_proposal = adopt_records([amendment(5, old, old=None)], [article("Article 1", old)], [])
