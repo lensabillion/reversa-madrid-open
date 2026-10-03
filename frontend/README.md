@@ -126,8 +126,10 @@ credit) and shown as "N of M amendments adopted" with the rate, in the backend's
 count the view could not compute reads "unknown", and a view with `status: "unknown"`
 shows its reason. Limitations and coverage gaps sit in a disclosure.
 
-Above the evidence, the page answers the brief for the law, from the same view only
-(`lib/lineage-insights.ts`, linear in the view's records):
+The law opens on a **Summary** tab (four key numbers and the five questions, one line each
+with "Explore →"); the detail lives in tabs the reader opens on demand: Who, How, Graph,
+Evidence and Check 3 links. Everything comes from the same view only
+(`lib/lineage-insights.ts`, `lib/lineage-graph.ts`, linear in the view's records):
 
 - **The five questions**: WHO and HOW are answered from the view; WHAT and TOWARDS are
   marked "partly" (one law; direction labels come from `make directions`); NEXT is marked
@@ -140,7 +142,13 @@ Above the evidence, the page answers the brief for the law, from the same view o
 - **How it got there** (`lineageChannels`): adopting amendments by stage, committee and year
   (each amendment once), the share tabled across political groups, the share of dated
   matches where the submission came first, and reworded (Jev, `kind: "semantic"`) matches
-  apart from word-for-word ones.
+  apart from word-for-word ones. Only matches dated before the amendment count: wording
+  said after it, or undated, cannot have shaped it, and is counted apart.
+- **Graph** (`buildLineageGraph`, `sliceGraph`, `components/lineage-graph.tsx`): organisation
+  → who tabled the amendment (political groups, or Members) → final-act provision, drawn
+  from adopted wording an organisation said first. The overview shows the 12 largest nodes
+  per column; clicking a node or a line keeps only the paths that share its phrases and
+  lists their evidence. Teal lines are lexical, dashed violet ones semantic.
 - **Check three links at random** (`drawLinks`): the jury's check built in. It draws three
   adopted phrases a submission said first, with a seeded generator whose seed is shown, so a
   draw can be repeated.

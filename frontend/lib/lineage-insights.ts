@@ -9,7 +9,11 @@ import type { LineageView, OriginMatchRecord } from "./lineage-api";
  * the stated sort order. Linear in the view's records, plus sorting the rows.
  */
 
-/** One organisation whose submission says wording that amendments inserted. */
+/**
+ * One organisation whose submission said, before any amendment carried it, wording that
+ * amendments inserted. Only such matches count: wording said after the amendment, or
+ * undated, cannot have shaped it.
+ */
 export interface OrganisationRow {
   /** The resolved actor when there is one, otherwise the name as the submission gives it. */
   key: string;
@@ -19,9 +23,7 @@ export interface OrganisationRow {
   /** Of `adoptedFirst`: found word for word (lexical), and found only reworded (semantic). */
   adoptedFirstLexical: number;
   adoptedFirstSemantic: number;
-  /** Adopted phrases it said too, but after an amendment or with a date order unknown. */
-  adoptedOther: number;
-  /** Phrases it said that amendments inserted but the final act does not hold. */
+  /** Phrases it said first that amendments inserted but the final act does not hold. */
   tabledOnly: number;
   /** Phrases found only by a reworded (semantic, Jev-judged) match, of all its phrases. */
   reworded: number;
@@ -36,13 +38,14 @@ export interface OrganisationRanking {
   unnamedDocuments: number;
   /** Matches that quote another act or the proposal: shared wording, not a request. */
   citations: number;
+  /** Matches dated after the first carrying amendment, or undated: not counted as influence. */
+  notFirst: number;
 }
 
 interface OrganisationTally {
   name: string;
   adoptedFirst: Set<string>;
   adoptedFirstLexical: Set<string>;
-  adoptedAll: Set<string>;
   tabled: Set<string>;
   verbatim: Set<string>;
   semantic: Set<string>;
@@ -71,9 +74,15 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
   const tallies = new Map<string, OrganisationTally>();
   const unnamed = new Set<string>();
   let citations = 0;
+  let notFirst = 0;
   for (const origin of view.origins) {
     if (origin.is_citation) {
       citations += 1;
+      continue;
+    }
+    // Wording said after the amendment, or undated, cannot be shown to have shaped it.
+    if (!countsAsOrigin(origin)) {
+      notFirst += 1;
       continue;
     }
     if (origin.organisation === null) {
@@ -85,7 +94,6 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
       name: origin.organisation,
       adoptedFirst: new Set<string>(),
       adoptedFirstLexical: new Set<string>(),
-      adoptedAll: new Set<string>(),
       tabled: new Set<string>(),
       verbatim: new Set<string>(),
       semantic: new Set<string>(),
@@ -99,12 +107,9 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
     if (!adopted.has(origin.phrase_id)) {
       tally.tabled.add(origin.phrase_id);
     } else {
-      tally.adoptedAll.add(origin.phrase_id);
-      if (countsAsOrigin(origin)) {
-        tally.adoptedFirst.add(origin.phrase_id);
-        if (origin.kind === "verbatim") {
-          tally.adoptedFirstLexical.add(origin.phrase_id);
-        }
+      tally.adoptedFirst.add(origin.phrase_id);
+      if (origin.kind === "verbatim") {
+        tally.adoptedFirstLexical.add(origin.phrase_id);
       }
     }
   }
@@ -115,7 +120,6 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
       adoptedFirst: tally.adoptedFirst.size,
       adoptedFirstLexical: tally.adoptedFirstLexical.size,
       adoptedFirstSemantic: tally.adoptedFirst.size - tally.adoptedFirstLexical.size,
-      adoptedOther: tally.adoptedAll.size - tally.adoptedFirst.size,
       tabledOnly: tally.tabled.size,
       reworded: [...tally.semantic].filter((id) => !tally.verbatim.has(id)).length,
       documents: tally.documents.size,
@@ -125,12 +129,11 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
   rows.sort(
     (left, right) =>
       right.adoptedFirst - left.adoptedFirst ||
-      right.adoptedOther - left.adoptedOther ||
       right.tabledOnly - left.tabledOnly ||
       left.name.localeCompare(right.name) ||
       left.key.localeCompare(right.key),
   );
-  return { rows, unnamedDocuments: unnamed.size, citations };
+  return { rows, unnamedDocuments: unnamed.size, citations, notFirst };
 }
 
 /** How many of something, under one label; rows are sorted by count, then by label. */
@@ -330,10 +333,18 @@ function generator(seed: number): () => number {
 
 /**
  * The phrases a published link can be drawn from: adopted wording that a submission said
- * before the amendments, so the link reads submission → amendment → final act.
+ * word for word before the amendments, so the link reads submission → amendment → final
+ * act. Semantic (Jev) matches are left out of the draw: word-for-word wording is the
+ * strongest evidence, while a reworded match can pair the same safeguard on a different
+ * object (on the AI Act, trade secrets in technical documentation, Art. 11, with personal
+ * data in the sandbox, Art. 54(1)(g)).
  */
 export function linkPool(adopted: readonly LineagePhraseRow[]): readonly LineagePhraseRow[] {
-  return adopted.filter((phrase) => phrase.adopted && phrase.hasEarlierRequest);
+  return adopted.filter(
+    (phrase) =>
+      phrase.adopted &&
+      phrase.origins.some((origin) => origin.countsAsOrigin && origin.kind === "verbatim"),
+  );
 }
 
 /**

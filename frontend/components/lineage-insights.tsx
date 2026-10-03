@@ -12,10 +12,11 @@ import {
 } from "../lib/lineage-insights";
 import { retryStyle } from "./atlas-law-browser";
 import { KindBadge, KindLegend, KindSplitBar } from "./lineage-kind";
+import type { LawTab } from "./lineage-law-browser";
 
 const count = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });
-const ORGANISATIONS_SHOWN = 15;
+const ORGANISATIONS_SHOWN = 10;
 /** The brief's check: the jury picks three links at random and reads both texts side by side. */
 export const LINKS_DRAWN = 3;
 
@@ -52,14 +53,14 @@ interface Question {
   question: string;
   state: QuestionState;
   answer: string;
-  /** Where on the page, or which command, holds more. */
-  more: string | null;
+  /** The tab that holds the detail, or `null` when nothing on the page does. */
+  more: LawTab | null;
 }
 
 const stateText: Record<QuestionState, string> = {
-  answered: "Answered here",
-  partial: "Partly answered",
-  missing: "Not in this view",
+  answered: "Answered",
+  partial: "Partly",
+  missing: "Not yet",
 };
 
 const stateStyle: Record<QuestionState, string> = {
@@ -75,85 +76,79 @@ function topGroup(tables: readonly LineageCreditTable[]): string | null {
     : `${row.name} (${count.format(row.amendments)} of ${count.format(row.amendmentsTabled)} amendments adopted)`;
 }
 
-/** The brief's five questions, each with what this law's lineage says and what it cannot. */
+/** The brief's five questions, each answered in one line from this law's lineage, or not. */
 export function questionsFor(
   view: LineageView,
   lineage: PreparedLineage,
   organisations: OrganisationRanking,
   channels: LineageChannels,
 ): readonly Question[] {
-  const leaders = organisations.rows.filter((row) => row.adoptedFirst > 0).slice(0, 3);
+  const leader = organisations.rows.find((row) => row.adoptedFirst > 0);
   const group = topGroup(lineage.credits);
-  const whoParts = [
-    leaders.length === 0
-      ? "No organisation said adopted wording before the amendments carried it."
-      : `Organisations whose wording reached the law first: ${leaders
-          .map((row) => `${row.name} (${row.adoptedFirst})`)
-          .join(", ")}.`,
-    group === null ? "" : `Top political group by rate: ${group}.`,
-  ].filter(Boolean);
   const committee = channels.byCommittee[0];
   const stage = channels.byStage[0];
-  const timed = channels.timing.askFirst + channels.timing.amendmentFirst;
-  const howParts = [
-    stage === undefined
-      ? ""
-      : `${share(stage.count, channels.adoptingAmendments)} of adopting amendments came at the ${stage.label} stage.`,
-    committee === undefined ? "" : `Most came through ${committee.label} (${committee.count}).`,
-    channels.withGroup === 0
-      ? ""
-      : `${share(channels.crossGroup, channels.withGroup)} were tabled across political groups.`,
-    timed === 0
-      ? ""
-      : `${share(channels.timing.askFirst, timed)} of dated submission matches came before the amendment.`,
-  ].filter(Boolean);
   return [
     {
       id: "who",
-      label: "01 Who",
-      question: "Which companies, associations and people influence this law the most?",
-      state: view.status === "computed" ? "answered" : "missing",
-      answer: whoParts.join(" "),
-      more: "#lineage-who",
+      label: "Who",
+      question: "Who shaped this law the most?",
+      state: leader === undefined ? "missing" : "answered",
+      answer:
+        leader === undefined
+          ? "No organisation said adopted wording before the amendments."
+          : `${leader.name} leads, with ${plural(leader.adoptedFirst, "adopted phrase")} said first.${group === null ? "" : ` Top group: ${group}.`}`,
+      more: "who",
     },
     {
       id: "what",
-      label: "02 What",
+      label: "What",
       question: "On which topics?",
       state: "partial",
-      answer: `This view covers one law, ${view.title}: ${count.format(lineage.adopted.length)} adopted phrases and ${count.format(lineage.tabled.length)} tabled ones. Search the evidence for a topic word. Comparing topics needs several laws collected.`,
-      more: "#lineage-evidence",
+      answer: `${count.format(lineage.adopted.length)} phrases of ${view.title} came from amendments. Search them by topic.`,
+      more: "evidence",
     },
     {
       id: "towards",
-      label: "03 Towards",
-      question: "Pushing for what, and does it match what they say in public?",
+      label: "Towards",
+      question: "Pushing for what?",
       state: "partial",
       answer:
-        "Each link shows what the submission asked, in its own words, beside the amendment and the final wording. Direction labels (stricter, weaker, exempt, delay) come from `make directions`, not this view.",
-      more: "#lineage-evidence",
+        "Each link puts the request beside the final wording. Direction labels are not computed here.",
+      more: "evidence",
     },
     {
       id: "how",
-      label: "04 How",
-      question: "Through which channels: consultations, MEPs, coalitions, timing?",
-      state: howParts.length === 0 ? "missing" : "answered",
-      answer: howParts.length === 0 ? "No adopting amendment to describe." : howParts.join(" "),
-      more: "#lineage-how",
+      label: "How",
+      question: "Through which channels?",
+      state: stage === undefined ? "missing" : "answered",
+      answer:
+        stage === undefined || committee === undefined
+          ? "No adopting amendment to describe."
+          : `${share(stage.count, channels.adoptingAmendments)} at the ${stage.label} stage, mostly ${committee.label}; ${share(channels.crossGroup, channels.withGroup)} across groups.`,
+      more: "how",
     },
     {
       id: "next",
-      label: "05 Next",
-      question: "Who is rising, and what will they win in the coming years?",
+      label: "Next",
+      question: "Who wins next?",
       state: "missing",
-      answer:
-        "No forecast is computed. One law's lineage is a past outcome; a forecast needs the same view across laws and years.",
+      answer: "No forecast yet: it needs several laws and years.",
       more: null,
     },
   ];
 }
 
-export function FiveQuestions({ questions }: { questions: readonly Question[] }) {
+function plural(value: number, one: string): string {
+  return `${count.format(value)} ${value === 1 ? one : `${one}s`}`;
+}
+
+export function FiveQuestions({
+  questions,
+  onOpen,
+}: {
+  questions: readonly Question[];
+  onOpen: (tab: LawTab) => void;
+}) {
   return (
     <section aria-labelledby="lineage-questions" className="space-y-3">
       <h3 id="lineage-questions" className="font-serif text-xl text-stone-900">
@@ -165,21 +160,27 @@ export function FiveQuestions({ questions }: { questions: readonly Question[] })
             key={item.id}
             className="flex flex-col gap-2 rounded-sm border border-stone-200 bg-white p-4"
           >
-            <p className={eyebrow}>{item.label}</p>
-            <p className="text-sm font-medium text-stone-900">{item.question}</p>
-            <p>
-              <span className={`rounded-sm px-2 py-0.5 text-xs ${stateStyle[item.state]}`}>
+            <p className="flex items-center justify-between gap-2">
+              <span className={eyebrow}>{item.label}</span>
+              <span className={`rounded-sm px-2 py-0.5 text-[11px] ${stateStyle[item.state]}`}>
                 {stateText[item.state]}
               </span>
             </p>
+            <p className="text-sm font-medium text-stone-900">{item.question}</p>
             <p className="text-sm leading-6 text-stone-700">{item.answer}</p>
             {item.more !== null && (
-              <a
-                href={item.more}
-                className="mt-auto text-xs font-medium text-teal-800 underline underline-offset-2"
+              <button
+                type="button"
+                onClick={() => {
+                  const tab = item.more;
+                  if (tab !== null) {
+                    onOpen(tab);
+                  }
+                }}
+                className="mt-auto self-start text-sm font-medium text-teal-800 underline underline-offset-2"
               >
-                See the evidence
-              </a>
+                Explore →
+              </button>
             )}
           </li>
         ))}
@@ -203,10 +204,7 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
               Adopted, said first
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Adopted, said later or undated
-            </th>
-            <th scope="col" className="py-1 text-right font-normal">
-              Tabled, not adopted
+              Said first, not adopted
             </th>
             {semantic && (
               <th scope="col" className="py-1 text-right font-normal">
@@ -229,7 +227,6 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
                   max={max}
                 />
               </td>
-              <td className="py-1.5 text-right">{count.format(row.adoptedOther)}</td>
               <td className="py-1.5 text-right">{count.format(row.tabledOnly)}</td>
               {semantic && <td className="py-1.5 text-right">{count.format(row.reworded)}</td>}
               <td className="py-1.5 text-right text-stone-500">
@@ -262,9 +259,7 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
             Who gets their way: organisations
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-stone-600">
-            Ranked by adopted phrases an organisation's submission said before any amendment carried
-            them. Each phrase counts once per organisation, whatever the number of its documents.
-            Shared wording is evidence of influence, not proof of authorship.
+            Ranked by adopted wording each organisation said before the amendments.
           </p>
           <KindLegend />
         </div>
@@ -293,7 +288,9 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
       <p className="text-xs text-stone-500">
         {count.format(ranking.rows.length)} organisations · {count.format(ranking.unnamedDocuments)}{" "}
         matching documents without an organisation name (citizens or unnamed attachments) ·{" "}
-        {count.format(ranking.citations)} matches left out as citations of other acts
+        {count.format(ranking.citations)} matches left out as citations of other acts ·{" "}
+        {count.format(ranking.notFirst)} matches dated after the amendment or undated, which cannot
+        show influence
       </p>
       {matching.length > ORGANISATIONS_SHOWN && (
         <button type="button" onClick={() => setAll((value) => !value)} className={retryStyle}>
@@ -370,7 +367,6 @@ function Tile({ label, value, note }: { label: string; value: string; note: stri
 /** HOW: stage, committee, coalition and timing of the wording that reached the law. */
 export function Channels({ channels }: { channels: LineageChannels }) {
   const { timing } = channels;
-  const matches = timing.askFirst + timing.amendmentFirst + timing.unknownDate + timing.citation;
   return (
     <section aria-labelledby="lineage-how" className="space-y-4">
       <div className="space-y-1">
@@ -378,9 +374,8 @@ export function Channels({ channels }: { channels: LineageChannels }) {
           How it got there: channels and timing
         </h3>
         <p className="max-w-3xl text-sm leading-6 text-stone-600">
-          Counted over the {count.format(channels.adoptingAmendments)} amendments whose wording
-          reached the final act, and the {count.format(matches)} matches between a submission and
-          inserted wording. Meetings and votes are not in this view.
+          Over the {count.format(channels.adoptingAmendments)} amendments whose wording reached the
+          final act.
         </p>
       </div>
       <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -401,7 +396,7 @@ export function Channels({ channels }: { channels: LineageChannels }) {
             <KindBadge kind="semantic" note={count.format(channels.rewordedMatches)} />
           </dd>
           <dd className="mt-1 text-xs leading-5 text-stone-500">
-            submission matches found word for word, and reworded ones Jev judged (unconfirmed)
+            submission matches found word for word, and reworded ones judged by Jev
           </dd>
         </div>
         <Tile
@@ -466,8 +461,8 @@ export function LinkCheck({
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-stone-600">
             Draws {LINKS_DRAWN} of the {count.format(pool.length)} adopted phrases a submission said
-            before the amendments, with every text side by side: what the organisation asked, the
-            amendment that carried it, and the final act.
+            word for word before the amendments: what the organisation asked, the amendment that
+            carried it, and the final act, side by side.
           </p>
         </div>
         <button

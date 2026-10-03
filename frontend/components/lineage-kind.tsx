@@ -20,7 +20,7 @@ export const kindStyle: Record<
   },
   semantic: {
     label: "Semantic",
-    detail: "other words, judged by Jev; unconfirmed",
+    detail: "other words, judged by Jev",
     mark: "bg-violet-600",
     border: "border-violet-600",
     badge: "bg-violet-50 text-violet-900 ring-1 ring-violet-600/40",

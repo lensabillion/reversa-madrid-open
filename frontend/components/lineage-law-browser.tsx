@@ -35,6 +35,7 @@ import {
 } from "../lib/lineage-insights";
 import { useResource } from "../lib/use-resource";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
+import { LineageGraphExplorer } from "./lineage-graph";
 import { Channels, FiveQuestions, LinkCheck, questionsFor, WhoShaped } from "./lineage-insights";
 import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 
@@ -156,7 +157,10 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
           </h4>
           <ul className="space-y-3">
             {phrase.origins.map((origin) => (
-              <li key={`${origin.documentId}:${origin.kind}`} className="space-y-1.5 text-sm">
+              <li
+                key={`${origin.documentId}:${origin.kind}:${origin.quote.start}`}
+                className="space-y-1.5 text-sm"
+              >
                 <p className="font-medium text-stone-900">
                   {origin.organisation ?? "Unnamed submitter"}
                 </p>
@@ -454,9 +458,7 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
         Who gets their way: Members and political groups
       </h3>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
-        Every holder of an adopted phrase is credited with the whole phrase; a phrase with several
-        holders is joint. Holders are ranked by the share of their amendments on this law that
-        reached the final act ("N of M"), not by phrase counts.
+        Ranked by the share of their amendments that reached the final act.
       </p>
       {tables.length === 0 ? (
         <p className="text-sm text-stone-600">No adopted wording, so no credit.</p>
@@ -497,7 +499,11 @@ type Prepared =
     }
   | { ok: false; error: string };
 
+/** One view at a time: the summary first, the detail only when the reader asks for it. */
+export type LawTab = "summary" | "who" | "how" | "graph" | "evidence" | "check";
+
 function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
+  const [tab, setTab] = useState<LawTab>("summary");
   const prepared = useMemo<Prepared>(() => {
     try {
       const lineage = prepareLineage(view);
@@ -533,37 +539,41 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
     const note = coverageNote(row);
     return note === null ? [] : [note];
   });
-  const sections = [
-    ["#lineage-questions", "Five questions"],
-    ["#lineage-who", "Who"],
-    ["#lineage-how", "How"],
-    ["#lineage-check", "Check 3 links"],
-    ["#lineage-evidence", "Evidence"],
-    ["#lineage-limits", "Limits"],
-  ] as const;
+  const tabs: readonly { id: LawTab; label: string }[] = [
+    { id: "summary", label: "Summary" },
+    { id: "who", label: "Who" },
+    { id: "how", label: "How" },
+    { id: "graph", label: "Graph" },
+    { id: "evidence", label: "Evidence" },
+    { id: "check", label: "Check 3 links" },
+  ];
+  const card = (phrase: LineagePhraseRow) => <PhraseCard key={phrase.phraseId} phrase={phrase} />;
   return (
-    <main className="mx-auto max-w-[1536px] space-y-8 px-5 py-6 sm:px-8">
+    <main className="mx-auto max-w-[1536px] space-y-6 px-5 py-6 sm:px-8">
       <header className="space-y-1">
         <h2 className="font-serif text-2xl text-stone-900">{view.title}</h2>
         <p className="text-xs text-stone-500">
-          {view.procedure_id} · {view.method} ({view.method_revision}) · run {view.run_id},
-          generated {view.generated_at}
+          {view.procedure_id} · run {view.run_id}
         </p>
       </header>
-      <nav
-        aria-label="Sections of this law"
+      <div
+        role="tablist"
+        aria-label="Views of this law"
         className="sticky top-0 z-20 -mx-5 flex flex-wrap gap-1 border-b border-stone-200 bg-stone-50/95 px-5 py-2 backdrop-blur sm:-mx-8 sm:px-8"
       >
-        {sections.map(([href, label]) => (
-          <a
-            key={href}
-            href={href}
-            className="rounded-sm px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-teal-700"
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+            className={`rounded-sm px-3 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-teal-700 ${tab === item.id ? "bg-teal-900 text-white" : "text-stone-700 hover:bg-stone-200"}`}
           >
-            {label}
-          </a>
+            {item.label}
+          </button>
         ))}
-      </nav>
+      </div>
       {view.status === "unknown" && (
         <p role="alert" className="max-w-3xl text-sm leading-6 text-amber-900">
           Adoption could not be computed for this law.{" "}
@@ -571,37 +581,57 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           counts that could not be computed read "unknown".
         </p>
       )}
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Adopted phrases" value={known(counts.adopted_phrases)} />
-        <Stat
-          label="Amendments with adopted wording"
-          value={ofTotal(counts.amendments_adopting, counts.amendments)}
-        />
-        <Stat
-          label="New final-act words traced to an amendment"
-          value={ofTotal(counts.linked_units, counts.changed_units)}
-        />
-        <Stat
-          label="Consultation documents that said it first"
-          value={ofTotal(counts.documents_with_origin, counts.documents_read)}
-        />
-      </dl>
-      <FiveQuestions questions={questionsFor(view, lineage, organisations, channels)} />
-      <WhoShaped ranking={organisations} />
-      <Credits tables={lineage.credits} />
-      <Channels channels={channels} />
-      <LinkCheck
-        pool={pool}
-        renderLink={(phrase) => <PhraseCard key={phrase.phraseId} phrase={phrase} />}
-      />
-      <Phrases lineage={lineage} />
+      <div
+        role="tabpanel"
+        aria-label={tabs.find((item) => item.id === tab)?.label}
+        className="space-y-8"
+      >
+        {tab === "summary" && (
+          <>
+            <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Stat label="Adopted phrases" value={known(counts.adopted_phrases)} />
+              <Stat
+                label="Amendments with adopted wording"
+                value={ofTotal(counts.amendments_adopting, counts.amendments)}
+              />
+              <Stat
+                label="New final-act words traced to an amendment"
+                value={ofTotal(counts.linked_units, counts.changed_units)}
+              />
+              <Stat
+                label="Consultation documents that said it first"
+                value={ofTotal(counts.documents_with_origin, counts.documents_read)}
+              />
+            </dl>
+            <FiveQuestions
+              questions={questionsFor(view, lineage, organisations, channels)}
+              onOpen={(next) => setTab(next)}
+            />
+          </>
+        )}
+        {tab === "who" && (
+          <>
+            <WhoShaped ranking={organisations} />
+            <Credits tables={lineage.credits} />
+          </>
+        )}
+        {tab === "how" && <Channels channels={channels} />}
+        {tab === "graph" && (
+          <LineageGraphExplorer view={view} phrases={lineage.adopted} renderPhrase={card} />
+        )}
+        {tab === "evidence" && <Phrases lineage={lineage} />}
+        {tab === "check" && <LinkCheck pool={pool} renderLink={card} />}
+      </div>
       <details
         id="lineage-limits"
         className="rounded-sm border border-stone-200 bg-white p-4 text-sm leading-6 text-stone-600"
       >
         <summary className="cursor-pointer font-medium text-stone-900">
-          Limitations and source coverage
+          Method, limitations and source coverage
         </summary>
+        <p className="mt-3 text-xs text-stone-500">
+          {view.method} ({view.method_revision}) · generated {view.generated_at}
+        </p>
         <ul className="mt-3 list-disc space-y-1 pl-5">
           {view.limitations.map((limitation) => (
             <li key={limitation}>{sentence(limitation)}</li>

@@ -212,7 +212,19 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       throw new Error(`${origin.document_id} names ${stranger}, which does not carry its phrase`);
     }
     const rows = origins.get(origin.phrase_id) ?? [];
-    rows.push(originRow(origin));
+    const row = originRow(origin);
+    // A reworded match is judged per amendment, so one passage can back the same phrase
+    // through several carrying amendments; the card shows that passage once.
+    const repeated = rows.some(
+      (other) =>
+        other.documentId === row.documentId &&
+        other.kind === row.kind &&
+        other.quote.start === row.quote.start &&
+        other.quote.end === row.quote.end,
+    );
+    if (!repeated) {
+      rows.push(row);
+    }
     origins.set(origin.phrase_id, rows);
   }
 
