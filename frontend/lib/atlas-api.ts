@@ -176,7 +176,7 @@ async function errorDetail(response: Response): Promise<string> {
   return response.statusText || "no detail was supplied";
 }
 
-/** Reads one Atlas API answer; the caller owns the check of `T` (see `lib/atlas-coordinated.ts`). */
+/** Reads one answer of the backend read API (Atlas or lineage); the caller owns the check of `T`. */
 export async function readAtlasJson<T>(url: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
@@ -185,7 +185,7 @@ export async function readAtlasJson<T>(url: string, signal: AbortSignal): Promis
     if (signal.aborted) {
       throw error;
     }
-    throw new Error(`The Atlas API could not be reached at ${url}.`, { cause: error });
+    throw new Error(`The API could not be reached at ${url}.`, { cause: error });
   }
   if (!response.ok) {
     throw new AtlasApiError(response.status, await errorDetail(response));

@@ -147,7 +147,9 @@ test("loads evidence, then changes source and amendment without any graph reques
   render(<HomePage />);
 
   expect(screen.getByRole("heading", { name: "GDPR amendments" })).toBeDefined();
-  expect(screen.getByRole("link", { name: "Influence Atlas" }).getAttribute("href")).toBe("/atlas");
+  expect(screen.getByRole("link", { name: "Lineage explorer" }).getAttribute("href")).toBe(
+    "/lineage",
+  );
   expect(screen.getByText("Loading amendments…")).toBeDefined();
   expect(await screen.findByRole("heading", { name: "ITRE 12" })).toBeDefined();
   expect(screen.getByText("1.00")).toBeDefined();

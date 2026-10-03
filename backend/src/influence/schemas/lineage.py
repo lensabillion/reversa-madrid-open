@@ -4,8 +4,9 @@ The Atlas pipeline goes from a submission to an amendment to the law. Lineage st
 law: it finds the stretches of the final act that were not in the Commission's proposal, finds
 the amendments whose new text holds them, and then who tabled those amendments and which
 consultation documents say the same thing earlier. It is a separate pipeline with its own
-view (`lineage-1`) and leaves the `atlas-1` records untouched, until it has passed the gates
-in `docs/design/` and replaces the first.
+view (`lineage-1`) and leaves the `atlas-1` records untouched. The explorer reads this view
+(`GET /api/v1/lineage/{slug}`, page `/lineage`); its claims stay labelled as unreviewed until
+they pass the gates in `docs/design/`.
 
 Pieces and who produces what:
 
@@ -350,6 +351,26 @@ class LineageView(FrozenModel):
         return self
 
 
+class LineageLawSummary(FrozenModel):
+    """One law with a written lineage view, as the explorer's law list shows it.
+
+    A count is None when the view could not compute it, as in `LineageCounts`.
+    """
+
+    slug: NonEmpty
+    procedure_id: ProcedureId
+    title: NonEmpty
+    run_id: NonEmpty
+    status: AdoptionStatus
+    adopted_phrases: int | None = Field(ge=0)
+    amendments_adopting: int | None = Field(ge=0)
+    documents_with_origin: int | None = Field(ge=0)
+
+
+class LineageLawList(FrozenModel):
+    laws: tuple[LineageLawSummary, ...]
+
+
 __all__ = [
     "COALITION_GROUPS",
     "LINEAGE_SCHEMA_VERSION",
@@ -359,6 +380,8 @@ __all__ = [
     "AmendmentAdoption",
     "Credit",
     "LineageCounts",
+    "LineageLawList",
+    "LineageLawSummary",
     "LineageView",
     "OriginMatch",
     "TabledPhrase",
