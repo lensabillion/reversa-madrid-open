@@ -146,3 +146,11 @@ technical design and plan); check `git status` before editing shared files. The 
 rebuilt it from the bead's notes: commit and push before a session ends. Load data and start services using README
 commands; never depend on a previous chat's running server, temporary log or browser
 state.
+
+## Agent 3 Component Preparation — 3 October 2026
+
+Agent 3's isolated `feat/atlas-explorer` branch adds reusable evidence/explorer components
+under `rev-oodw`, with handoff details in [frontend README](../frontend/README.md#atlas-components-and-agent-3-handoff).
+The 46 frontend tests, production build and audits passed. Components use synthetic test
+records and await Agent 1's shared snapshot contract; no live Atlas route or graph is
+claimed. Broader work remains tracked in `rev-i006` and its dependent beads.

@@ -99,3 +99,38 @@ The role-label clarification is tracked in **rev-foxs**.
 Its full `make check` also passes 106 backend and 38 frontend tests, build and audits.
 Browser inspection confirmed the three explanatory captions and Amazon's filename/page
 inside its own column. Model accuracy is unchanged by this display clarification.
+
+## Atlas Components and Agent 3 Handoff
+
+`AtlasExplorer` and `AtlasEvidence` prepare architecture part 8 to display the graph
+from part 6. They are reusable components; the application route still uses the
+existing evidence workspace until the shared snapshot adapter is implemented.
+
+- `AtlasExplorer` accepts already assessed links and source coverage notes. It filters
+  loaded records by law/actor/request text, topic and year, and opens each link's
+  evidence. Published links and unconfirmed/contradicted audit candidates have separate
+  views.
+- `AtlasEvidence` shows the request, original wording, amendment and final wording,
+  with source URLs, pages, dates, supplied assessment methods and limitations. Missing
+  originals differ from known empty originals; unknown outcomes differ from failures.
+  Unicode code-point spans must exactly match their source quote before highlighting.
+- `AtlasLinkView` and `AtlasEvidenceProps` are component props, not an API schema.
+  The adapter must preserve stable unique link IDs and map pipeline publication and
+  outcome decisions without recalculating them. Supply excerpts from their recorded
+  source versions and express coverage gaps in `coverageNotes`.
+
+Agent 3 branch: `feat/atlas-explorer`; component bead: `rev-oodw`; broader graph bead:
+`rev-i006`. Base: main `0518f17`. Shared schema revision: **pending Agent 1**. Tests use
+synthetic examples only; no real influence findings or graph projection are delivered
+by these components. No route, lockfile, scorer or shared backend schema is changed.
+
+Integration needs Agent 1's frozen `GraphSnapshot`, source/evidence fixtures and API
+route contract, plus Agent 2's publication decisions and outcomes (including unmatched
+asks). Agent 1 creates the separate UI integration child of `rev-qn6b`. Graph projection,
+ranking denominators, public-position enrichment, report and forecast views remain open.
+
+Verified on 3 October 2026: 46 frontend tests, Biome, TypeScript, production build and
+package audit passed. A temporary synthetic preview was inspected at desktop width and
+390-pixel mobile width; mobile content width was 390 pixels with no horizontal overflow.
+The preview route was removed. These checks verify presentation, not model accuracy,
+live data joins, any-law runtime or jury readiness.
