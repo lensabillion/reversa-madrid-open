@@ -2,12 +2,14 @@
 
 Pipeline output kept in the repository so the explorer can be shown without running the
 pipeline (about 20 minutes of downloads for one law). The layout mirrors `data/`, so the
-backend serves it unchanged:
+backend serves it unchanged. `make dev-backend` serves this directory by default:
 
 ```sh
-INFLUENCE_DATA_ROOT=mock-data make dev-backend   # API at http://127.0.0.1:8000
-make dev-frontend                                # http://localhost:3000/lineage?law=2021-0106-COD
+make dev-backend    # API at http://127.0.0.1:8000, law views from mock-data/
+make dev-frontend   # http://localhost:3000/lineage?law=2021-0106-COD
 ```
+
+`INFLUENCE_DATA_ROOT=data make dev-backend` serves the laws you built in `data/` instead.
 
 | File | Law | Produced by | Run |
 | --- | --- | --- | --- |

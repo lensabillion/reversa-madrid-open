@@ -1032,7 +1032,8 @@ Rehearse it twice with a timer, once with a teammate naming an obscure law.
   submissions are aggregated, never named.
 - **One-command rerun**: `make setup` once (downloads the global inputs with dated,
   hashed provenance), then `make atlas LAW='AI Act'` (collects the law and builds its view
-  in `data/laws/<procedure>/atlas.json`; `make dev-backend` serves it), with the hardware
+  in `data/laws/<procedure>/atlas.json`; `INFLUENCE_DATA_ROOT=data make dev-backend` serves
+it), with the hardware
   and timings measured today. A multi-law `make atlas-sample` was proposed but never built.
 
 ## 12. Today's Plan

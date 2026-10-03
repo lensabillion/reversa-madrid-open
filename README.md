@@ -47,6 +47,11 @@ name (`'AI Act'`, `'DSA'`) or a title. Every output is written under
 amendments, submissions and a run manifest. `data/` is never committed; everything in it
 comes from public sources and is rebuilt by these commands. `make check` runs every gate.
 
+To open the explorer, run `make dev-backend` and `make dev-frontend` in two terminals and
+go to `http://localhost:3000`. The backend serves the committed snapshots in `mock-data/`
+by default, so this works before any download; `INFLUENCE_DATA_ROOT=data make dev-backend`
+serves the laws you built.
+
 ## Licence
 
 The licence is pending the project owner's decision (D6 in

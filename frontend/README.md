@@ -48,6 +48,11 @@ make dev-backend
 make dev-frontend
 ```
 
+The backend serves the law views committed in `mock-data/` (the AI Act and the Data
+Governance Act lineage), so `/lineage` works without running the pipeline. Start it with
+`INFLUENCE_DATA_ROOT=data make dev-backend` to see the laws you built in `data/`; `/atlas`
+needs that, because `mock-data/` has no Atlas views.
+
 Open `http://localhost:3000`. Search `ITRE 616` for the Amazon example. The browser calls
 `/api/v1/…`; Next.js proxies those requests to `http://127.0.0.1:8000`. Set
 `INFLUENCE_API_URL` before starting or building Next.js to use another backend address.
