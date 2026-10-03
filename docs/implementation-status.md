@@ -83,6 +83,30 @@ frontend audit found 0 vulnerabilities. These services are not wired into a real
 pipeline, API or live explorer yet. Any-law latency, real links and public report
 findings remain unverified. Tracking: `rev-i006` and `rev-5yy6`.
 
+## Collect Command (Atlas Part 1) — 3 October 2026
+
+`influence collect <query>` (`make collect LAW='...'`) joins the merged part 1 connectors
+into one run for any law (bead `rev-pjk2`, plan gate 1). The query resolves through a
+catalog built from Parltrack's dossiers (CELLAR only for an unknown CELEX or COM number;
+an unclear title returns its choices). Stages `texts` (CELLAR proposal and final act,
+split into provisions), `amendments` (Parltrack committee and plenary amendments, tabling
+MEPs) and `asks` (Have Your Say by COM reference, feedback and attachments split into
+passages, senders resolved against the register) save through `StageStore`, keyed by
+their inputs and a hash of the package source, and a `law` stage writes one `LawRecord`
+with ten typed coverage rows. The manifest is published last. Details: the
+[backend README](../backend/README.md#collect-command-atlas-part-1).
+
+Verified offline (`measured`, cloud container, Python 3.14.7): 41 tests in
+`tests/test_collect.py` on a small world in the real source formats, covering every
+coverage status and stop; `make check-backend` passes with 636 tests and 100% branch
+coverage (3,947 statements, 994 branches). **Not verified:** a run on real sources. The
+cloud session that wrote it cannot reach the EU hosts, so the AI Act counts and the
+cached and uncached timings must be measured on a laptop: `make collect
+LAW='2021/0106(COD)'`. No command yet downloads the Parltrack dumps and the register or
+builds the Have Your Say index (follow-up bead); without the index, the consultation is
+found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
+`not_collected`.
+
 ## Architecture Assessment
 
 The Atlas architecture, agreed when the owner merged PR #21, is eight parts plus a
