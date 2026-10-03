@@ -25,7 +25,8 @@ forecast view renders its records and limitations.
 
 Begin with Agent 1's frozen GraphSnapshot and evidence fixtures. Build graph/UI before
 real matching finishes. Fixture tests are consumer-contract tests, not proof of working
-live data. Agree on file ownership for the split `rev-qn6b` with Agent 1.
+live data. Agent 1 owns parent `rev-qn6b` and creates CLI/API and UI child beads before dispatch.
+Claim the UI child only; record its ID and file ownership in your handoff.
 
 ## Implementation Order
 
@@ -38,7 +39,9 @@ live data. Agree on file ownership for the split `rev-qn6b` with Agent 1.
    A graph node or edge opens its exact source evidence. Frontend uses Unicode code-point
    offsets via `Array.from`, not raw UTF-16 indices.
 3. Compute reproducible distinct-ask counts and observed outcome rates, with denominators,
-   partial wins and unknown counts. Duplicate amendments cannot multiply wins. An incomplete
+   partial wins and unknown counts. Consume Agent 2's outcomes for unmatched asks too;
+if absent, report incomplete outcome coverage rather than silently dropping those asks.
+Duplicate amendments cannot multiply wins. An incomplete
    ask inventory produces a labelled observed-sample ranking, not an all-actor claim.
    Joint asks retain joint attribution. Smoothing/spend comparisons are optional disclosed
    conventions; no causal credit from equal splitting or text similarity.

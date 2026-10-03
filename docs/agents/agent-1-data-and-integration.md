@@ -21,12 +21,16 @@ or switch its worktree branch.
 Existing beads: `rev-pjk2` collection, `rev-1vxz` actors, CLI portion of `rev-qn6b`,
 `rev-0who` coverage/batch, `rev-p61s` reproduction and `rev-nzqr` release preparation.
 Check current claims before claiming or dispatching work; follow pull/read/start/sync.
+You own parent `rev-qn6b`. Before dispatch, create separate CLI/API and UI child beads;
+Agent 3 claims the UI child, not the parent. Record the child IDs in both handoffs so
+one bead never has competing delegates.
 
 ## First Handoff Before Other Agents Build
 
 Create a small shared-contract PR and fixtures under `backend/tests/fixtures/atlas/`.
 Freeze the minimal LawRecord, SourceDocument, SourceSpan, Actor, Ask, Amendment,
-Candidate, LinkAssessment, Outcome, GraphSnapshot and RunManifest contracts. Include
+Candidate, LinkAssessment, ArticleVersion, PublicPosition, Outcome, Forecast/scenario,
+GraphSnapshot and RunManifest contracts. Include
 schema versions, canonical IDs, original Unicode code-point offsets, null/unknown states
 and coverage counts. Ask extraction belongs to Agent 2; you define its input/output shape.
 

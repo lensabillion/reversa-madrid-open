@@ -45,6 +45,10 @@ exact spans and stage-specific outcomes. Keep IDs stable across handoffs.
    Parliament-position and final outcomes separately. Support full/partial/not observed/
    unknown. Missing final act is not a loss; limited retrieval failure is not proof of
    non-survival. Handle deletion asks against surrounding obligations/context.
+   Assess outcomes for the complete observed ask inventory, including asks with no
+   published amendment link. Key outcomes by ask ID with an optional link ID; direct
+   ask-to-final results retain a separate relation type. If a request cannot be assessed,
+   return unknown with a reason. Do not give Agent 3 only successful/echoed asks.
 6. Build a forecast baseline only when sufficient audited outcomes exist. Freeze pre-event
    features and use rolling temporal splits with procedure/duplicate grouping. No final
    law leakage. Publish scenarios if probability calibration cannot be supported.
