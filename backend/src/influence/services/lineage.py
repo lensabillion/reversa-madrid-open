@@ -2,10 +2,11 @@
 
 The first pipeline goes from a submission forward. This piece starts from the final act. A
 run of consecutive words is adopted wording when it stands in the final act, is not in the
-Commission's proposal, and an amendment inserted it. A run of twelve or more words cannot be
-a coincidence, but it is still only evidence of shared wording: the final act is also shaped by
-the Council and the trilogues, and the same run often sits in several amendments because they
-were coordinated or co-signed. Nothing here says who wrote it first or why.
+Commission's proposal, and an amendment inserted it. A run of eight or more words that holds
+at least three of the law's rare words (`Rarity`) is unlikely to be a coincidence or one of
+the law's own formulas, but it is still only evidence of shared wording: the final act is also
+shaped by the Council and the trilogues, and the same run often sits in several amendments
+because they were coordinated or co-signed. Nothing here says who wrote it first or why.
 
 Method, all on lower-cased alphanumeric words (`prose_match.words_of`):
 
@@ -16,7 +17,9 @@ Method, all on lower-cased alphanumeric words (`prose_match.words_of`):
    (the whole new text when the original is unknown), as blocks of consecutive inserted words.
 3. Inside a block, a window counts when it is in the final act and not in the proposal.
    Consecutive such windows that also stand next to each other in the same final-act article
-   (the same diagonal) merge into one run; a run of `MIN_ADOPTED_RUN_WORDS` or more is a phrase.
+   (the same diagonal) merge into one run; a run of `MIN_ADOPTED_RUN_WORDS` or more that is
+   significant (`Rarity.significant`) is a phrase. Final-act renumbering ("Article 6(2)"
+   becoming "Article 9(2)") makes formulas look new, which is what the rarity test removes.
 4. A phrase is identified by its folded text, so the same run in many amendments is one
    `AdoptedPhrase`, with exact spans in the final act.
 5. Each phrase is worth 1, split equally among the holders credited for it: the MEPs who tabled
@@ -30,10 +33,11 @@ seconds.
 """
 
 import hashlib
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from typing import Self
 
 from influence.schemas.atlas import Actor, Amendment, ArticleVersion, SourceSpan
 from influence.schemas.lineage import (
@@ -55,6 +59,11 @@ MAX_DIFF_WORDS = 3000
 COMMITTEE_TEXT = "committee_text"
 MAX_SPANS_PER_PHRASE = 3
 UNKNOWN_GROUP = "unknown"
+# A word is rare in a law when it stands in fewer than this share of its provisions (proposal
+# and final act), or in only one. A run needs this many distinct rare words to count.
+# Provisional values, chosen on 3 October without labelled data.
+RARE_PROVISION_SHARE = 0.05
+MIN_RARE_WORDS = 3
 
 type Diagonal = tuple[int, int]
 
@@ -84,6 +93,31 @@ class Adoption:
 
 
 @dataclass(frozen=True, slots=True)
+class Rarity:
+    """The words that are common in one law, so a run made of them is not shared wording.
+
+    Document frequency is counted over provisions: a word in many provisions ("shall",
+    "provider", "article") is common. Building it is linear in the law's words.
+    """
+
+    common: frozenset[str]
+
+    @classmethod
+    def of(cls, texts: Iterable[str]) -> Self:
+        frequency: Counter[str] = Counter()
+        provisions = 0
+        for text in texts:
+            provisions += 1
+            frequency.update({word.text for word in words_of(text)})
+        floor = max(2.0, RARE_PROVISION_SHARE * provisions)
+        return cls(frozenset(word for word, count in frequency.items() if count >= floor))
+
+    def significant(self, words: Sequence[str]) -> bool:
+        """True when the run holds at least `MIN_RARE_WORDS` distinct rare words."""
+        return len({word for word in words if word not in self.common}) >= MIN_RARE_WORDS
+
+
+@dataclass(frozen=True, slots=True)
 class _Run:
     """A phrase found in one amendment, with where it stands in the final act."""
 
@@ -97,7 +131,7 @@ def _windows(words: Sequence[str]) -> Iterable[tuple[int, tuple[str, ...]]]:
         yield index, tuple(words[index : index + NGRAM_WORDS])
 
 
-def _inserted_blocks(amendment: Amendment) -> tuple[tuple[list[str], ...], str]:
+def inserted_blocks(amendment: Amendment) -> tuple[tuple[list[str], ...], str]:
     """Blocks of consecutive inserted words, and how they were found.
 
     The second value is "exact", "unknown_original" or "approximate" so the caller can count
@@ -136,17 +170,27 @@ def _runs(
     block: list[str],
     final_index: dict[tuple[str, ...], list[tuple[int, int]]],
     proposal: set[tuple[str, ...]],
+    rarity: Rarity,
+    dropped: list[int],
 ) -> list[_Run]:
-    """Maximal runs of windows that are novel, in the final act, and next to each other there."""
+    """Maximal runs of windows that are novel, in the final act, and next to each other there.
+
+    A run long enough but made of the law's common words is not kept; `dropped` counts it.
+    """
     runs: list[_Run] = []
     current: set[Diagonal] | None = None
     start = last = 0
 
-    def close() -> None:
-        length = last + NGRAM_WORDS - start
-        if current and length >= MIN_ADOPTED_RUN_WORDS:
-            places = tuple(sorted((article, start + shift) for article, shift in current))
-            runs.append(_Run(tuple(block[start : last + NGRAM_WORDS]), places, start))
+    def close(run: set[Diagonal]) -> None:
+        # Every run is at least one window long, and a window is `MIN_ADOPTED_RUN_WORDS`
+        # words, so no length test is needed; a larger minimum would need one, and the
+        # `AdoptedPhrase` contract refuses a shorter phrase loudly if it is ever missed.
+        words = tuple(block[start : last + NGRAM_WORDS])
+        if not rarity.significant(words):
+            dropped[0] += 1
+            return
+        places = tuple(sorted((article, start + shift) for article, shift in run))
+        runs.append(_Run(words, places, start))
 
     for index, window in _windows(block):
         diagonals: set[Diagonal] = (
@@ -159,15 +203,15 @@ def _runs(
             last = index
             continue
         if current is not None:
-            close()
+            close(current)
         current = diagonals or None
         start = last = index
     if current is not None:
-        close()
+        close(current)
     return runs
 
 
-def _phrase_id(words: Sequence[str]) -> str:
+def phrase_id_of(words: Sequence[str]) -> str:
     return "phrase:" + hashlib.sha256(" ".join(words).encode("utf-8")).hexdigest()[:16]
 
 
@@ -191,7 +235,12 @@ def adopt_records(
     articles: Sequence[ArticleVersion],
     actors: Sequence[Actor],
 ) -> Adoption:
-    """Find the adopted wording, the amendments that carry it and the credit for each holder."""
+    """Find the adopted wording, the amendments that carry it and the credit for each holder.
+
+    Rarity is measured over `articles`, the law's own proposal and final-act provisions.
+    """
+    rarity = Rarity.of(article.text for article in articles)
+    dropped = [0]
     proposal: set[tuple[str, ...]] = set()
     final_articles = [article for article in articles if article.stage == "final_act"]
     final_words = [words_of(article.text) for article in final_articles]
@@ -210,16 +259,16 @@ def adopt_records(
     adoptions: list[AmendmentAdoption] = []
     bases: defaultdict[str, int] = defaultdict(int)
     for amendment in amendments:
-        blocks, basis = _inserted_blocks(amendment)
+        blocks, basis = inserted_blocks(amendment)
         bases[basis] += 1
         found = [
             (number, run)
             for number, block in enumerate(blocks)
-            for run in _runs(block, final_index, proposal)
+            for run in _runs(block, final_index, proposal, rarity, dropped)
         ]
         if not found:
             continue
-        distinct = {_phrase_id(run.words): run for _, run in found}
+        distinct = {phrase_id_of(run.words): run for _, run in found}
         for phrase_id, run in distinct.items():
             carried.setdefault(phrase_id, run)
             carriers[phrase_id].append(amendment.amendment_id)
@@ -260,6 +309,11 @@ def adopt_records(
     by_amendment = {amendment.amendment_id: amendment for amendment in amendments}
     credits = _credits(adoptions, by_amendment, actors, carriers)
     notes: list[str] = []
+    if dropped[0]:
+        notes.append(
+            f"{dropped[0]} run(s) of {MIN_ADOPTED_RUN_WORDS} or more words were not counted: "
+            f"they hold fewer than {MIN_RARE_WORDS} of the law's rare words."
+        )
     if bases["unknown_original"]:
         notes.append(
             f"{bases['unknown_original']} amendment(s) have no original wording; their whole "

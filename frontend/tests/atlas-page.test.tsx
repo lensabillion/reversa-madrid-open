@@ -226,11 +226,18 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
   expect(await screen.findByRole("heading", workspaceHeading)).toBeDefined();
   expect(requested(fetchMock)).toEqual(["/api/v1/atlas", `/api/v1/atlas/${slug}`]);
   expect(law.getAttribute("aria-pressed")).toBe("true");
+  const notice = screen.getByRole("region", { name: "About these results" });
   expect(
-    screen.getByText(
-      "Ask extraction method: passage-v0. Ask extraction v0: each consultation passage is treated as one ask, so counts are passages, not distinct requests. Invented contract fixtures.",
+    within(notice).getByText("Counts represent submission passages, not distinct requests."),
+  ).toBeDefined();
+  expect(within(notice).getByText("Ask extraction method: passage-v0.")).toBeDefined();
+  expect(
+    within(notice).getByText(
+      "Ask extraction v0: each consultation passage is treated as one ask, so counts are passages, not distinct requests.",
     ),
   ).toBeDefined();
+  expect(within(notice).getByText("Invented contract fixtures.")).toBeDefined();
+  expect(notice.querySelector("details")?.open).toBe(false);
   expect(
     screen.getByText(/Atlas run 20991201T090000Z, generated 2099-12-01T09:00:00Z/),
   ).toBeDefined();
@@ -373,14 +380,44 @@ test("complete coverage and absent limitations are stated, not left blank", asyn
   });
   render(<AtlasPage />);
 
+  const notice = await screen.findByRole("region", { name: "About these results" });
+  expect(within(notice).getByText("Ask extraction method: passage-v0.")).toBeDefined();
   expect(
-    await screen.findByText(
-      "Ask extraction method: passage-v0. The pipeline supplied no limitations for this run.",
-    ),
+    within(notice).getByText("The pipeline supplied no limitations for this run."),
   ).toBeDefined();
+  expect(within(notice).queryByText(/complete/i)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "See the outcomes" }));
   expect(screen.getByText("Every source layer recorded for this law is complete.")).toBeDefined();
   expect(screen.queryByText("Coverage information unavailable.")).toBeNull();
+});
+
+test("an unknown extraction method keeps neutral wording and its supplied limitations", async () => {
+  window.history.replaceState(null, "", `/atlas?law=${slug}`);
+  const warning = "Some records require manual source review";
+  const otherMethod: AtlasView = {
+    ...view,
+    ask_method: "atomic-requests-v2",
+    coverage: [],
+    limitations: [warning],
+  };
+  installFetch((path) => {
+    if (path === "/api/v1/atlas") {
+      return reply(laws);
+    }
+    return path === `/api/v1/atlas/${slug}` ? reply(otherMethod) : unexpected(path);
+  });
+  render(<AtlasPage />);
+
+  const notice = await screen.findByRole("region", { name: "About these results" });
+  expect(
+    within(notice).getByText("Results reflect the recorded method and available source material."),
+  ).toBeDefined();
+  expect(within(notice).queryByText(/Counts represent submission passages/)).toBeNull();
+  expect(within(notice).getByText("Ask extraction method: atomic-requests-v2.")).toBeDefined();
+  expect(within(notice).getByText(`${warning}.`).closest("details")).toBe(
+    notice.querySelector("details"),
+  );
+  expect(within(notice).queryByText(/complete/i)).toBeNull();
 });
 
 test("an empty list says how to build the first Atlas and requests no law", async () => {

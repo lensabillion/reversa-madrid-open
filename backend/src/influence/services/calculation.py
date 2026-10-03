@@ -26,7 +26,7 @@ from influence.services.assessment import METHOD_REVISION as ASSESSMENT_REVISION
 from influence.services.assessment import assess_link
 from influence.services.audit import AuditReport, wilson_interval
 from influence.services.calibration import FittedCombiner
-from influence.services.masking import mask_quoted_law
+from influence.services.masking import QuotedLaw
 from influence.services.passage_change import read_changes
 from influence.services.ranking_signals import RankedPair, background_signals, feature_vector
 from influence.services.scoring import changed_spans, score_pair
@@ -315,14 +315,11 @@ def calculate_links(
                 ).score
             ),
         )
-        masked = (
-            mask_quoted_law(
-                reading.new,
-                (proposal_texts or {}).get(candidate.procedure_id, amendment.old_text or ""),
-            )
+        masked = QuotedLaw(
+            ((proposal_texts or {}).get(candidate.procedure_id, amendment.old_text or ""),)
             if reading.old is None
-            else mask_quoted_law(reading.new, "")
-        )
+            else ()
+        ).mask(reading.new)
         # An all-masked passage is a zero edit, not an invented insertion or blank input.
         remaining_words = any(token.isalnum() for token in TOKEN_PATTERN.findall(masked.text))
         submission_change = (
