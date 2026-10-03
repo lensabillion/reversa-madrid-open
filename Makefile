@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions batch \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
 
@@ -96,6 +96,11 @@ channels:  ## Count the channels one law was lobbied through: make channels LAW=
 directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
 	$(BACKEND) influence directions "$(LAW)" $(ARGS)
+
+# Plan gate 9: many laws at once, resumable, with a coverage banner in data/laws/batch.json.
+batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 'AI Act,DSA'" or ARGS='--since 2019 --with-amendments'
+	$(if $(ARGS),,$(error ARGS is required: make batch ARGS='--since 2019 --with-amendments'))
+	$(BACKEND) influence batch $(ARGS)
 
 # First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
 # made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default

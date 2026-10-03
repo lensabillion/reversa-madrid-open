@@ -12,7 +12,9 @@ it (`lineage.json`). `influence channels <law>` collects, then counts the channe
 was lobbied through: consultation stages, timing, tabling Members and coalitions
 (`channels.json`). `influence directions <law>` collects, then counts which way the
 amendments move the law and, through the atlas view's published links, each actor's asks
-(`directions.json`). `influence submit` is the first brief's pairs command, kept until
+(`directions.json`). `influence batch` runs collect and those steps over many laws, named
+or every procedure amended since a date, resumably, into `data/laws/batch.json`.
+`influence submit` is the first brief's pairs command, kept until
 part 4 replaces it. Exit status: 0 when every output was written, 1 on any input, source
 or output failure, 2 on a command-line usage error.
 """
@@ -23,7 +25,7 @@ import platform
 import sys
 from collections import Counter
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from time import perf_counter
 from typing import cast
@@ -35,7 +37,9 @@ from influence.extraction.fetching import CachedFetcher, UrllibFetcher
 from influence.extraction.records import RecordError
 from influence.repositories.hys import HysError, read_index
 from influence.repositories.parltrack import ParltrackError
+from influence.schemas.batch import BatchLaw, BatchRun, BatchSelection, BatchStep
 from influence.schemas.coordinated import CoordinatedCluster, CoordinatedView
+from influence.services import batch as batching
 from influence.services.channels import build_channels, publication_types, write_channels
 from influence.services.collect import (
     AmbiguousLawError,
@@ -45,6 +49,7 @@ from influence.services.collect import (
     CollectSettings,
     ResolvedLaw,
     collect_law,
+    load_catalog,
     source_revision,
 )
 from influence.services.coordinated import build_coordination, write_coordination
@@ -428,6 +433,127 @@ def _collect(
     return then(result) if then is not None else 0
 
 
+def _law_names(value: str) -> tuple[str, ...]:
+    names = tuple(name.strip() for name in value.split(",") if name.strip())
+    if not names:
+        raise argparse.ArgumentTypeError("name at least one law")
+    return names
+
+
+def _year(value: str) -> date:
+    """`2019` as 1 January 2019, the first day an amendment may be tabled on."""
+    try:
+        return date(int(value), 1, 1)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"not a year: {value!r}") from error
+
+
+def _steps(value: str) -> tuple[BatchStep, ...]:
+    """`lineage,atlas` as batch steps, in run order whatever order was typed."""
+    named = {name.strip() for name in value.split(",")}
+    unknown = sorted(named - set(batching.STEPS))
+    if unknown:
+        listed = ", ".join(repr(name) for name in unknown)
+        raise argparse.ArgumentTypeError(
+            f"unknown {listed}; choose from {','.join(batching.STEPS)}"
+        )
+    return tuple(step for step in batching.STEPS if step in named)
+
+
+def _print_batch_law(position: int, total: int, law: BatchLaw) -> None:
+    steps = ", ".join(
+        f"{step.step} {step.status}"
+        + (f" {step.seconds:.1f} s" if step.status in ("done", "failed") else "")
+        for step in law.steps
+    )
+    amendments = "" if law.amendments is None else f"; {law.amendments:,} amendments"
+    print(
+        f"[{position}/{total}] {law.procedure_id or law.query} {law.status} "
+        f"in {law.seconds:.1f} s ({steps or 'nothing run'}){amendments}",
+        flush=True,
+    )
+    for step in law.steps:
+        if step.error is not None:
+            print(f"  {step.step}: {step.error}", file=sys.stderr)
+    if law.error is not None:
+        print(f"  {law.error}", file=sys.stderr)
+
+
+def _print_banner(run: BatchRun, path: Path) -> None:
+    banner = run.banner
+    print(
+        f"Batch: {banner.laws_attempted} of {banner.laws_selected} laws attempted, "
+        f"{banner.laws_complete} complete, {banner.laws_partial} partial, "
+        f"{banner.laws_failed} failed; {banner.amendments_covered:,} amendments covered"
+    )
+    missing = ", ".join(f"{layer} {count}" for layer, count in banner.layers_missing.items())
+    print(f"  layers not complete (laws): {missing or 'none'}")
+    failed = ", ".join(f"{step} {count}" for step, count in banner.steps_failed.items())
+    print(f"  steps failed (laws): {failed or 'none'}")
+    print(f"  hardware: {banner.hardware}")
+    print(f"  started {banner.started_at}, finished {banner.finished_at}")
+    print(f"batch: {path.absolute()}")
+
+
+def _batch(
+    data_root: Path | None,
+    selection: BatchSelection,
+    steps: tuple[BatchStep, ...],
+    *,
+    refresh: bool,
+    attachments: bool,
+) -> int:
+    logging.getLogger("pypdf").setLevel(logging.ERROR)
+    root = data_root if data_root is not None else default_data_root()
+    inputs = CollectInputs.under(root)
+    fetcher = CachedFetcher(cache=HttpCache(root / "cache"), fetcher=UrllibFetcher())
+    absent = inputs.missing()
+    if absent:
+        listed = ", ".join(str(path) for path in absent)
+        print(f"error: required input files are missing: {listed}", file=sys.stderr)
+        print("Run `make setup` first.", file=sys.stderr)
+        return 1
+    try:
+        catalog = load_catalog(inputs.dossiers, root / "catalog")
+        if selection.since is None:
+            planned = batching.plan_named(selection.laws, catalog, fetcher)
+        else:
+            print(
+                f"Scanning the amendment dumps for amendments tabled since {selection.since}",
+                flush=True,
+            )
+            counts = batching.amended_since(
+                (inputs.committee_amendments, inputs.plenary_amendments), selection.since
+            )
+            planned = batching.plan_since(catalog, counts, selection.limit)
+    except (CollectError, ParltrackError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        print("No law was run.", file=sys.stderr)
+        return 1
+    print(f"Batch of {len(planned)} laws; steps: collect, {', '.join(steps)}", flush=True)
+    settings = batching.BatchSettings(
+        collect=CollectSettings(
+            data_root=root,
+            code_revision=source_revision(Path(influence.__file__).parent),
+            attachments=attachments,
+            refresh=refresh,
+            hardware=platform.platform(),
+        ),
+        steps=steps,
+        selection=selection,
+    )
+    run, path = batching.run_batch(
+        planned,
+        inputs=inputs,
+        settings=settings,
+        fetcher=fetcher,
+        clock=lambda: datetime.now(UTC),
+        on_law=_print_batch_law,
+    )
+    _print_banner(run, path)
+    return 0 if run.banner.laws_complete == len(run.laws) else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="influence", description="Influence Atlas commands that run without the server."
@@ -497,6 +623,56 @@ def main(argv: Sequence[str] | None = None) -> int:
             action="store_true",
             help="skip submission attachments (faster; the asks layer is then partial)",
         )
+    batch = commands.add_parser(
+        "batch",
+        help="collect many laws and run the per-law steps on each, resumably",
+        description=(
+            "Collect each selected law, then run the chosen steps on it, writing "
+            "data/laws/batch.json after every law. A law already collected is not collected "
+            "again, and a step whose output carries the current collect run is skipped, "
+            "unless --refresh is given. A failing law is recorded and the batch goes on."
+        ),
+    )
+    chosen = batch.add_mutually_exclusive_group(required=True)
+    chosen.add_argument(
+        "--laws",
+        type=_law_names,
+        metavar="NAMES",
+        help="comma-separated procedure numbers, CELEX, COM references or names: 'AI Act,DSA'",
+    )
+    chosen.add_argument(
+        "--since",
+        type=_year,
+        metavar="YEAR",
+        help="with --with-amendments: every catalog procedure amended since 1 January YEAR",
+    )
+    batch.add_argument(
+        "--with-amendments",
+        action="store_true",
+        help="select by amendments tabled (the one --since rule built so far)",
+    )
+    batch.add_argument(
+        "--limit", type=_count, default=None, help="with --since: the N most amended procedures"
+    )
+    batch.add_argument(
+        "--steps",
+        type=_steps,
+        default=batching.DEFAULT_STEPS,
+        metavar="STEPS",
+        help=(
+            f"comma-separated subset of {','.join(batching.STEPS)} "
+            f"(default: {','.join(batching.DEFAULT_STEPS)}; atlas takes minutes a law)"
+        ),
+    )
+    batch.add_argument(
+        "--attachments",
+        action="store_true",
+        help="read submission attachments (slower; skipped by default, so asks are partial)",
+    )
+    batch.add_argument(
+        "--refresh", action="store_true", help="collect every law again and redo every step"
+    )
+    batch.add_argument("--data-root", type=Path, default=None, help="overrides INFLUENCE_DATA_ROOT")
     submit = commands.add_parser(
         "submit",
         help="score supplied pairs into pairs.csv",
@@ -523,6 +699,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("Path | None", args.data_root),
             cast("tuple[SetupGroup, ...]", args.only),
             refresh=cast("bool", args.refresh),
+        )
+    if args.command == "batch":
+        since = cast("date | None", args.since)
+        limit = cast("int | None", args.limit)
+        if (since is not None) != cast("bool", args.with_amendments):
+            parser.error("--since and --with-amendments go together")
+        if since is None and limit is not None:
+            parser.error("--limit applies to --since only")
+        laws = cast("tuple[str, ...] | None", args.laws) or ()
+        return _batch(
+            cast("Path | None", args.data_root),
+            BatchSelection(
+                mode="laws" if since is None else "since", laws=laws, since=since, limit=limit
+            ),
+            cast("tuple[BatchStep, ...]", args.steps),
+            refresh=cast("bool", args.refresh),
+            attachments=cast("bool", args.attachments),
         )
     after: dict[str, Callable[[CollectResult], int] | None] = {
         "collect": None,
