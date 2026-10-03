@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from test_collect import FEEDBACK, World, make_world, scripted_cli
+from test_collect import LATER as OTHER_LAW
+from test_collect import RECENT as RECENT_DAY
 from test_hys import as_json, feedback, feedback_page
 from test_parltrack import committee_record, mep_record, write_dump
 
@@ -50,6 +52,9 @@ def matching_world(tmp_path: Path) -> World:
                 old=["Providers shall keep the logs."],
                 new=[f"Providers shall keep the logs {RARE}."],
             ),
+            # Another law's recent amendment, as in make_world: the dump reaches past the
+            # AI Act's end, so its amendment layer stays complete.
+            committee_record(id="PE8-8", reference=OTHER_LAW, meps=[], date=RECENT_DAY),
         ],
     )
     asking = feedback(
