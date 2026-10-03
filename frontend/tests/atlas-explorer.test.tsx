@@ -21,16 +21,33 @@ const base: AtlasLinkView = {
       text: "Retain records.",
       language: "en",
       spans: [],
-      source: { title: "Example paper", url: "https://example.org", page: null, publishedAt: null },
+      source: {
+        title: "Example paper",
+        url: "https://example.org",
+        page: null,
+        publishedAt: null,
+        tabledOn: null,
+      },
     },
     original: null,
     amendment: {
       text: "Retain records.",
       language: "en",
       spans: [],
-      source: { title: "Amendment", url: "https://example.org/am", page: null, publishedAt: null },
+      source: {
+        title: "Amendment",
+        url: "https://example.org/am",
+        page: null,
+        publishedAt: null,
+        tabledOn: null,
+      },
     },
-    outcome: { status: "unknown", explanation: "Not yet assessed", finalText: null },
+    outcome: {
+      status: "unknown",
+      explanation: "Not yet assessed",
+      finalText: null,
+      tracedVia: null,
+    },
   },
 };
 const candidate: AtlasLinkView = {

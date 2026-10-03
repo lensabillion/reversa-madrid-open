@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import type { AtlasRankingEvidence } from "../lib/atlas";
 import {
   type AtlasFindingsResult,
   atlasFindingsUrl,
@@ -29,8 +30,14 @@ export interface AtlasRankingRow {
   partial: number;
   notObserved: number;
   unknown: number;
-  sources: readonly AtlasAnalysisSource[];
+  /** The row's supplied evidence records, resolved to sources and evidence cards. */
+  evidence: readonly AtlasRankingEvidence[];
 }
+
+/** Below this many assessed asks a row's count is an anecdote, not a rank (plan §7). */
+export const minAssessedAsks = 3;
+/** Evidence sources listed before the rest fold behind a disclosure. */
+const shownEvidence = 3;
 
 /** A supplied finding retains the sources and limitations that support its wording. */
 export interface AtlasFinding {
@@ -47,6 +54,8 @@ export interface AtlasAnalysisProps {
   sampleLabel: string;
   coverageNotes: readonly string[];
   rankings: readonly AtlasRankingRow[];
+  /** Opens a published evidence card in the Evidence view; without it only sources link. */
+  onOpenEvidence?: (linkId: string) => void;
   findings: Record<(typeof reportSections)[number], readonly AtlasFinding[]>;
 }
 
@@ -180,11 +189,82 @@ function EndpointFinding({ section, state }: { section: Section; state: Findings
   );
 }
 
+function EvidenceItem({
+  item,
+  onOpenEvidence,
+}: {
+  item: AtlasRankingEvidence;
+  onOpenEvidence: ((linkId: string) => void) | null;
+}) {
+  const [usable] = item.url === null ? [] : publicSources([{ title: item.title, url: item.url }]);
+  const records = item.recordIds.join(", ");
+  return (
+    <li className="break-words">
+      {usable === undefined ? (
+        <span className="text-amber-900">
+          {records}:{" "}
+          {item.url === null
+            ? "not in the loaded records; no source available."
+            : "source link unavailable."}
+        </span>
+      ) : (
+        <a
+          href={usable.url}
+          target="_blank"
+          rel="noreferrer"
+          title={records}
+          className="text-teal-800 underline underline-offset-4"
+        >
+          {usable.title}
+        </a>
+      )}
+      {item.linkId !== null && onOpenEvidence !== null && (
+        <button
+          type="button"
+          onClick={() => item.linkId !== null && onOpenEvidence(item.linkId)}
+          className="ml-2 cursor-pointer font-medium text-teal-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-teal-700"
+        >
+          Open evidence card
+        </button>
+      )}
+    </li>
+  );
+}
+
+function RankingEvidence({
+  evidence,
+  onOpenEvidence,
+}: {
+  evidence: readonly AtlasRankingEvidence[];
+  onOpenEvidence: ((linkId: string) => void) | null;
+}) {
+  if (evidence.length === 0) {
+    return <p className="text-amber-900">No evidence records supplied for this row.</p>;
+  }
+  const items = (rows: readonly AtlasRankingEvidence[]) =>
+    rows.map((item) => <EvidenceItem key={item.key} item={item} onOpenEvidence={onOpenEvidence} />);
+  const rest = evidence.slice(shownEvidence);
+  return (
+    <>
+      <ul className="space-y-1">{items(evidence.slice(0, shownEvidence))}</ul>
+      {rest.length > 0 && (
+        <details className="mt-1">
+          <summary className="cursor-pointer text-stone-600">
+            {rest.length} more {rest.length === 1 ? "source" : "sources"}
+          </summary>
+          <ul className="mt-1 space-y-1">{items(rest)}</ul>
+        </details>
+      )}
+    </>
+  );
+}
+
 /** Presents observed outcomes and a cited report without estimating influence or forecasts. */
 export function AtlasAnalysis({
   sampleLabel,
   coverageNotes,
   rankings,
+  onOpenEvidence,
   findings,
 }: AtlasAnalysisProps) {
   // The law browser names the open law in the URL; the findings follow it, as the view does.
@@ -221,7 +301,8 @@ export function AtlasAnalysis({
           The denominator includes assessed outcomes, including partial outcomes, and excludes
           unknown outcomes. All observed asks are shown separately for coverage. Counts describe
           this sample; they do not establish causal influence or coverage of all EU law. Row order
-          is supplied by the pipeline.
+          is supplied by the pipeline. A row with fewer than {minAssessedAsks} assessed asks is an
+          anecdote, not a rank.
         </p>
         {rankings.length === 0 ? (
           <p className="mt-4 text-sm text-stone-500">
@@ -237,7 +318,7 @@ export function AtlasAnalysis({
                 <tr>
                   {[
                     "Actor",
-                    "Fully reflected / assessed asks",
+                    "Fully reflected, of assessed asks",
                     "All observed asks",
                     "Partial",
                     "Not reflected",
@@ -255,11 +336,15 @@ export function AtlasAnalysis({
                   <tr key={row.actorId} className="border-t border-stone-200 align-top">
                     <td className="p-3 font-medium">{row.actor}</td>
                     <td className="p-3 tabular-nums">
-                      {row.assessedAsks === 0 ? (
-                        <>Rate unavailable · {row.fullWins} full wins; 0 assessed asks</>
-                      ) : (
+                      {row.assessedAsks === 0
+                        ? `Rate unavailable · ${row.fullWins} full wins; 0 assessed asks`
+                        : `${row.fullWins} of ${row.assessedAsks} assessed`}
+                      {row.assessedAsks < minAssessedAsks && (
                         <>
-                          {row.fullWins} / {row.assessedAsks}
+                          {" "}
+                          <span className="mt-1 block text-xs font-medium text-amber-900">
+                            too few to rank (fewer than {minAssessedAsks} assessed)
+                          </span>
                         </>
                       )}
                     </td>
@@ -268,7 +353,10 @@ export function AtlasAnalysis({
                     <td className="p-3 tabular-nums">{row.notObserved}</td>
                     <td className="p-3 tabular-nums">{row.unknown}</td>
                     <td className="max-w-64 p-3 text-xs leading-6">
-                      <Sources sources={row.sources} />
+                      <RankingEvidence
+                        evidence={row.evidence}
+                        onOpenEvidence={onOpenEvidence ?? null}
+                      />
                     </td>
                   </tr>
                 ))}

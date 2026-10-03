@@ -32,7 +32,8 @@ export function AtlasWorkspace({
   coverage: readonly AtlasLayerCoverage[];
   coverageNotes: readonly string[];
   dataNotice: AtlasDataNotice;
-  analysis: ReactNode;
+  /** A function receives a callback that opens one published link in the Evidence view. */
+  analysis: ReactNode | ((openEvidence: (linkId: string) => void) => ReactNode);
   coordinated?: ReactNode;
 }) {
   const [view, setView] = useState<WorkspaceView>("graph");
@@ -155,7 +156,12 @@ export function AtlasWorkspace({
               from the final text. Requests with unknown outcomes stay separate. Getting the
               requested result does not prove that an organization caused it.
             </p>
-            {analysis}
+            {typeof analysis === "function"
+              ? analysis((linkId) => {
+                  setSelectedLink(linkId);
+                  setView("evidence");
+                })
+              : analysis}
           </section>
         )}
         {view === "coordinated" && coordinated}

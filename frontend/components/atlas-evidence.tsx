@@ -15,6 +15,8 @@ export interface AtlasExcerpt {
     url: string;
     page: number | null;
     publishedAt: string | null;
+    /** The amendment's tabling date, for amendment wording; `null` for other sources. */
+    tabledOn: string | null;
   };
 }
 
@@ -35,6 +37,8 @@ export interface AtlasEvidenceProps {
     status: "full" | "partial" | "not_observed" | "unknown";
     explanation: string;
     finalText: AtlasExcerpt | null;
+    /** The amendment the ask's final-act result was traced through, when not this card's. */
+    tracedVia: string | null;
   };
 }
 
@@ -177,9 +181,11 @@ function Excerpt({
           )}
           <p>
             {excerpt.source.page === null ? "Page unspecified" : `Page ${excerpt.source.page}`} ·{" "}
-            {excerpt.source.publishedAt === null
-              ? "Publication date unknown"
-              : `Published ${excerpt.source.publishedAt}`}
+            {excerpt.source.tabledOn !== null
+              ? `Tabled ${excerpt.source.tabledOn}`
+              : excerpt.source.publishedAt === null
+                ? "Publication date unknown"
+                : `Published ${excerpt.source.publishedAt}`}
           </p>
         </div>
       )}
@@ -232,12 +238,20 @@ export function AtlasEvidence({
           title="Final legal text"
           excerpt={outcome.finalText}
           empty={
-            outcome.finalText === null ? "Final wording unavailable" : "Known empty final wording"
+            outcome.tracedVia !== null
+              ? `Final text traced via another amendment (${outcome.tracedVia})`
+              : outcome.finalText === null
+                ? "Final wording unavailable"
+                : "Known empty final wording"
           }
         />
       </div>
       <section aria-label="Legal outcome" className="mt-7 border-t border-stone-200 pt-5">
-        <h3 className="text-sm font-medium text-stone-800">{outcomeLabels[outcome.status]}</h3>
+        <h3 className="text-sm font-medium text-stone-800">
+          {outcome.tracedVia === null
+            ? outcomeLabels[outcome.status]
+            : `Final text traced via another amendment (${outcome.tracedVia})`}
+        </h3>
         <p className="mt-2 text-sm leading-6 text-stone-600">{outcome.explanation}</p>
       </section>
       <details className="mt-6 border-t border-stone-200 pt-4 text-xs leading-6 text-stone-500">

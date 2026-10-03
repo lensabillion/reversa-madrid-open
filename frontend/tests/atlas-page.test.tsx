@@ -395,9 +395,9 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     "Widget Makers Europe",
     "City Network",
   ]);
-  expect(rows[1]?.textContent).toContain("2 / 2");
+  expect(rows[1]?.textContent).toContain("2 of 2 assessed");
   expect(
-    within(screen.getByRole("table")).getAllByText("Source evidence unavailable."),
+    within(screen.getByRole("table")).getAllByText("too few to rank (fewer than 3 assessed)"),
   ).toHaveLength(3);
   // The outcome cards read the report's findings for the open law, only once that tab opens.
   for (const section of ["WHO", "WHAT", "TOWARDS", "HOW", "NEXT"]) {
@@ -406,6 +406,28 @@ test("lists collected laws, opens one into the URL and renders its real atlas-1 
     expect(card.textContent).not.toContain("Evidence gap");
   }
   expect(requested(fetchMock).at(-1)).toBe(`/api/v1/atlas/${slug}/findings`);
+  // Supplied outcome ids resolve to the final act's source; only the actor with a published
+  // card that shows that record offers it, and unpublished candidates are never offered.
+  expect(
+    within(screen.getByRole("table"))
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href")),
+  ).toEqual([
+    "https://example.invalid/fixture/celex/32099R0001",
+    "https://example.invalid/fixture/celex/32099R0001",
+    "https://example.invalid/fixture/celex/32099R0001",
+  ]);
+  expect(within(screen.getByRole("table")).getAllByRole("button")).toHaveLength(1);
+  const openCard = within(rows[1] ?? document.body).getByRole("button", {
+    name: "Open evidence card",
+  });
+  // A ranking row's evidence anchor opens the record it names in the Evidence view.
+  fireEvent.click(openCard);
+  expect(
+    within(screen.getByRole("article", { name: "Atlas link evidence" })).getByRole("heading", {
+      name: "Keep logs for at least six months",
+    }),
+  ).toBeDefined();
 });
 
 test("a failed consultation collection is explained on the opening graph, not only in other tabs", async () => {

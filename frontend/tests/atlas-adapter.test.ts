@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, expect, test } from "vitest";
 import { AtlasExplorer } from "../components/atlas-explorer";
-import { type AtlasBundle, atlasLinkViews } from "../lib/atlas";
+import { type AtlasBundle, atlasLinkViews, atlasRankingEvidence } from "../lib/atlas";
 
 /** Committed fixtures are generated and validated by the authoritative Python contracts. */
 function records<T>(name: string): T[] {
@@ -58,6 +58,7 @@ test("joins shared atlas-1 fixtures, provenance and exact fields without inferri
     url: "https://example.invalid/fixture/feedback/9000001",
     page: null,
     publishedAt: "2099-02-01T12:00:00Z",
+    tabledOn: null,
   });
   expect(copy.evidence.amendment.spans).toEqual([
     { start: 36, end: 59, text: "for at least six months" },
@@ -78,6 +79,7 @@ test("joins shared atlas-1 fixtures, provenance and exact fields without inferri
     status: "unknown",
     explanation: "No final act: the procedure is still being negotiated.",
     finalText: null,
+    tracedVia: null,
   });
 });
 
@@ -192,6 +194,7 @@ test("selects final_act only, never upgrades a heard or Parliament result into a
     status: "unknown",
     explanation: "No final-act outcome was supplied.",
     finalText: null,
+    tracedVia: null,
   });
   const final = bundle.outcomes.find((row) => row.stage === "final_act");
   if (!final) {
@@ -253,6 +256,103 @@ test("rejects a passage assigned to a different actor even when its text and doc
       ),
     }),
   ).toThrow("Ask passage mismatch");
+});
+
+test("dates amendment wording by its tabling date and submissions by publication", () => {
+  const copy = first(atlasLinkViews(fixture()));
+  expect(copy.evidence.amendment.source.tabledOn).toBe("2099-04-01");
+  expect(copy.evidence.original?.source.tabledOn).toBe("2099-04-01");
+  expect(copy.evidence.submission.source.tabledOn).toBeNull();
+  expect(copy.evidence.outcome.finalText?.source.tabledOn).toBeNull();
+});
+
+test("an ask with two links shows its final outcome only on the card it was traced through", () => {
+  const bundle = fixture();
+  const traced = first(bundle.links);
+  const other = bundle.amendments.find(
+    (row) => row.amendment_id !== traced.amendment_id && row.procedure_id === traced.procedure_id,
+  );
+  if (!other) {
+    throw new Error("Second amendment fixture missing");
+  }
+  const views = atlasLinkViews({
+    ...bundle,
+    links: [
+      ...bundle.links,
+      {
+        ...traced,
+        link_id: "link:a-other-makers",
+        amendment_id: other.amendment_id,
+        amendment_spans: [],
+      },
+    ],
+  });
+  const own = views.find((view) => view.id === traced.link_id)?.evidence.outcome;
+  expect(own?.status).toBe("full");
+  expect(own?.tracedVia).toBeNull();
+  expect(own?.finalText).not.toBeNull();
+  const borrowed = views.find((view) => view.id === "link:a-other-makers")?.evidence.outcome;
+  expect(borrowed).toEqual({
+    status: "unknown",
+    explanation: `The ask's final-act result was traced through amendment ${traced.amendment_id}; this amendment's own path to the final act was not assessed.`,
+    finalText: null,
+    tracedVia: traced.amendment_id,
+  });
+  // A direct ask-to-final outcome names no amendment and stays on the ask's card.
+  expect(views.find((view) => view.id === "link:a-am1-watch")?.evidence.outcome.status).toBe(
+    "not_observed",
+  );
+});
+
+test("ranking evidence resolves supplied ids to deduplicated sources and the actor's own card", () => {
+  const evidence = atlasRankingEvidence(fixture());
+  expect(
+    evidence("actor:tr:123456789012-34", [
+      "doc:hys_feedback:9000001",
+      "passage:makers-1",
+      "doc:hys_feedback:9000001",
+      "art:32099R0001:article-6-1",
+      "outcome:a-ask-undated-final",
+      "doc:hys_feedback:missing",
+    ]),
+  ).toEqual([
+    {
+      key: "https://example.invalid/fixture/feedback/9000001",
+      recordIds: ["doc:hys_feedback:9000001", "passage:makers-1"],
+      title: "doc:hys_feedback:9000001",
+      url: "https://example.invalid/fixture/feedback/9000001",
+      linkId: "link:a-am1-makers",
+    },
+    {
+      key: "https://example.invalid/fixture/celex/32099R0001",
+      recordIds: ["art:32099R0001:article-6-1", "outcome:a-ask-undated-final"],
+      title: "doc:cellar:32099R0001",
+      url: "https://example.invalid/fixture/celex/32099R0001",
+      linkId: "link:a-am1-makers",
+    },
+    {
+      key: "doc:hys_feedback:missing",
+      recordIds: ["doc:hys_feedback:missing"],
+      title: "doc:hys_feedback:missing",
+      url: null,
+      linkId: null,
+    },
+  ]);
+  // An unpublished candidate is never offered as a row's supporting card, and another
+  // actor's published card is never borrowed for a shared source.
+  expect(evidence("actor:name:hys_feedback.acme", ["doc:hys_feedback:9000004"])).toEqual([
+    {
+      key: "https://example.invalid/fixture/feedback/9000004",
+      recordIds: ["doc:hys_feedback:9000004"],
+      title: "doc:hys_feedback:9000004",
+      url: "https://example.invalid/fixture/feedback/9000004",
+      linkId: null,
+    },
+  ]);
+  expect(first(evidence("actor:tr:234567890123-45", ["art:32099R0001:article-6-1"])).linkId).toBe(
+    null,
+  );
+  expect(evidence("actor:tr:123456789012-34", [])).toEqual([]);
 });
 
 test("missing law subjects remain an explicit unknown topic", () => {
