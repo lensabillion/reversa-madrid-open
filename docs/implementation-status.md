@@ -146,7 +146,7 @@ the step it depends on has a recorded response shape. Create a bead per step.
 ## Agent 1 Handoff: Data and Integration
 
 The full handoff is [docs/agents/agent-1-handoff.md](agents/agent-1-handoff.md): branches,
-what is done and measured, what was unfinished, the gate's exact failures, the next
+what is done and measured, what is unfinished, the gate's state, the next
 steps in order and how to run things on the Windows laptop. In short, at 14:15 CEST on
 3 October:
 
@@ -156,8 +156,9 @@ steps in order and how to run things on the Windows laptop. In short, at 14:15 C
 - Draft PR [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)
   (`feat/collect-law`) holds the law-query parser, the resumable stage store, and the
   Parltrack, Transparency Register and actor-resolution connectors (each at 100% branch
-  coverage), plus unfinished CELLAR and Have Your Say connectors. Its gate does not pass
-  yet: 458 tests pass, 1 fails, coverage is 90% (`measured`).
+  coverage), the CELLAR law-text connector, and the Have Your Say connector with passage
+  splitting (its real-data check is not reported yet). The backend gate passes at 14:35:
+  486 tests, 100% branch coverage (`measured`).
 - Not started: the collect service, `influence collect <query>`, the run on real sources
   for the AI Act and its timings. No link, score or graph exists yet.
 

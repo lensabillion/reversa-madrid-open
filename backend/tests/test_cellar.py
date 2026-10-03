@@ -397,7 +397,8 @@ OFFICIAL_JOURNAL = b"""<?xml version="1.0" encoding="UTF-8"?>
         </div>
         <div class="eli-subdivision" id="art_5">
           <p class="oj-ti-art">Article 5</p>
-          <div class="eli-title" id="art_5.tit_1"><p class="oj-sti-art">Prohibited AI practices</p></div>
+          <div class="eli-title" id="art_5.tit_1">
+            <p class="oj-sti-art">Prohibited AI practices</p></div>
           <div id="005.001">
             <p class="oj-normal">1.   The following AI practices shall be prohibited:</p>
             <table><tbody><tr><td><p class="oj-normal">(a)</p></td>

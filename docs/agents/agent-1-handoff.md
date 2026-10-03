@@ -1,6 +1,6 @@
 # Agent 1 Handoff: Data and Integration
 
-Written 3 October 2026, 14:15 CEST, for the session that continues
+Written 3 October 2026, 14:15 CEST, updated 14:40, for the session that continues
 [the Agent 1 assignment](agent-1-data-and-integration.md). Everything below is on the
 branch `feat/collect-law` (draft PR
 [#26](https://github.com/lensabillion/reversa-madrid-open/pull/26)) unless it says
@@ -11,9 +11,9 @@ by the lead), `not verified`.
 
 1. `git fetch && git checkout feat/collect-law`.
 2. Read this file, then `backend/src/influence/schemas/atlas.py`.
-3. Run the backend gate (commands in [This Laptop](#this-laptop)). It fails today; the
-   exact failures are in [Gate State](#gate-state-of-the-snapshot).
-4. Fix the gate, then build the collect service (see [Next Steps](#next-steps-in-order)).
+3. Run the backend gate (commands in [This Laptop](#this-laptop)). It passed at 14:35
+   (see [Gate State](#gate-state)).
+4. Build the collect service (see [Next Steps](#next-steps-in-order)).
 
 ## Branches and Pull Requests
 
@@ -21,7 +21,7 @@ by the lead), `not verified`.
 | --- | --- | --- |
 | `feat/atlas-contracts` | `schemas/atlas.py` (schema `atlas-1`), fixtures in `backend/tests/fixtures/atlas/` | PR [#25](https://github.com/lensabillion/reversa-madrid-open/pull/25), open, all nine CI checks green (`measured`). **Agents 2 and 3 build against commit `f1525db`.** Needs the owner's merge |
 | `feat/extraction-foundations` | The cloud session's fetcher, HTTP cache, layout, name matching and probe CLI, with `main` merged in | Pushed, no PR. 256 tests, 100% branch coverage (`measured`). It is contained in `feat/collect-law`; open its own PR only if the owner wants it reviewed separately |
-| `feat/collect-law` | Both of the above merged, plus all collection work | Draft PR #26. A work-in-progress snapshot: the gate does not pass yet |
+| `feat/collect-law` | Both of the above merged, plus all collection work | Draft PR #26. The backend gate passes at 14:35 (`measured`); the pipeline that joins the connectors is not written |
 
 Nothing has been merged to `main` by this session. The stack to aim for: #25 first, then
 #26 rebased on `main`.
@@ -90,43 +90,64 @@ Decisions the next session must take on it:
 - EHDS has no `celex_final` or lead committee in the Parltrack dossier: take the final
   act from CELLAR.
 
-## In Flight When This Was Written
+### CELLAR on Real Data (`reported` by its sub-agent)
 
-Two sub-agents were still writing these. Their files are committed as they stood at
-14:15; a sub-agent does not survive the session, so treat each as unfinished.
+`repositories/cellar.py` (27 tests, 100% branch coverage, `measured`) and request-header
+plus HTTP 300 support in `extraction/fetching.py` (100%).
 
-| Files | Job | State at the snapshot |
-| --- | --- | --- |
-| `repositories/cellar.py` (655 lines); request headers and HTTP 300 support in `extraction/fetching.py`, `tests/extraction_fixtures.py`, `tests/test_extraction_network.py` | Procedure to CELEX by SPARQL; fetch proposal and final act by content negotiation; split XHTML into `ArticleVersion` | `fetching.py` at 100% coverage. **`cellar.py` had no test file when the gate was run (0% coverage);** a `tests/test_cellar.py` appeared minutes later and is committed but has not been run by the lead. Not run on real data by the lead |
-| `repositories/hys.py`, `services/passages.py`, `tests/test_hys.py`, `tests/test_passages.py` | Have Your Say index by COM reference, feedback paging, attachment PDFs to text, passages with code-point offsets | Both modules at 100% coverage, but 1 failing test (`test_feedback_becomes_a_source_document_and_its_text`), 4 type errors in `tests/test_hys.py`, and Ruff errors in `tests/test_passages.py`. The index crawl had not written `data/catalog/hys-index.jsonl` |
+- `resolve_celex`: AI Act `52021PC0206` / `32024R1689`; DSA `52020PC0825` / `32022R2065`;
+  CSDDD `52022PC0071` / `32024L1760`; EHDS `52022PC0197` / `32025R0327`; the open
+  procedure `2025/0059(COD)` has a proposal and no final act. 0.3 to 0.6 s each.
+  `procedure_for_celex` returns the full reference (`32024R1689` to `2021/0106(COD)`) in
+  2 to 4 s.
+- `fetch_act` and `split_provisions`: AI Act final 180 recitals, 113 articles, 500
+  paragraphs, 13 annexes; AI Act proposal 89 recitals, 85 articles; DSA final 156
+  recitals, 93 articles. Under 1 s to fetch and 0.25 s to split each. Every provision
+  text is an exact substring of the document text.
+- `split_provisions` returns four values: `(document_text, provisions, reason, published_on)`.
 
-The briefs the sub-agents were given (rules, expected functions, what to measure) are
-summarised in [Connector Specifications](#connector-specifications) so the work can be
-finished or checked without them.
+Gaps the next session must handle:
 
-## Gate State of the Snapshot
+- **Parliament's position text is not obtained.** CELLAR's dossier links only the short
+  legislative resolution (`52024AP0138` for the AI Act), which has no articles. Record the
+  `parliament_position` layer as `missing` with that reason, or source the consolidated
+  text from the EP API (`adopted-texts`, `TA-9-2024-0138`); untested.
+- Proposals are split by English text rules; a non-English proposal gives zero
+  provisions with a reason. Proposal annexes (a separate stream) are not fetched.
+- `language` is CELLAR's three-letter code (`eng`); Have Your Say uses two letters.
+  Normalise in the collect service.
+- SPARQL answers are cached without expiry: pass `refresh=True` for open procedures.
 
-Run at 14:10 on the working tree that became this commit (`measured`):
+## Still Running at 14:40: Have Your Say
+
+`repositories/hys.py`, `services/passages.py` and their tests pass the gate as committed
+(100% branch coverage of both, `measured`). Their sub-agent was still running and had
+not reported: **its real-data numbers are unknown**, and it may leave uncommitted edits
+to those four files in this checkout (`git status`). `data/catalog/hys-index.jsonl`
+exists (1.5 MB); whether the crawl of all 4,128 initiatives finished is `not verified`:
+count its lines and compare. Expected on publication 14488 (AI Act): 304 items, 187 with
+a Register ID, 259 with attachments; publication 25429 should raise `HysUnavailable`.
+
+## Gate State
+
+Full backend gate on commit-ready files at 14:35 (`measured`, WSL, uv 0.12.8):
 
 ```text
-ruff format --check src tests   -> 87 files already formatted
-ruff check src tests            -> 8 errors, all in tests/test_passages.py (RUF001, RUF007)
-basedpyright                    -> 4 errors, all in tests/test_hys.py (untyped lambda)
-pytest --cov                    -> 458 passed, 1 failed (tests/test_hys.py); coverage 90%
-                                   (repositories/cellar.py 0%, every other module 100%)
+ruff format --check src tests   -> 88 files already formatted
+ruff check src tests            -> All checks passed!
+basedpyright                    -> 0 errors, 0 warnings, 0 notes
+pytest --cov                    -> 486 passed; 100% branch coverage
 ```
+
+Frontend gates, `check-docs`, `check-scripts` and the audits were not run locally; CI
+runs them on the pull request.
 
 ## Next Steps, in Order
 
-1. **Make the gate pass**: write `tests/test_cellar.py` (offline, fake fetcher, trimmed
-   real XHTML and SPARQL JSON) to 100% branch coverage; fix the Have Your Say test, the
-   four type errors and the eight Ruff errors.
-2. **Check each connector on real sources** and record the numbers here: CELLAR for the
-   AI Act (final `32024R1689`, expect 180 recitals and 113 articles; proposal
-   `52021PC0206`, which answers HTTP 300 and needs the `DOC_1` stream), DSA, a directive
-   and an open procedure; Have Your Say publication 14488 (expect 304 items, 187 with a
-   Register ID, 259 with attachments), publication 25429 (expect the typed
-   "unavailable"), register entry count and resolution counts by method.
+1. **Close out Have Your Say**: read its sub-agent's leftovers (`git status`), rerun the
+   gate, and measure it on publication 14488 and 25429.
+2. **Decide the open points** listed under each connector above (insertions as unknown
+   or empty; amendment `document_id`; the "Europe" name rule; Parliament's position).
 3. **`services/collect.py`**: `parse_query`, resolve to a procedure through the Parltrack
    catalog and CELLAR, then run stages through `StageStore`: metadata, law texts,
    amendments, asks (feedback, attachments, passages), actors. Fill
@@ -211,12 +232,20 @@ command here.
 
 ## Beads
 
-Not confirmed. A command that creates the contracts bead, the CLI/API and UI child beads
-of `rev-qn6b`, and claims `rev-pjk2` (taken over from the cloud session with the owner's
-agreement) was started at about 12:45 and had printed nothing by 14:15. Run `tbd list`
-before creating anything, to avoid duplicates. Still owed: record PR #25 and #26 on
-`rev-pjk2`, write the two child bead IDs into this folder's Agent 1 and Agent 3 files,
-create a bead per remaining step above, and `tbd sync`.
+Created at about 13:30 (`tbd` output, `measured`), all children of existing beads:
+
+| Bead | What | Owner |
+| --- | --- | --- |
+| `rev-lh4f` | Atlas shared contracts and fixtures (PR #25) | Agent 1; close when #25 merges |
+| `rev-k9rm` | Any-law command: CLI and thin API, child of `rev-qn6b` | Agent 1 |
+| `rev-ifao` | Explorer UI for the any-law page and evidence card, child of `rev-qn6b` | **Agent 3 claims this one**, not the parent |
+
+`rev-pjk2` (collect) is still shown as claimed by `claude-code@vm`, the earlier cloud
+session: `tbd start` skipped it. The owner agreed this session takes it over; the claim
+itself was not changed. Still owed: `tbd sync` (not confirmed to have run), PR #25 and
+#26 recorded on `rev-lh4f`, `rev-pjk2` and `rev-1vxz`, and a bead per remaining step.
+`tbd list --status in_progress` also showed `rev-i006` and `rev-oodw` (Agent 3) and
+`rev-aapn` (Agent 2) in progress.
 
 ## Open Questions for the Owner
 
