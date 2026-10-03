@@ -5,7 +5,7 @@ title: "Part 8 · Any-law command and explorer: a law's name or procedure number
 kind: feature
 status: open
 priority: 0
-version: 6
+version: 7
 labels: []
 dependencies:
   - type: blocks
@@ -14,8 +14,9 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 child_order_hints:
   - is-01m40nw41zbvnpsq0zexzfhx42
   - is-01m40nw6ndb84q46r7gq1kyknj
+  - is-01m40vj7j8teddwx12kvr1x7yk
 created_at: 2026-10-03T08:53:51.465Z
-updated_at: 2026-10-03T12:13:31.037Z
+updated_at: 2026-10-03T12:24:31.560Z
 ---
 Atlas part 8; the live 'any law' check (20 points) and the 'real links' check (25). Command: influence atlas <procedure|name> runs parts 1-6 for one law (from cache when precomputed) and the explorer shows actors, links and the three-column evidence (ask | amendment | final article). Name lookup over procedure titles and common names. Honest empty states per layer (no consultation, no amendments, not yet adopted, non-English paper not analysed). Time it from cache and from download on the demo laptop.
 
