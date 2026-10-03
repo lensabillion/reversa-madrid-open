@@ -5,7 +5,7 @@ title: Focus Atlas evidence on cited context so long documents remain comparable
 kind: bug
 status: in_progress
 priority: 1
-version: 3
+version: 4
 delegate: claude-code@vm
 labels: []
 dependencies: []
@@ -13,7 +13,7 @@ parent_id: is-01m40nw6ndb84q46r7gq1kyknj
 hold: null
 hold_until: null
 created_at: 2026-10-03T13:07:03.125Z
-updated_at: 2026-10-03T14:22:49.689Z
+updated_at: 2026-10-03T14:31:51.371Z
 started_at: 2026-10-03T14:16:24.749Z
 ---
 Architecture part 8 (Publish), using part 4 source spans and the shared Atlas evidence adapter; no scoring or source-text changes.
@@ -28,4 +28,4 @@ Browser proof: /tmp/atlas-live-highlight-viewport.png (late quote with three bla
 
 ## Notes
 
-Fixed in 9085607, merged to claude/great-johnson-36vizc (697e736), PR https://github.com/lensabillion/reversa-madrid-open/pull/62. make check-frontend: 102 tests, build ok (Node 24.21.0). Not browser-verified on the real Novartis link.
+Now in PR https://github.com/lensabillion/reversa-madrid-open/pull/67 (PR #62 merged before this fix landed; branch rebuilt on main 94e6f50, head c330458).
