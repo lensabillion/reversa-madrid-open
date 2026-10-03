@@ -739,3 +739,23 @@ file and current source hashes. The evaluator rejects incomplete coverage or mis
 scores instead of inserting zeros. Its output retains all variants, five fitted models
 per variant, paired out-of-fold scores, settings, hashes and threshold diagnostics.
 Those pooled diagnostics cannot serve as the cutoff for a separately refitted model.
+
+## Lineage in the Explorer (Experiment)
+
+Two scripts in `benchmarks/` feed the existing explorer with lineage instead of part 3's
+BM25 verdicts. Both read a collected law (`make collect LAW='AI Act'`).
+
+```sh
+cd backend
+# Reworded origins: BM25 shortlists passages per adopting amendment, Jev judges each pair.
+uv run --locked python benchmarks/lineage_jev.py --law ../data/laws/2021-0106-COD            # dry run, no call
+uv run --locked python benchmarks/lineage_jev.py --law ../data/laws/2021-0106-COD \
+  --execute --env-file .env --max-cost-usd 1                                                   # calls Jev
+# Verbatim + Jev links -> data/laws/<slug>/atlas.json, served at /atlas unchanged.
+uv run --locked python benchmarks/lineage_view.py --law ../data/laws/2021-0106-COD
+```
+
+`--env-file` names a file holding `TYPESAFE_API_KEY` (never committed); without it the key is
+read from the environment. Answers are cached under `data/laws/<slug>/lineage-jev/`, with the
+cumulative charge in its `ledger.json`. Jev links are always `unconfirmed`: no publication
+threshold on real consultation prose has been audited. See `docs/implementation-status.md`.
