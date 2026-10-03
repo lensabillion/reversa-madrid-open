@@ -84,6 +84,9 @@ class PassageIndex:
                 self._postings[term].append((index, count))
         self._average_length = sum(self._lengths) / len(passages) if passages else 0.0
 
+    def __len__(self) -> int:
+        return len(self._passages)
+
     def _context(self, index: int) -> tuple[int, int]:
         document = self._passages[index].document_id
         first = index - 1 if index and self._passages[index - 1].document_id == document else index
