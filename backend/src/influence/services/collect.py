@@ -363,21 +363,28 @@ def _act(
             stage=stage,
             document_id=cellar.cellar_document_id(celex),
             version_date=None,
+            annexes=fetched.annexes,
         )
     except cellar.CellarError as error:
         return (), LayerCoverage(layer=stage, status="not_collected", reason=f"{celex}: {error}")
+    # A lost or unsplit annex leaves the act usable but its annexes' wording unknown, so
+    # that wording would look new in the final act: the layer says so.
+    gaps = [*(f"{celex}: {gap}" for gap in fetched.annex_gaps), *split.annex_reasons]
+    if not split.provisions:
+        gaps.insert(0, f"{celex}: {split.reason}")
+    complete = bool(split.provisions) and not gaps
     document = cellar.source_document(
         fetched,
         procedure_id=run.law.procedure_id,
-        extraction_status="extracted" if split.provisions else "partial",
+        extraction_status="extracted" if complete else "partial",
         text_characters=len(split.document_text.text),
         published_at=_published_at(split.published_on),
     )
     coverage = LayerCoverage(
         layer=stage,
-        status="complete" if split.provisions else "partial",
+        status="complete" if complete else "partial",
         count=len(split.provisions),
-        reason=None if split.provisions else f"{celex}: {split.reason}",
+        reason="; ".join(gaps) or None,
     )
     return (document, split.document_text, *split.provisions), coverage
 

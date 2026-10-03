@@ -275,13 +275,42 @@ def test_a_proposal_answers_with_a_list_of_streams_and_the_act_stream_is_followe
         [
             (CELEX_BASE + "52021PC0206", RawResponse(300, XHTML, LISTING)),
             (STREAM_BASE + "DOC_1", RawResponse(200, XHTML, b"<p>Proposal for a</p>")),
+            (STREAM_BASE + "DOC_3", RawResponse(200, XHTML, b"<p>ANNEX I</p>")),
         ],
     )
     act = cellar.fetch_act(fetcher, "52021PC0206")
     assert isinstance(act, FetchedAct)
     assert (act.url, act.body) == (STREAM_BASE + "DOC_1", b"<p>Proposal for a</p>")
-    assert scripted.calls == [CELEX_BASE + "52021PC0206", STREAM_BASE + "DOC_1"]
+    assert (act.annexes, act.annex_gaps) == ((b"<p>ANNEX I</p>",), ())
+    assert scripted.calls == [
+        CELEX_BASE + "52021PC0206",
+        STREAM_BASE + "DOC_1",
+        STREAM_BASE + "DOC_3",
+    ]
     assert cellar.act_stream_url(LISTING) == STREAM_BASE + "DOC_1"
+    assert cellar.annex_stream_urls(LISTING) == (STREAM_BASE + "DOC_3",)
+    # The digest covers every stream the text came from, in order.
+    assert act.sha256 == hashlib.sha256(b"<p>Proposal for a</p><p>ANNEX I</p>").hexdigest()
+
+
+def test_annex_streams_are_taken_in_their_stream_order(tmp_path: Path) -> None:
+    second = LISTING.replace(b"1_EN_ACT_part2", b"2_EN_annexe_proposition_part2")
+    assert cellar.annex_stream_urls(second) == (STREAM_BASE + "DOC_2", STREAM_BASE + "DOC_3")
+
+
+def test_a_lost_annex_stream_is_recorded_and_does_not_lose_the_act(tmp_path: Path) -> None:
+    fetcher, _ = fetcher_for(
+        tmp_path,
+        [
+            (CELEX_BASE + "52021PC0206", RawResponse(300, XHTML, LISTING)),
+            (STREAM_BASE + "DOC_1", RawResponse(200, XHTML, b"<p>Proposal for a</p>")),
+        ],
+    )
+    act = cellar.fetch_act(fetcher, "52021PC0206")
+    assert isinstance(act, FetchedAct)
+    assert act.annexes == ()
+    assert act.annex_gaps == (STREAM_BASE + "DOC_3: No response: unscripted",)
+    assert act.sha256 == hashlib.sha256(b"<p>Proposal for a</p>").hexdigest()
 
 
 def test_a_list_with_no_recognisable_act_stream_is_a_failure_with_its_reason(
@@ -588,6 +617,84 @@ def test_a_proposal_without_ids_is_split_on_its_english_headings() -> None:
     assert "Article 1\nSubject matter" in result.document_text.text
     for item in result.provisions:
         assert item.text in result.document_text.text
+
+
+# The "v7" Word export of the 52021PC0206 annex stream: a cover page that names the annexes,
+# then one "ANNEX N" heading per annex with its title after a line break.
+PROPOSAL_ANNEXES = b"""<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>2_EN_annexe_proposition_part1_v7</title>
+</head><body><div class="contentWrapper"><div class="content">
+  <p class="Typedudocument_cp"><span>ANNEXES</span></p>
+  <p class="Titreobjet_cp"><span>to the Proposal for a Regulation laying down harmonised
+    rules on artificial intelligence</span></p>
+  <p class="Annexetitre"><span>ANNEX I</span><span><br/>ARTIFICIAL INTELLIGENCE TECHNIQUES
+    AND APPROACHES</span></p>
+  <p class="li Point0"><span class="num"><span>(a)</span></span><span>Machine learning
+    approaches, as referred to in Annex III;</span></p>
+  <p class="Annexetitre"><span>ANNEX III</span></p>
+  <p class="Normal"><span>High-risk AI systems</span></p>
+</div></div></body></html>
+"""
+
+
+def test_a_proposals_annex_streams_follow_its_act_and_split_one_provision_per_annex() -> None:
+    result = cellar.split_provisions(
+        PROPOSAL,
+        procedure_id=AI_ACT,
+        celex="52021PC0206",
+        stage="proposal",
+        document_id=cellar.cellar_document_id("52021PC0206"),
+        version_date=None,
+        annexes=(PROPOSAL_ANNEXES,),
+    )
+    annexes = [item for item in result.provisions if item.kind == "annex"]
+    assert [(item.provision, item.article_id) for item in annexes] == [
+        ("Annex I", "art:52021PC0206:annex-i"),
+        ("Annex III", "art:52021PC0206:annex-iii"),
+    ]
+    # The cover page ("ANNEXES") opens nothing; a cross-reference ("Annex III") neither.
+    assert annexes[0].text == (
+        "ANNEX I\nARTIFICIAL INTELLIGENCE TECHNIQUES AND APPROACHES\n"
+        "(a) Machine learning approaches, as referred to in Annex III;"
+    )
+    assert annexes[1].text == "ANNEX III\nHigh-risk AI systems"
+    # The act's provisions come first and are unchanged.
+    assert [item.provision for item in result.provisions[:2]] == ["Recital 1", "Recital 2"]
+    assert result.document_text.text.endswith("ANNEX III\nHigh-risk AI systems")
+    for item in result.provisions:
+        assert item.text in result.document_text.text
+    assert result.annex_reasons == ()
+
+
+def test_an_annex_stream_with_no_heading_is_kept_as_text_and_says_why() -> None:
+    bare = b"<html><body><p>ANNEX</p><p>One annex.</p></body></html>"
+    unheaded = b"<html><body><p>ANNEXES</p><p>A cover page only.</p></body></html>"
+    result = cellar.split_provisions(
+        PROPOSAL,
+        procedure_id=AI_ACT,
+        celex="52021PC0206",
+        stage="proposal",
+        document_id=cellar.cellar_document_id("52021PC0206"),
+        version_date=None,
+        annexes=(bare, unheaded, b""),
+    )
+    assert [item.provision for item in result.provisions if item.kind == "annex"] == ["Annex"]
+    assert "A cover page only." in result.document_text.text
+    # An empty stream has nothing to split and is not reported.
+    assert result.annex_reasons == (f"52021PC0206 annex stream 2: {cellar.NO_ANNEX_HEADING}",)
+
+
+def test_an_annex_stream_that_is_not_utf8_is_an_error_naming_the_stream() -> None:
+    with pytest.raises(CellarError, match="52021PC0206 annex stream 1 is not UTF-8"):
+        cellar.split_provisions(
+            PROPOSAL,
+            procedure_id=AI_ACT,
+            celex="52021PC0206",
+            stage="proposal",
+            document_id=cellar.cellar_document_id("52021PC0206"),
+            version_date=None,
+            annexes=(b"\xff\xfe",),
+        )
 
 
 def test_text_with_no_recognisable_structure_yields_no_provisions_and_says_why() -> None:
