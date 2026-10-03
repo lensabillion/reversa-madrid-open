@@ -573,6 +573,32 @@ every procedure since 2019 takes hours; it has not yet been timed on real data. 
 collected earlier is reused even when collected with other settings; use `--refresh`
 after a code or dump change. Tested offline (`tests/test_batch.py`).
 
+## Law Search and Build API
+
+The explorer finds any law by what was typed and builds its files without a terminal.
+Routes are thin over `services/law_search.py`, which reuses `collect.resolve_law` (the
+resolver every command uses) and the batch's `StepRunner` (the steps every command runs).
+
+- `GET /api/v1/laws/search?q=<text>` answers `{query, status, law, choices, message}`:
+  `found` (one procedure), `ambiguous` (the top title matches as `choices`) or `not_found`
+  (with the reason). `q` takes a procedure number, CELEX, COM reference, common name or
+  title. Each hit says whether `lineage.json` and `atlas.json` exist and carries its build.
+  An empty `q` is 422; without `make setup` it is 503. A procedure number the dossiers dump
+  does not hold is `not_found`, because a build needs its catalog record.
+- `POST /api/v1/laws/{slug}/build` with `{"steps": [...]}` (any of `lineage`, `atlas`,
+  `coordinated`, `channels`, `directions`; default `["lineage", "atlas"]`) answers 202
+  and the build state. It collects the law **without attachments** (faster; attachment text
+  is not read), then runs the steps in the batch's order. One build runs at a time per
+  process: a second is 409. A slug that is no catalog procedure is 404.
+- `GET /api/v1/laws/{slug}/build` answers `{slug, procedure_id, state, step, steps,
+  started_at, finished_at, error, log}`, `state` being `queued`, `running`, `done` or
+  `failed` (`error` is `<Type>: message`); 404 when no build was started.
+
+Costs: the dossiers catalog is loaded on the first search and kept for the server's life
+(a hash of the dossiers dump and a read of the cached catalog, seconds; about 24,000
+entries in memory); each search is linear in the catalog. Limitation: build state lives
+in memory only, so a restarted server forgets earlier builds (their files remain).
+
 ## Report Command (Part 8)
 
 `influence report <law> [<law> ...]` (`make report LAW='2021/0106(COD)'`; several laws are
