@@ -97,7 +97,7 @@ def _windows(words: Sequence[str]) -> Iterable[tuple[int, tuple[str, ...]]]:
         yield index, tuple(words[index : index + NGRAM_WORDS])
 
 
-def _inserted_blocks(amendment: Amendment) -> tuple[tuple[list[str], ...], str]:
+def inserted_blocks(amendment: Amendment) -> tuple[tuple[list[str], ...], str]:
     """Blocks of consecutive inserted words, and how they were found.
 
     The second value is "exact", "unknown_original" or "approximate" so the caller can count
@@ -167,7 +167,7 @@ def _runs(
     return runs
 
 
-def _phrase_id(words: Sequence[str]) -> str:
+def phrase_id_of(words: Sequence[str]) -> str:
     return "phrase:" + hashlib.sha256(" ".join(words).encode("utf-8")).hexdigest()[:16]
 
 
@@ -210,7 +210,7 @@ def adopt_records(
     adoptions: list[AmendmentAdoption] = []
     bases: defaultdict[str, int] = defaultdict(int)
     for amendment in amendments:
-        blocks, basis = _inserted_blocks(amendment)
+        blocks, basis = inserted_blocks(amendment)
         bases[basis] += 1
         found = [
             (number, run)
@@ -219,7 +219,7 @@ def adopt_records(
         ]
         if not found:
             continue
-        distinct = {_phrase_id(run.words): run for _, run in found}
+        distinct = {phrase_id_of(run.words): run for _, run in found}
         for phrase_id, run in distinct.items():
             carried.setdefault(phrase_id, run)
             carriers[phrase_id].append(amendment.amendment_id)
