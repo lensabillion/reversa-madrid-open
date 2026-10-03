@@ -23,12 +23,15 @@ actions rather than telling them to run commands.
 
 ## What This Project Is
 
-Our entry for Reversa's Challenge 03, Influence Graph, at the Madrid Open on Saturday
-3 October 2026. Given an EU amendment and a lobby submission, the system scores how
-likely the amendment was written from the submission; it then maps who wins and predicts
-which consultation proposals reach the final law.
-Read [the explainer](docs/explainer/influence-graph-primer.md) and the
-[organizers' brief](docs/brief/madrid-open-reversa-challenges.pdf) before changing
+Our entry for Reversa's Challenge 03, **The Influence Atlas**, at the Madrid Open on
+Saturday 3 October 2026. It maps who shapes EU law since 2019: whose asks reached
+amendments and the final law, who wins, how, and what they will win next. We hand in a
+graph the jury explores live, a short public report, and this repository, open source and
+rerunnable by anyone.
+The organizers replaced the first Challenge 03 brief (Influence Graph: score 60 supplied
+pairs into CSVs) at kickoff on 3 October; work done under it is kept where it still serves.
+Read [the Atlas explainer](docs/explainer/influence-atlas-primer.md) and the
+[organizers' brief](docs/brief/influence-atlas-challenge-brief.pdf) before changing
 behavior.
 
 ## Where the Project's State Lives
@@ -68,7 +71,7 @@ These come from the project owner and override any default habit.
 | `frontend/` | Next.js web app (npm project) |
 | `scripts/` | Repository checks used by `make` targets and CI |
 | `docs/implementation-status.md` | Current state, decisions and next work; read first |
-| `docs/brief/` | The organizers' brief |
+| `docs/brief/` | The organizers' briefs: the current Influence Atlas brief and the superseded first brief |
 | `docs/research/` | Research documents and softschema catalogs |
 | `docs/explainer/` | The team explainer, in Markdown so GitHub renders it |
 | `data/` | Downloaded public data; never committed |
@@ -93,7 +96,7 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
 | `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
-| `make submit PAIRS=<file> OUT=<dir>` | The 19:00 command: scores a JSON Lines pairs file into `OUT/pairs.csv` and `OUT/pairs.evidence.jsonl`; `EXPECTED_PAIRS=<n>` overrides the brief's 60 |
+| `make submit PAIRS=<file> OUT=<dir>` | From the first brief: scores a JSON Lines pairs file into `OUT/pairs.csv` and `OUT/pairs.evidence.jsonl`. The Atlas brief has no CSV deliverable; the command stays until part 4 (verify links) replaces it |
 
 Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 
@@ -104,8 +107,9 @@ Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 2. **Claim it.** `tbd sync --pull`, re-read the bead, `tbd start <id>`, `tbd sync`.
 3. **Fit it into the architecture** before designing, with the
    [influence-architecture skill](.agents/skills/influence-architecture/SKILL.md): name
-   the part of the seven-part design the work belongs to, and build on that part's
-   existing code. Code in `attic/` predates the architecture and is never a source.
+   the part of the Atlas architecture (eight parts plus a practice loop) the work belongs
+   to, and build on that part's existing code. Code in `attic/` predates the architecture
+   and is never a source.
 4. **Load the guidelines** that match the change, in one call, before writing code:
    always `general-eng-agent-principles`; then `python-rules python-modern-guidelines`
    for Python, `typescript-rules typescript-lint-format-rules` for TypeScript, and
@@ -138,8 +142,9 @@ bottom to top with merge commits.
 
 - **Measure before optimizing, then keep the measurement.** Any claim that code is fast
   enough cites a benchmark run, its input size, and the hardware.
-  The 19:00–20:00 test window is the real budget: the full pipeline over 60 pairs and 20
-  proposals must finish in minutes, not the hour.
+  The live "any law" check is the real budget: the jury names an EU law at 19:30 and the
+  pipeline must show who shaped it within minutes, with no code changes. Time one law end
+  to end, from download and from cache, on the demo laptop.
 - **State the complexity** of every non-trivial algorithm in its docstring when it is not
   linear, and the input sizes it was designed for.
 - **Prefer the standard library and existing dependencies.** Every new dependency needs
@@ -159,11 +164,11 @@ Each behavior is checked from the angles that can catch its failures:
 | --- | --- | --- |
 | Unit | Does each function meet its contract on representative and edge inputs? | pytest, Vitest |
 | Property-based | Does an invariant hold on many generated inputs (for example, a score stays within 0–1, matching is symmetric where it should be)? | Hypothesis, fast-check |
-| Contract | Do the API, CLI, and CSV outputs keep their exact shape? | pytest with the FastAPI test client; golden files |
+| Contract | Do the API, CLI and data outputs keep their exact shape? | pytest with the FastAPI test client; golden files |
 | Gate probes | Do the linters still reject a known violation? | committed probe files run by the gates |
-| Evaluation | Does a model change improve the metrics the hidden test uses? | the practice harness: precision in the top 20, recall, AUC, on lobbyist-grouped folds |
-| Performance | Does the pipeline stay inside its time budget? | timed runs on fixed inputs |
-| End to end | Does the 19:00 command turn raw inputs into valid CSVs? | a rehearsal on held-out practice inputs |
+| Evaluation | Does a scoring change raise the precision of the links we publish without losing recall? | the practice harness on LobbyPlag's labelled pairs (organization-grouped folds), plus a blind audit of a random sample of our own published links, reported with a confidence interval |
+| Performance | Does one law, named live, finish within minutes? | timed runs on fixed laws, from download and from cache |
+| End to end | Does one command turn a procedure number into a graph, rankings and report figures? | a rehearsal on laws not used during development |
 
 Rules that apply to every test (`tbd guidelines general-testing-rules`):
 
@@ -209,8 +214,11 @@ lockfiles committed and installed frozen; GitHub Actions pinned to commit SHAs.
 
 ## Data and Challenge Rules
 
-- Public data only. Downloads go under `data/`, which is never committed.
-- Hand-labelling the hidden test pairs disqualifies the team.
-  The pipeline must produce every submitted score without human edits.
+- Public data only, so everything we find can be published. Downloads go under `data/`,
+  which is never committed; the scripts that fetch them are, so anyone can rerun.
+- The code goes in a public repository with an open licence (a rule of the brief).
+- The pipeline produces every link, score and ranking; nobody edits them by hand.
+  People may audit a random sample of published links to measure precision; audit
+  labels are stored apart from model output and never feed back into the shown graph.
 - Keep raw model output separate from human labels and corrections.
 - Practice labels come from public datasets (LobbyPlag); record their provenance.

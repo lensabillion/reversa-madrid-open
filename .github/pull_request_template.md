@@ -10,10 +10,10 @@ What this PR does, and why it is needed now.
 
 ## Architecture and Agreed Decisions
 
-For each change: the part of the seven-part architecture it belongs to (explainer §11,
-`docs/explainer/influence-graph-primer.md`), what it takes from the part before and hands
+For each change: the part of the Atlas architecture it belongs to (explainer §6,
+`docs/explainer/influence-atlas-primer.md`), what it takes from the part before and hands
 to the part after, and the agreed decision or design rule it follows (a row of the
-Decisions table in `docs/implementation-status.md`, a §11 design rule, or a §11 arrow).
+Decisions table in `docs/implementation-status.md`, a §6 design rule, or a §6 arrow).
 Say so when a change is outside the pipeline, such as tooling or docs.
 
 | Changed | Architecture part | Agreed decision or rule it follows |
