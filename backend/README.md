@@ -256,6 +256,44 @@ Outcomes are traced only for asks with a published or
 unconfirmed link. Tested offline (`tests/test_pipeline.py`); not yet run on real data or
 timed.
 
+## Coordinated Amendments Command (Part 3)
+
+`influence coordinated <law>` (`make coordinated LAW='2021/0106(COD)'`) collects the law
+as `influence collect` does, then lists the amendments whose inserted wording is
+near-identical and which were tabled by Members of different political groups. Such a
+cluster is a candidate for a shared outside draft; it is not proof of one. It reads only
+what part 1 took from Parltrack: the law's amendments and their Members.
+
+| Step | Code | Rule |
+| --- | --- | --- |
+| The change | `services/scoring.changed_spans`, the diff parts 3 and 4 use | Only inserted wording is compared, quoted from `new_text` with exact offsets. An unknown original is read as empty |
+| Comparable | `MIN_INSERTED_WORDS = 12` | Shorter insertions and deletions are counted as `too_short`; amendments over the diff's bounds (800 tokens a side) as `not_comparable` |
+| Similar | `SHINGLE_WORDS = 5`, `SIMILARITY_THRESHOLD = 0.8` | Jaccard similarity of the two sets of five-word runs; pairs are found through an inverted index |
+| Cluster | union-find over similar pairs | A chain joins A to C through B; `min_similarity` reports the least similar pair |
+| Across groups | `cross_group` | Two members with no author in common and no political group in common, both groups known |
+
+The output is `data/laws/<procedure>/coordinated.json` (`schemas/coordinated.py`,
+`CoordinatedView`): the parameters, the counts, every cluster with its members, and the
+limitations. Clusters that span groups come first. The command prints the first ten.
+
+**Measured** (3 October 2026; Windows 11 laptop, Intel Core Ultra 7 258V, 8 logical CPUs
+and 15 GB in WSL2, Python 3.14.7; `--no-attachments`, HTTP answers cached, a fresh law
+folder). Wall time is the whole command, of which collect is the first figure:
+
+| Law | Amendments | Compared | Clusters | Span groups | Collect | Whole command | Peak memory |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| AI Act, 2021/0106(COD) | 5,660 | 2,967 | 269 | 83 | 25.4 s | 29.2 s | 228 MB |
+| Digital Services Act, 2020/0361(COD) | 6,476 | 3,299 | 508 | 80 | 23.8 s | 27.3 s | 236 MB |
+| Data Act, 2022/0047(COD) | 2,437 | 1,325 | 173 | 72 | 22.4 s | not kept | not kept |
+
+**Limits.** The three parameters are proposed, not calibrated: no labelled set of
+coordinated amendments exists, and nobody has audited a sample of these clusters. A
+Member's group is the one of their latest spell in Parltrack's dump, so a Member who
+changed group after tabling is listed under the later group (the AI Act's list shows
+"Patriots for Europe Group", founded in 2024, on 2022 amendments). Members also agree
+wording among themselves, so a cluster shows shared wording, not its author. The clusters
+are not yet in `atlas.json` or the explorer.
+
 ## Submission Command
 
 `influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
