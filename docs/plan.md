@@ -25,14 +25,15 @@ Facts carry the explainer's tags: `verified` (primary source read today), `measu
 ## Contents
 
 - [1. Which Document Answers What](#1-which-document-answers-what)
-- [2. What All Three Agree On](#2-what-all-three-agree-on)
-- [3. Where They Differ, and the Choice](#3-where-they-differ-and-the-choice)
-- [4. The Generic Law Path](#4-the-generic-law-path)
-- [5. Typed Partial Results](#5-typed-partial-results)
-- [6. Counting Wins Honestly](#6-counting-wins-honestly)
-- [7. Acceptance Gates, in Order](#7-acceptance-gates-in-order)
-- [8. Dependencies: What We Add and What We Do Not](#8-dependencies-what-we-add-and-what-we-do-not)
-- [9. What This Plan Leaves Open](#9-what-this-plan-leaves-open)
+- [2. Checked Against the Brief](#2-checked-against-the-brief)
+- [3. What All Three Agree On](#3-what-all-three-agree-on)
+- [4. Where They Differ, and the Choice](#4-where-they-differ-and-the-choice)
+- [5. The Generic Law Path](#5-the-generic-law-path)
+- [6. Typed Partial Results](#6-typed-partial-results)
+- [7. Counting Wins Honestly](#7-counting-wins-honestly)
+- [8. Acceptance Gates, in Order](#8-acceptance-gates-in-order)
+- [9. Dependencies: What We Add and What We Do Not](#9-dependencies-what-we-add-and-what-we-do-not)
+- [10. What This Plan Leaves Open](#10-what-this-plan-leaves-open)
 
 ## 1. Which Document Answers What
 
@@ -46,10 +47,36 @@ Facts carry the explainer's tags: `verified` (primary source read today), `measu
 | Who is working on what | tbd beads (`tbd ready`) |
 
 The uploaded plan stays unchanged as an input. Where it differs from this file, this file
-applies (§3 lists every difference). A pull request that departs from this plan changes
+applies (§4 lists every difference). A pull request that departs from this plan changes
 this file in the same pull request, so the next person builds the current plan.
 
-## 2. What All Three Agree On
+## 2. Checked Against the Brief
+
+Read again, page by page, at 12:10 on 3 October (`verified`, the 12-page PDF). Every
+requirement below has an owner in this plan; the right column names where.
+
+| Brief | Requirement | Where this plan answers it |
+| --- | --- | --- |
+| p. 4, the challenge | Which companies and people get their way; all of Europe from 2019; thousands of submissions and amendments; one graph | Gates 1–6 for one law, gate 9 for the batch since 2019; one graph across laws (part 6) |
+| p. 4, the trap | Similar wording proves nothing; "real influence is usually reworded, and that is what we want you to catch" | Masking and rarity (part 4); the reworded tier, published at its audited precision; D1 decided by the 13:30 checkpoint (§10), because catching paraphrase is what the judge or the meaning signals are for |
+| p. 5, five questions | WHO, WHAT, TOWARDS (and does it match what they say in public), HOW (consultations, meetings, MEPs, coalitions, timing), NEXT | The report must answer all five (gate 8). TOWARDS and HOW have a required minimum (gate 7b) so no question goes unanswered |
+| p. 6, map | Actor → ask → amendment → final article since 2019, "enriched with public positions" | Parts 1–6; public positions enter the graph as dated context nodes beside the asks (design, PublicPosition) |
+| p. 6, rank | Ranked by real wins, by topic and by year | Part 7 rank with §7's counting; topics from Legislative Observatory subject codes |
+| p. 6, explain | What each actor says in public versus what it asks, and the playbook that wins | Gate 7b minimum, gate 10 in full |
+| p. 6, forecast | Who is rising and fading; which asks will land in laws negotiated now | Gate 9 with rolling time splits; open files need asks from Have Your Say and amendments from the EP after Parltrack's February 2026 cut-off (a stated risk) |
+| p. 6, hand-in | A graph explored live, a short public report on the five questions, a repository anyone can rerun | Gates 6, 8 and 11 |
+| p. 7, data | The EU record (register, meetings, Have Your Say, Legislative Observatory, amendments, HowTheyVote, EUR-Lex, LobbyFacts); public voice (websites, position papers, press releases, op-eds, social media, news through GDELT); then go global | The EU record: §5. Public voice: organizations' own websites, position papers and press releases, for a sample of actors. **Cut today, and said so in the report**: social media; GDELT (rate-limited from our network, `verified`); non-EU registers (the US disclosure API answered 403, `verified`) |
+| p. 7, "the magic is in the comparison" | What an actor says in public, what it asks, and what ends up in the law, side by side | The evidence card (part 8) plus gate 7b's public-voice cards for the actors with the strongest links |
+| p. 8, the bar | Every edge shows the ask, the amendment and the final article; wins "even when it is not who spends most"; positions and the playbook; the next years with reasons; a report a journalist could publish | Parts 4, 5 and 8; wins against spend (§4, part 7); forecasts with reasons (gate 9); the report outline in explainer §11 |
+| p. 9, scoring | Real links 25, any law 20, insight 25, report 15, ambition 15, all checked live | Gates 3 and 7 (real links), 6 (any law: results "in minutes, and they hold up", so the any-law page shows only links above the same threshold), 7b and 8 (insight, report), 9 (ambition) |
+| p. 10, rules | No data or labels handed out; public sources only; public repository with an open licence; teams of three or four; "your own models, editors and agents" | Labels are our own audit, kept apart; D6 before 19:30 (gate 11); the rules allow our own models, so D1 is the owner's call on cost and measured gain, not a rules question |
+| p. 11, the day | Demos at 19:30, five minutes each | The explainer's five-minute demo script (§11) and the cut lines in §8 |
+
+What the brief does not say, and we therefore treat as open: whether code written before
+today may be used ("nothing prepared, on purpose", `rev-qvmx`), and the exact meaning of
+"since 2019" (§10).
+
+## 3. What All Three Agree On
 
 These hold without change. Each is in the uploaded plan and in the explainer or design.
 
@@ -62,7 +89,7 @@ These hold without change. Each is in the uploaded plan and in the explainer or 
   read against that law's own background, not a global constant.
 - **Cheap before expensive.** Lexical and embedding filters find candidates; careful
   checks run only on the shortlist.
-- **Never an empty screen.** A missing source becomes a labelled partial result (§5).
+- **Never an empty screen.** A missing source becomes a labelled partial result (§6).
 - **Careful wording.** "The ask appears in the amendment", never "X wrote the law". Echo
   is not causation; a meeting is context, not proof.
 - **Match on the change, not the document.** Compare what an amendment inserts or deletes
@@ -79,10 +106,11 @@ These hold without change. Each is in the uploaded plan and in the explainer or 
   and labels kept apart from model output.
 - **Outcomes never rely on article numbers**: final acts renumber.
 - **Rankings shrink small numbers** (a beta-binomial prior) and show counts beside rates.
-- **Out of scope today**: fine-tuning, large local models, non-EU jurisdictions, social
-  media, news mining.
+- **Out of scope today**: fine-tuning, large local models, social media, news mining and
+  non-EU registers. The brief lists the last three as sources (p. 7); §2 says why each is
+  cut, and the report says so too.
 
-## 3. Where They Differ, and the Choice
+## 4. Where They Differ, and the Choice
 
 Each row: what the uploaded plan proposes, what we do instead (`proposed`), and why.
 Rows the uploaded plan got right but under-specified say "Retained, with".
@@ -140,7 +168,7 @@ Rows the uploaded plan got right but under-specified say "Retained, with".
 
 | Topic | Uploaded plan | Consolidated choice | Why |
 | --- | --- | --- | --- |
-| Credit for a shared ask | 1/N to each actor | No fractional credit: deduplicated denominators (§6) | 1/N invents a causal share nobody measured |
+| Credit for a shared ask | 1/N to each actor | No fractional credit: deduplicated denominators (§7) | 1/N invents a causal share nobody measured |
 | Success against spend | Percentile of success minus percentile of spend | Residual of wins regressed on log declared spend (explainer §8), keeping the uploaded plan's minimum of 3 assessed asks, with n and an interval | One method, as agreed in the explainer; the minimum stops "1 of 1" from leading |
 | Forecast validation | Leave-one-law-out (`GroupKFold` by law) | Rolling time splits by procedure completion date; every feature built from documents dated before the forecast cutoff; baselines: base rate and "the rapporteur's draft includes it"; AUC and Brier score | Leave-one-law-out trains on 2024 laws to predict 2021 laws: actor history and coalitions leak from the future |
 | Forecast features | Author role, co-signatories, cross-group support, actor history, coalition | Retained, each computed at the cutoff, plus the explainer's direction and Council-position features | Same idea, without leakage |
@@ -156,11 +184,40 @@ Rows the uploaded plan got right but under-specified say "Retained, with".
 | Report | Jinja2 template; a language model drafts the narrative | Numbers generated by reproducible queries into Markdown with the standard library; people write the narrative; no model drafting before D1 | Every claim links to its query; nobody edits the numbers |
 | Precomputed laws | 10–15 laws into `demo/` | Retained as a cache under `data/laws/`, never a limit on which laws work; the flagship list is explainer §12 | Survives a network failure at 19:30 |
 
-## 4. The Generic Law Path
+## 5. The Generic Law Path
 
 The any-law check (20 points) needs one path for every law. The uploaded plan's resolver
 and law bundle are the right shape; this section fixes their sources to the routes
 verified in the [data-sources report](research/influence-atlas-2026-10/data-sources.md).
+
+```mermaid
+flowchart LR
+  query["Law name, procedure,<br/>CELEX or COM number"] --> resolve["Resolve<br/>(catalog, aliases)"]
+  subgraph sources["Public sources"]
+    parl["Parltrack dumps<br/>amendments, dossiers, MEPs"]
+    cellar["CELLAR<br/>proposal, final act"]
+    epapi["EP API v2<br/>Parliament position"]
+    hys["Have Your Say<br/>feedback, PDFs"]
+    reg["Register, meetings,<br/>votes"]
+  end
+  resolve --> collect["1 · Collect<br/>law bundle + manifest"]
+  sources --> collect
+  collect --> actors["2 · Actors"] --> find["3 · Candidates"] --> verify["4 · Verify"]
+  verify -->|"above threshold"| published["Published links"]
+  verify -->|"below"| unconfirmed["Unconfirmed<br/>(audit view only)"]
+  published --> trace["5 · Outcomes"]
+  collect --> trace
+  trace --> atlas["6 · Atlas graph"]
+  published --> atlas
+  atlas --> analyse["7 · Rank, explain,<br/>forecast (pre-cutoff)"]
+  atlas --> publish["8 · Explorer, any-law<br/>command, report"]
+  analyse --> publish
+  practice["Practice loop<br/>LobbyPlag, blind audit,<br/>time-split backtest"] -.->|"threshold"| verify
+  practice -.->|"backtest"| analyse
+```
+
+This is the target, not what runs today: [implementation status](implementation-status.md)
+says which parts exist.
 
 ### Setup, Once
 
@@ -208,15 +265,17 @@ with each source's URL, retrieval time and SHA-256.
 | Pilot law chosen | AI Act, 2021/0106(COD) (`proposed`, explainer §5) |
 | Pilot law counts logged in the run manifest | Open: the first test of `rev-pjk2` |
 
-## 5. Typed Partial Results
+## 6. Typed Partial Results
 
 The uploaded plan's "degradation modes" become typed fields of the run manifest, so the
 explorer, report and rankings read them instead of guessing from empty files.
 
 Each layer of a law (metadata, proposal, Parliament position, final act, committee
 amendments, plenary amendments, asks, actors, meetings, votes) carries one status:
-`complete`, `partial`, `missing`, `stale` or `not_applicable`, with a reason code, a count
-and the source's last-updated date. Unknown is never stored as zero.
+`complete`, `partial`, `missing`, `stale`, `not_applicable` or `not_collected`, with a
+reason code, a count and the source's last-updated date. `missing` means the source lacks
+it; `not_collected` means this run did not try (for example, a connector not built yet).
+Unknown is never stored as zero.
 
 | What is missing | Mode label | Still shown | Never shown |
 | --- | --- | --- | --- |
@@ -230,7 +289,7 @@ A missing *required* input stops the run with an explicit error (`AGENTS.md`, "E
 explicit"): the procedure must resolve, and links need both amendments and asks. Every
 other gap is labelled and the run continues.
 
-## 6. Counting Wins Honestly
+## 7. Counting Wins Honestly
 
 Rankings and the report divide wins by asks. Both numbers must count the same things once.
 
@@ -249,7 +308,7 @@ Rankings and the report divide wins by asks. Both numbers must count the same th
 - **Coverage**: every ranking states which laws and layers it covers; it is a ranking
   within observed coverage.
 
-## 7. Acceptance Gates, in Order
+## 8. Acceptance Gates, in Order
 
 A gate is done when its test passes on `main`, with the output recorded in its pull
 request. Gates 1–6 carry real links and any law (45 points); later gates build on them.
@@ -258,24 +317,25 @@ Madrid time, and the cut lines there apply.
 
 | Gate | Work | Beads | Done when | Target |
 | --- | --- | --- | --- | --- |
-| 0 | Background downloads; the two setup catalogs (§4) | `rev-pjk2` | Dossiers, MEPs, the Have Your Say index and the AI Act's texts and attachments are on disk with manifests | Started now |
+| 0 | Background downloads; the two setup catalogs (§5) | `rev-pjk2` | Dossiers, MEPs, the Have Your Say index and the AI Act's texts and attachments are on disk with manifests | Started now |
 | 1 | Collect one law | `rev-pjk2`, `rev-xltz` | `influence collect 2021/0106(COD)` writes the bundle; counts match the research (4,852 amendments; 304 feedback items, 259 with attachments); a second procedure (for example 2022/0140(COD)) runs with no code change; missing layers are typed | 12:30 |
 | 2 | Find candidates; coordinated amendments | `rev-aapn`, `rev-00x6`, `rev-637f` | Recall@20 on LobbyPlag reported for BM25, dense and fused; candidates for the AI Act; coordinated amendments listed from Parltrack alone | 13:00 |
-| 3 | Verify links | `rev-nuk5`, `rev-sbrp`, `rev-zzur`, `rev-jaig` | Every published span is an exact substring at its offsets; polarity tests pass; the threshold comes from a practice-loop file; at least 20 published AI Act links and 10 read at random | **13:30 checkpoint** |
+| 3 | Verify links | `rev-nuk5`, `rev-sbrp`, `rev-zzur`, `rev-jaig` | Every published span is an exact substring at its offsets; polarity tests pass; the threshold comes from a practice-loop file; at least 20 published AI Act links and 10 read at random; D1 decided on the measured reworded-link evidence | **13:30 checkpoint** |
 | 4 | Trace outcomes | `rev-uhpq` | Tests cover renumbered, partial, deletion, status-quo and unknown cases; Parliament position before final act | 14:30 |
 | 5 | Resolve actors; atlas graph | `rev-1vxz`, `rev-i006` | Two Register IDs are never merged; the graph is built only from published links and outcomes; every edge opens its evidence | 15:00 |
 | 6 | Any-law command and explorer | `rev-qn6b` | A teammate names a law not used in development; it appears with layer badges and no code change; cached and uncached times recorded with hardware | **15:00 cut line** |
 | 7 | Blind audit | `rev-sn3u` | 40 links, two readers, Wilson interval in the report; if short, the threshold moves for every link | 17:00 freeze |
-| 8 | Rank; report | `rev-5yy6`, `rev-fod0` | Every number in the report comes from a recorded query; rankings use §6's counting | 17:00; report text until 18:30 |
+| 7b | Minimum answers to TOWARDS and HOW | `rev-rg6l` | TOWARDS: the direction of each top actor's asks (stricter, weaker, delete, delay, exempt) from its changes, and public-voice cards for 3–5 actors with strong links, the public quote beside the ask and the law, labelled as a sample with no automatic stance. HOW: counts computable from collected data (consultation stage, tabling MEPs and their groups, coalition asks, timing against the proposal and votes), meetings where loaded | 17:00 freeze |
+| 8 | Rank; report | `rev-5yy6`, `rev-fod0` | Every number in the report comes from a recorded query; rankings use §7's counting; each of the five questions has a number, a named actor or law, evidence links and a limitation | 17:00; report text until 18:30 |
 | 9 | Batch; forecast | `rev-0who`, `rev-104q` | Coverage banner from manifests; forecast on rolling time splits, or the rapporteur-draft rule as the labelled fallback | 17:00 freeze |
-| 10 | Explain: channels and public voice | `rev-rg6l` | Each flag shows both quotes; the sample is labelled as a sample | Before 17:00, if time allows |
+| 10 | Explain in full: stance scoring over more actors, meetings, the playbook per actor | `rev-rg6l` | Each flag shows both quotes and a person checked it; the sample is labelled as a sample | Before 17:00, if time allows |
 | 11 | Release | `rev-nzqr`, `rev-p61s`, `rev-qvmx` | Licence and public repository (owner, D6); a fresh checkout reruns `make atlas-sample` | 18:30 code freeze |
 
 If a gate slips, the explainer's 15:00 cut line applies: keep about twelve flagship laws,
 keep the amendment layer for all of 2019–2026, badge multilingual scoring as off, use the
 rule baseline instead of a trained forecast, and drop insights F–H.
 
-## 8. Dependencies: What We Add and What We Do Not
+## 9. Dependencies: What We Add and What We Do Not
 
 The backend's runtime dependencies today are FastAPI, Pydantic, `pypdf` and Uvicorn
 (`backend/pyproject.toml`). Each addition gets its own pull request under
@@ -289,10 +349,12 @@ committed).
 | Model stack (`torch`, `sentence-transformers`, entailment model) | 3, 4 | An isolated, locked model environment (explainer §10), never the backend's | Heavy; pinned revisions; the pipeline must run without it |
 | `bm25s`, `duckdb`, `pyarrow`, `zstandard`, `httpx`, `tenacity`, `pysbd`, `pymupdf`, `datasketch`, `networkx`, `jinja2`, `eurlxp`, `hys-scraper`, `anthropic` | — | Not added | Standard library or `numpy` covers the job at measured sizes, the source route is verified without it, or the decision is open (D1) |
 
-## 9. What This Plan Leaves Open
+## 10. What This Plan Leaves Open
 
-- **D1**, the language-model judge (`rev-jaig`): decided on practice-loop and audit
-  evidence.
+- **D1**, the language-model judge (`rev-jaig`): decided by the 13:30 checkpoint on
+  practice-loop and audit evidence. The brief allows our own models and agents (p. 10)
+  and wants reworded influence caught (p. 4), so the question is cost, approval to send
+  public text to a provider, and measured gain.
 - **D4**, the team split: the explainer's §12 roles map onto the gates above (A: gates
   0–1 and 5; B: 2–3 and 7; C: 5–6; D: 4 and 8–10).
 - **D6**, licence and public repository (`rev-nzqr`): owner only.

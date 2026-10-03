@@ -70,7 +70,7 @@ manifest) and a seven-step delivery sequence with completion tests. The
 plan's law resolver, law bundle, degradation modes and audit, and replaces its scraping
 routes, hand-set weights and thresholds, fuzzy quote check, short-edit filter,
 fractional credit and leave-one-law-out forecast validation, giving the reason for each
-([plan §3](plan.md#3-where-they-differ-and-the-choice)).
+([plan §4](plan.md#4-where-they-differ-and-the-choice)).
 
 The implemented dependency direction stays: HTTP routers → typed contracts and services
 → repositories or extraction and scoring functions, so batch commands call the same
@@ -109,7 +109,7 @@ Open decisions are not settled until the project owner agrees.
 
 The beads below are children of the epic `rev-i2dl` and depend on each other in this
 order (`tbd ready` shows what is unblocked). Points are the brief's criteria each one
-carries. [Plan §7](plan.md#7-acceptance-gates-in-order) gives each step its completion
+carries. [Plan §8](plan.md#8-acceptance-gates-in-order) gives each step its completion
 test and target time.
 
 1. `rev-pjk2` Part 1 · Collect one law from its procedure number; start the downloads

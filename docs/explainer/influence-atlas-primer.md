@@ -1037,7 +1037,7 @@ Rehearse it twice with a timer, once with a teammate naming an obscure law.
 ## 12. Today's Plan
 
 Times are Madrid time; demos start 19:30. Owners are suggestions for decision D4. The
-[consolidated plan's gates](../plan.md#7-acceptance-gates-in-order) give each milestone
+[consolidated plan's gates](../plan.md#8-acceptance-gates-in-order) give each milestone
 its completion test.
 
 | Time | Milestone | Beads |
