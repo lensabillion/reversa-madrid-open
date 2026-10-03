@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit collect atlas \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag
 
@@ -69,6 +69,11 @@ dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ ch
 atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
 	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
 	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
+
+# Run once per machine before the first `make collect` (needs network). Present files are
+# kept, so a rerun after a failure fetches only what is missing.
+setup:  ## Download collect's global inputs and build the Have Your Say index: make setup [ARGS='--only parltrack,register']
+	$(BACKEND) influence setup $(ARGS)
 
 collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make collect LAW='2021/0106(COD)'))

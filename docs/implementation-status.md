@@ -107,6 +107,8 @@ builds the Have Your Say index (follow-up bead); without the index, the consulta
 found by a labelled title search. `parliament_position`, `meetings` and `votes` stay
 `not_collected`.
 
+Setup (bead `rev-6c1o`): `make setup` now streams the four Parltrack dumps and the register export into `data/raw/` (atomic, with a `<name>.source.json` provenance record each) and builds `data/catalog/hys-index.jsonl`, closing the download gap named above; tested offline (`tests/test_setup.py`) and on a local 120 MB file, not yet against the real hosts ([backend README](../backend/README.md#setup-command-atlas-part-1-inputs)).
+
 ## End to End: Atlas Command, View API and Explorer Page — 3 October 2026
 
 The first end-to-end check (14:00) found the pipeline's parts working alone but not

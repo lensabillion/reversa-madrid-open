@@ -43,11 +43,18 @@ def make_actor(actor_id: str, name: str, acronym: str | None = None) -> ActorRow
 
 @dataclass
 class FakeUrlResponse:
-    """Stands in for http.client.HTTPResponse: status, headers and a single read()."""
+    """Stands in for http.client.HTTPResponse: status, headers, `length` and read().
+
+    `length` is the declared Content-Length, which a cut-off body falls short of. `reads`
+    records the size asked of every read(), None for a read of the whole rest.
+    """
 
     status: int
     body: bytes
     content_type: str | None = None
+    length: int | None = None
+    reads: list[int | None] = field(default_factory=list[int | None])
+    position: int = 0
 
     @property
     def headers(self) -> Message:
@@ -56,8 +63,12 @@ class FakeUrlResponse:
             message["Content-Type"] = self.content_type
         return message
 
-    def read(self) -> bytes:
-        return self.body
+    def read(self, amt: int | None = None) -> bytes:
+        self.reads.append(amt)
+        end = len(self.body) if amt is None else min(len(self.body), self.position + amt)
+        chunk = self.body[self.position : end]
+        self.position = end
+        return chunk
 
     def __enter__(self) -> FakeUrlResponse:
         return self
