@@ -36,6 +36,7 @@ import {
 } from "../lib/lineage-insights";
 import { useResource } from "../lib/use-resource";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
+import { LawSearch } from "./law-search";
 import { LineageGraphExplorer } from "./lineage-graph";
 import {
   Channels,
@@ -675,6 +676,10 @@ export function LineageLawBrowser() {
     params.set("law", slug);
     window.history.pushState(null, "", `?${params.toString()}`);
   }
+  function built(slug: string) {
+    laws.retry();
+    select(slug);
+  }
   const navStyle =
     "rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700";
   return (
@@ -702,6 +707,9 @@ export function LineageLawBrowser() {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
             Collected laws
           </h2>
+          <div className="mt-3">
+            <LawSearch view="lineage" onOpen={select} onBuilt={built} />
+          </div>
           {laws.loading && (
             <p role="status" className="mt-3 text-sm text-stone-500">
               Loading collected laws…

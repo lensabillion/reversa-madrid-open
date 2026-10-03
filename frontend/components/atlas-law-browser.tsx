@@ -22,6 +22,7 @@ import { AtlasCoordinated } from "./atlas-coordinated";
 import { AtlasModes } from "./atlas-coverage";
 import type { AtlasLinkView } from "./atlas-explorer";
 import { type AtlasDataNotice, AtlasWorkspace } from "./atlas-workspace";
+import { LawSearch } from "./law-search";
 
 const buildCommand = "make atlas LAW='2021/0106(COD)'";
 const noFindings: AtlasAnalysisProps["findings"] = {
@@ -299,6 +300,10 @@ export function AtlasLawBrowser() {
     params.set("law", slug);
     window.history.pushState(null, "", `?${params.toString()}`);
   }
+  function built(slug: string) {
+    laws.retry();
+    select(slug);
+  }
   return (
     <div className="min-h-dvh bg-stone-50 text-stone-900">
       <header className="flex h-14 items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
@@ -330,6 +335,9 @@ export function AtlasLawBrowser() {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-600">
             Collected laws
           </h2>
+          <div className="basis-full">
+            <LawSearch view="atlas" onOpen={select} onBuilt={built} />
+          </div>
           {laws.loading && (
             <p role="status" className="text-sm text-stone-500">
               Loading collected laws…
