@@ -17,12 +17,51 @@ from influence.schemas.atlas import (
     SourceSpan,
     span_matches,
 )
-from influence.schemas.scoring import ChangeSpan
-from influence.services.assessment import amendment_direction, assess_link
+from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN, ChangeSpan
+from influence.services.assessment import amendment_direction, ask_limit_reason, assess_link
 
 FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 SOURCE = "Intro. Providers shall keep logs for at least six months after launch. Outro."
 QUOTE = "for at least six months after launch."
+
+
+@pytest.mark.parametrize("instruction", ["statement", "replace", "delete", "mixed"])
+def test_punctuation_heavy_ask_is_insufficient_without_truncating(instruction: str) -> None:
+    dotted = "Contents " + "." * 810 + " providers retain logs"
+    assert len(dotted.split()) < 120
+    assert len(TOKEN_PATTERN.findall(dotted)) > MAX_TOKENS
+    text = {
+        "statement": dotted,
+        "replace": f'replace "{dotted}" with "logs"',
+        "delete": f'delete "{dotted}"',
+        "mixed": f'add "logs"; delete "{dotted}"',
+    }[instruction]
+    source = "Préface. " + text + " End."
+    ask = _ask(text, start=len("Préface. "))
+    before = ask.model_dump_json()
+    result = assess_link(_amendment(), ask, source, candidate_id="cand:oversized")
+    assert result.status == "insufficient_evidence"
+    assert result.candidate_id == "cand:oversized"
+    assert result.support_score == 0
+    assert result.ask_spans == result.amendment_spans == ()
+    assert "800 tokens" in result.limitations[0]
+    assert ask.model_dump_json() == before
+    assert source[ask.span.start : ask.span.end] == ask.span.text
+
+
+def test_blank_ask_has_an_explicit_reason() -> None:
+    ask = _ask("  ", start=0)
+    assert (
+        ask_limit_reason(ask)
+        == "The ask has no non-whitespace statement or quoted instruction to assess."
+    )
+    assert assess_link(_amendment(), ask, "  ").status == "insufficient_evidence"
+
+
+def test_valid_quoted_instruction_uses_its_parsed_bounds() -> None:
+    text = "Discussion " + "." * 810 + ' add "logs"'
+    ask = _ask(text, start=0)
+    assert ask_limit_reason(ask) is None
 
 
 def _rows(name: str) -> list[dict[str, object]]:

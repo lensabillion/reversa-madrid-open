@@ -11,6 +11,8 @@ text length; the scorer's token diff is O(n*m) at 800 tokens per side.
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from influence.schemas.atlas import (
     Amendment,
     Ask,
@@ -114,6 +116,29 @@ def _best_reading(ask: Ask, amendment_change: TextChange) -> _Reading:
     return max(readings, key=lambda reading: reading.result.score)
 
 
+def ask_limit_reason(ask: Ask) -> str | None:
+    """Check the exact parsed inputs the scorer will receive, without changing source text.
+
+    A passage's whitespace-word count misses punctuation-heavy PDF tables of contents.
+    Reuse TextChange's token/character bounds for every reading, including replacements
+    and deletions. One unsupported reading makes the whole ask explicitly unassessed;
+    choosing only its convenient bounded readings would silently discard part of the ask.
+    """
+    readings = read_changes(ask.span.text)
+    if not readings:
+        return "The ask has no non-whitespace statement or quoted instruction to assess."
+    try:
+        for change in readings:
+            TextChange(old=change.old or "", new=change.new)
+    except ValidationError as error:
+        # Omit input text from the error: the source is retained under its original ID.
+        reasons = "; ".join(
+            item["msg"] for item in error.errors(include_input=False, include_context=False)
+        )
+        return f"The ask exceeds the scorer's input bounds: {reasons}"
+    return None
+
+
 def _amendment_spans(amendment: Amendment, result: ScoreResult) -> tuple[SourceSpan, ...]:
     spans: list[SourceSpan] = []
     sources: tuple[tuple[Operation, SpanField, str], ...] = (
@@ -185,6 +210,20 @@ def assess_link(
     checked against it. Contradicted wins over everything; a link that is not publishable
     for another reason stays "unconfirmed" with the reason in `limitations`.
     """
+    if reason := ask_limit_reason(ask):
+        return LinkAssessment(
+            link_id=f"link:{id_part(ask.ask_id)}:{id_part(amendment.amendment_id)}",
+            procedure_id=amendment.procedure_id,
+            candidate_id=candidate_id,
+            amendment_id=amendment.amendment_id,
+            ask_id=ask.ask_id,
+            status="insufficient_evidence",
+            support_score=0.0,
+            time_eligibility=_time_eligibility(amendment, ask),
+            method=METHOD,
+            method_revision=METHOD_REVISION,
+            limitations=(reason,),
+        )
     amendment_change = TextChange(old=amendment.old_text or "", new=amendment.new_text)
     reading = _best_reading(ask, amendment_change)
     result = reading.result

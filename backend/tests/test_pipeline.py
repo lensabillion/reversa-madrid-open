@@ -19,7 +19,8 @@ from influence import cli
 from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.repositories import hys
-from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, span_matches
+from influence.schemas.atlas import Actor, LawRecord, LinkAssessment, SourceSpan, span_matches
+from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN
 from influence.services import assessment, pipeline
 from influence.services.pipeline import PipelineError
 
@@ -349,3 +350,50 @@ def test_candidates_can_be_found_without_collecting_the_unsearchable(tmp_path: P
     recital = bundle.amendments[0].model_copy(update={"old_text": "word " * 900})
     asks = pipeline.asks_from_passages(bundle.passages)
     assert pipeline.find_candidates([recital], asks) == ()
+
+
+def test_dot_leader_ask_is_excluded_before_retrieval_and_reported(tmp_path: Path) -> None:
+    bundle = collected(matching_world(tmp_path))
+    passage = bundle.passages[0]
+    dotted = "Contents " + "." * 810 + " providers logs market"
+    assert len(dotted.split()) < 120
+    assert len(TOKEN_PATTERN.findall(dotted)) > MAX_TOKENS
+    document = next(
+        text for text in bundle.document_texts if text.document_id == passage.document_id
+    )
+    start = len(document.text) + 1
+    original_document = document.model_copy(update={"text": document.text + "\n" + dotted})
+    unsupported = passage.model_copy(
+        update={
+            "passage_id": "passage:dot-leaders",
+            "span": SourceSpan(
+                record_id=passage.document_id, start=start, end=start + len(dotted), text=dotted
+            ),
+        }
+    )
+    with_unsupported = replace(
+        bundle,
+        passages=(*bundle.passages, unsupported),
+        document_texts=tuple(
+            original_document if text.document_id == passage.document_id else text
+            for text in bundle.document_texts
+        ),
+    )
+    original = unsupported.model_dump_json()
+    asks = pipeline.asks_from_passages(with_unsupported.passages)
+    rejected: dict[str, str] = {}
+    candidates = pipeline.find_candidates(bundle.amendments, asks, unsearchable_asks=rejected)
+    bad_id = asks[-1].ask_id
+    assert rejected.keys() == {bad_id}
+    assert "800 tokens" in rejected[bad_id]
+    assert all(candidate.ask_id != bad_id for candidate in candidates)
+    assert pipeline.find_candidates(bundle.amendments, asks) == candidates
+    view = pipeline.build_view(with_unsupported, generated_at=LATER)
+    assert [link for link in view.bundle.links if link.status == "published"]
+    assert view.limitations[-1].startswith("1 ask(s) could not be assessed")
+    assert bad_id in view.limitations[-1]
+    assert "800 tokens" in view.limitations[-1]
+    assert "collected bundle" in view.limitations[-1]
+    assert unsupported.model_dump_json() == original
+    assert original_document.text[unsupported.span.start : unsupported.span.end] == dotted
+    assert len(with_unsupported.passages) == len(bundle.passages) + 1
