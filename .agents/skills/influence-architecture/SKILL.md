@@ -70,7 +70,9 @@ Design rules that come with it:
 ## Before You Design or Write Code
 
 1. **Read the state.** `docs/implementation-status.md` says what is built, decided and
-   open. Then read the part of the explainer's §6 your work touches.
+   open. Then read the part of the explainer's §6 your work touches, and that part's rows
+   in `docs/plan.md` §4: the tools, thresholds and rules already chosen for it (for
+   example: CELLAR rather than the EUR-Lex website, exact evidence spans, no DuckDB).
 2. **Name the part.** Write it in the bead.
    If the feature fits no part, stop and ask the user: it is either out of scope or a
    change to the architecture, and only the project owner changes the architecture.

@@ -22,7 +22,9 @@ Facts carry a tag:
 The research behind each section is in
 [docs/research/influence-atlas-2026-10/](../research/influence-atlas-2026-10/), and the
 record contracts and acceptance tests for each part are in the
-[technical design](../design/influence-atlas-design.md).
+[technical design](../design/influence-atlas-design.md). The
+[consolidated plan](../plan.md) settles where this page, the design and the uploaded
+[technical plan](../brief/PLAN.md) disagree on tools, thresholds and order.
 
 ## Contents
 
@@ -1034,7 +1036,9 @@ Rehearse it twice with a timer, once with a teammate naming an obscure law.
 
 ## 12. Today's Plan
 
-Times are Madrid time; demos start 19:30. Owners are suggestions for decision D4.
+Times are Madrid time; demos start 19:30. Owners are suggestions for decision D4. The
+[consolidated plan's gates](../plan.md#8-acceptance-gates-in-order) give each milestone
+its completion test.
 
 | Time | Milestone | Beads |
 | --- | --- | --- |

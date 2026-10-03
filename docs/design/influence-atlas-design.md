@@ -1,7 +1,9 @@
 # Influence Atlas Architecture and Delivery Design
 
 3 October 2026. Proposed design requested by the project owner; implementation is planned unless
-explicitly marked delivered. Tracked by `rev-f090`.
+explicitly marked delivered. Tracked by `rev-f090`. The [consolidated plan](../plan.md)
+orders this design's delivery sequence as acceptance gates and settles where it differs
+from the uploaded [technical plan](../brief/PLAN.md).
 
 Build an evidence-backed public atlas of who shapes EU law, across procedures since
 2019. A reader must be able to follow an actor's request through an amendment to a final
