@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from threading import Lock
@@ -10,15 +11,29 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+import influence
+from influence.extraction.cache import HttpCache
 from influence.extraction.cli import default_data_root
+from influence.extraction.fetching import CachedFetcher, UrllibFetcher
 from influence.repositories.lobbyplag import (
     DatasetInvalidError,
     DatasetUnavailableError,
     DemoRepository,
     EntityNotFoundError,
 )
-from influence.routers import atlas, comparison, demo, documents, health, lineage, scoring
+from influence.routers import (
+    atlas,
+    comparison,
+    demo,
+    documents,
+    health,
+    laws,
+    lineage,
+    scoring,
+)
+from influence.services.collect import source_revision
 from influence.services.demo import DemoService
+from influence.services.law_search import LawService
 
 # Installed metadata makes pyproject.toml the single source for the API version.
 VERSION = version("influence")
@@ -56,7 +71,14 @@ def create_app(data_dir: Path | None = None, atlas_data_root: Path | None = None
             return service
 
     app.state.demo_service_provider = demo_service
-    app.state.atlas_data_root = atlas_data_root or default_data_root()
+    root = atlas_data_root or default_data_root()
+    app.state.atlas_data_root = root
+    app.state.law_service = LawService(
+        root,
+        fetcher=CachedFetcher(cache=HttpCache(root / "cache"), fetcher=UrllibFetcher()),
+        code_revision=source_revision(Path(influence.__file__).parent),
+        clock=lambda: datetime.now(UTC),
+    )
     app.include_router(health.router)
     app.include_router(demo.router)
     app.include_router(scoring.router)
@@ -64,6 +86,7 @@ def create_app(data_dir: Path | None = None, atlas_data_root: Path | None = None
     app.include_router(comparison.router)
     app.include_router(atlas.router)
     app.include_router(lineage.router)
+    app.include_router(laws.router)
 
     @app.exception_handler(DatasetUnavailableError)
     async def unavailable(_request: Request, _error: DatasetUnavailableError) -> JSONResponse:
