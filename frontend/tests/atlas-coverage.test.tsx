@@ -65,7 +65,7 @@ function renderWorkspace(
       links={links}
       coverage={coverage}
       coverageNotes={["Synthetic source coverage"]}
-      dataNotice="Invented contract fixtures only."
+      dataNotice={{ summary: "Invented contract fixtures only.", details: [] }}
       analysis={<p>Supplied outcome table</p>}
     />,
   );

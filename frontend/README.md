@@ -114,7 +114,11 @@ the same `/api/v1/…` proxy:
 The selected law lives in the URL (`/atlas?law=2021-0106-COD`), so a reload or a shared
 link reopens it. The view becomes `AtlasWorkspace` props: the snapshot as the graph,
 `atlasLinkViews(bundle)` as the evidence, one sentence per coverage layer that is not
-complete, and the limitations plus the ask method as the data notice. Rankings keep the
+complete, and a compact data notice. For `passage-v0`, the notice visibly states that
+counts represent passages rather than distinct requests. The exact method and every
+backend limitation remain in a collapsed native disclosure, with bounded scrolling and
+long-ID wrapping. Other extraction methods receive a neutral summary. No limitations
+being supplied is not presented as proof of complete coverage. Rankings keep the
 backend's order; their rows link no sources yet, and every report section shows its
 labelled gap, because no report has been generated.
 

@@ -6,6 +6,11 @@ import { AtlasSourceLayers } from "./atlas-coverage";
 import { AtlasExplorer, type AtlasLinkView } from "./atlas-explorer";
 import { AtlasGraph, type AtlasGraphSnapshot } from "./atlas-graph";
 
+export interface AtlasDataNotice {
+  summary: string;
+  details: readonly string[];
+}
+
 /** Explain the investigation before offering evidence and supplied outcome calculations. */
 export function AtlasWorkspace({
   snapshot,
@@ -19,7 +24,7 @@ export function AtlasWorkspace({
   links: readonly AtlasLinkView[];
   coverage: readonly AtlasLayerCoverage[];
   coverageNotes: readonly string[];
-  dataNotice: string;
+  dataNotice: AtlasDataNotice;
   analysis: ReactNode;
 }) {
   const [view, setView] = useState<"graph" | "evidence" | "outcomes">("graph");
@@ -66,9 +71,24 @@ export function AtlasWorkspace({
               ))}
             </ol>
           </details>
-          <p className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-            {dataNotice}
-          </p>
+          <section
+            aria-label="About these results"
+            className="mt-6 min-w-0 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+          >
+            <p>{dataNotice.summary}</p>
+            <details className="mt-1">
+              <summary className="cursor-pointer font-medium underline decoration-amber-400 underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-800">
+                Coverage, methods and excluded records
+              </summary>
+              <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain border-t border-amber-200 pt-3">
+                <ul className="list-disc space-y-3 pl-5 pr-3 [overflow-wrap:anywhere]">
+                  {dataNotice.details.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          </section>
         </div>
       </header>
       <div className="mx-auto max-w-[1600px] px-5 py-6 sm:px-8">
