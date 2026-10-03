@@ -1,0 +1,24 @@
+entity_id: is-01m40f5kr88w2kqb1a95m0kr99
+timestamp: 2026-10-03T09:52:00.251Z
+field: notes
+lost_value: "\"Consolidated plan docs/plan.md now includes the complete source-to-output
+  Mermaid pipeline: eight parts, source feeds, publication gate, separate unconfirmed
+  records, missing-final heard links, pre-cutoff forecast path, report/explorer outputs
+  and practice feedback. Diagram describes target architecture, not implemented
+  end-to-end runner. git diff --check passed.\\n\\n2026-10-03 12:25, cloud session
+  claude/eloquent-allen-jbxbmy: the laptop's docs/plan.md was never pushed, so
+  docs/plan.md was rebuilt from these notes and the three sources, then checked page by
+  page against the brief (new §2; gate 7b makes TOWARDS and HOW minimum answers
+  required; D1 due at 13:30; cuts stated). PR
+  https://github.com/lensabillion/reversa-madrid-open/pull/23 (commits 5b8aeb6,
+  ea87574). Verified: link/anchor check 0 problems (checker shown to fail on planted
+  errors), make check-docs 6/6, make check-scripts, git diff --check main, Mermaid
+  render. Conflict risk: the laptop's local docs/plan.md (Mermaid pipeline, 11:38) must
+  be reconciled with this one before either is edited again.\""
+winner_source: local
+loser_source: remote
+context:
+  local_version: 10
+  remote_version: 10
+  local_updated_at: 2026-10-03T09:51:58.143Z
+  remote_updated_at: 2026-10-03T09:51:03.058Z
