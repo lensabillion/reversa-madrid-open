@@ -87,12 +87,15 @@ def _negations(features: dict[Feature, list[TextSpan]]) -> Counter[Feature]:
     )
 
 
-def score_pair(request: ScoreRequest) -> ScoreResult:
+def score_pair(request: ScoreRequest, *, guard_negation: bool = True) -> ScoreResult:
     """Compare same-operation changed unigrams and within-run bigrams by multiset Dice.
 
     Every unit has equal weight: score = 2 * matched units / total units on both sides.
     No-change pairs score zero. A mismatch in changed English negation cues suppresses
     the score and evidence conservatively; this is a lexical guard, not semantic analysis.
+    `guard_negation=False` scores the wording as if the cues agreed (`negation_conflict` is
+    still reported), so a caller can tell "the same words with a 'not' added", which is a
+    contradiction, from wording that simply differs.
     Symmetric scoring does not imply symmetric old/new diff alignment. Worst-case time
     is O(n*m) for each diff (800 tokens/side); feature matching is O(n+m) expected time.
     """
@@ -102,7 +105,7 @@ def score_pair(request: ScoreRequest) -> ScoreResult:
     submission = _features(submission_changes)
     negation_conflict = _negations(amendment) != _negations(submission)
     evidence: list[MatchEvidence] = []
-    if not negation_conflict:
+    if not (negation_conflict and guard_negation):
         for key, spans in amendment.items():
             evidence.extend(
                 MatchEvidence(operation=key[0], amendment=left, submission=right)
