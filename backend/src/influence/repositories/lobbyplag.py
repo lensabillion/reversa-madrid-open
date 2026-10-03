@@ -39,6 +39,9 @@ class RawAmendment(RawRecord):
     relations: tuple[str, ...]
     text: tuple[RawText, ...] = Field(min_length=1)
 
+    def text_in(self, language: str) -> RawText | None:
+        return next((text for text in self.text if text.lang == language), None)
+
 
 class RawProposal(RawRecord):
     doc_uid: str
@@ -46,10 +49,42 @@ class RawProposal(RawRecord):
     text: RawText
 
 
+class RawProcessing(BaseModel):
+    """LobbyPlag's crowd-check tallies: how often volunteers checked, and voted yes."""
+
+    model_config = ConfigDict(frozen=True, extra="ignore", strict=True)
+    checked: int = Field(ge=0)
+    verified: int = Field(ge=0)
+
+
 class RawCandidate(RawRecord):
+    """A pair LobbyPlag's matcher proposed. `match` is that matcher's similarity score."""
+
     amendment: str
     proposal: str
     verified: bool
+    match: float = Field(ge=0, le=1, allow_inf_nan=False)
+    processing: RawProcessing
+
+
+def _merge_rows(previous: RawCandidate, candidate: RawCandidate) -> RawCandidate:
+    """Coalesce rows that repeat one candidate identifier.
+
+    Upstream repeats a candidate once per related law location; two identifiers carry a crowd
+    check on only one of their rows. A check of any row is a check of the same pair, so the
+    tallies merge by maximum: idempotent for exact copies, and a yes vote anywhere survives.
+    Any other disagreement is a conflict.
+    """
+    if previous.model_dump(exclude={"processing"}) != candidate.model_dump(exclude={"processing"}):
+        raise DatasetInvalidError(f"Conflicting duplicate candidate {candidate.uid}")
+    return previous.model_copy(
+        update={
+            "processing": RawProcessing(
+                checked=max(previous.processing.checked, candidate.processing.checked),
+                verified=max(previous.processing.verified, candidate.processing.verified),
+            )
+        }
+    )
 
 
 class RawDocument(RawRecord):
@@ -90,6 +125,8 @@ class DemoRepository:
     documents: Mapping[str, RawDocument]
     organizations: Mapping[str, RawOrganization]
     duplicate_candidate_rows: int = 0
+    # Candidate identifiers whose repeated rows disagreed on crowd tallies (merged by maximum).
+    merged_crowd_tallies: int = 0
 
     @classmethod
     def load(cls, directory: Path) -> DemoRepository:
@@ -97,11 +134,15 @@ class DemoRepository:
         proposals = _index(_read(directory, "proposals", RawProposal), "proposals")
         raw_candidates = _read(directory, "plags", RawCandidate)
         candidates: dict[str, RawCandidate] = {}
+        merged_tallies: set[str] = set()
         for candidate in raw_candidates:
             previous = candidates.get(candidate.uid)
-            if previous is not None and previous != candidate:
-                raise DatasetInvalidError(f"Conflicting duplicate candidate {candidate.uid}")
-            candidates[candidate.uid] = candidate
+            if previous is None:
+                candidates[candidate.uid] = candidate
+                continue
+            if previous.processing != candidate.processing:
+                merged_tallies.add(candidate.uid)
+            candidates[candidate.uid] = _merge_rows(previous, candidate)
         documents = _index(_read(directory, "documents", RawDocument), "documents")
         raw_organizations = _read(directory, "lobbyists", RawOrganization)
         organizations = {record.id: record for record in raw_organizations}
@@ -130,6 +171,7 @@ class DemoRepository:
             documents,
             MappingProxyType(organizations),
             len(raw_candidates) - len(candidates),
+            len(merged_tallies),
         )
 
     def amendment(self, amendment_id: str) -> RawAmendment:

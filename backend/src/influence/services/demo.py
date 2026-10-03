@@ -33,7 +33,7 @@ def _text(text: RawText) -> SourceText:
 
 
 def _amendment_text(amendment: RawAmendment) -> RawText:
-    return next((text for text in amendment.text if text.lang == "en"), amendment.text[0])
+    return amendment.text_in("en") or amendment.text[0]
 
 
 def _score(
