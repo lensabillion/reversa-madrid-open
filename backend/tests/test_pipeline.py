@@ -403,8 +403,10 @@ def test_the_atlas_command_keeps_the_bundle_when_the_view_fails(
     world = matching_world(tmp_path)
     scripted_cli(monkeypatch, world)
 
-    def broken(_collected: pipeline.Collected, *, generated_at: datetime) -> pipeline.AtlasView:
-        raise PipelineError(f"no view at {generated_at:%H}")
+    def broken(
+        _collected: pipeline.Collected, *, generated_at: datetime, judge: object = None
+    ) -> pipeline.AtlasView:
+        raise PipelineError(f"no view at {generated_at:%H} (judge: {judge})")
 
     monkeypatch.setattr(cli, "build_view", broken)
 

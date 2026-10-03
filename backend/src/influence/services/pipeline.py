@@ -61,6 +61,7 @@ from influence.services.assessment import (
 )
 from influence.services.atlas_analysis import aggregate_outcomes
 from influence.services.atlas_graph import build_graph
+from influence.services.jev_judge import JevJudge, judge_links
 from influence.services.outcomes import trace_outcomes
 from influence.services.prose_match import rarity_weights
 from influence.services.retrieval import PassageIndex
@@ -345,12 +346,18 @@ def _rankings(
 
 
 def build_view(
-    collected: Collected, *, generated_at: datetime, publish_prose: bool = False
+    collected: Collected,
+    *,
+    generated_at: datetime,
+    publish_prose: bool = False,
+    judge: JevJudge | None = None,
 ) -> AtlasView:
     """Run parts 3 to 7 and keep every record the shown links reach, and only those.
 
     The graph and the bundle are built from the same records, so the frontend adapter
-    re-checks exactly what the graph shows.
+    re-checks exactly what the graph shows. With a `judge`, Jev judges every candidate the
+    rules left unconfirmed or insufficient (`jev_judge.judge_links`); without one, the
+    rules alone decide.
     """
     law = collected.law
     asks = asks_from_passages(collected.passages)
@@ -369,6 +376,10 @@ def build_view(
         (article.text for article in collected.articles),
         publish_prose,
     )
+    judge_notes: tuple[str, ...] = ()
+    if judge is not None:
+        links, note = judge_links(judge, links, amendments, asks_by_id, texts, collected.articles)
+        judge_notes = (note,)
     shown = tuple(link for link in links if link.status in SHOWN_STATUSES)
     outcomes = trace(asks, amendments, shown, collected.articles)
 
@@ -435,6 +446,7 @@ def build_view(
         rankings=rankings,
         limitations=(
             *LIMITATIONS,
+            *judge_notes,
             *ranking_notes,
             *(
                 (

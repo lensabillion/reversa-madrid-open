@@ -514,7 +514,10 @@ def test_the_command_prints_the_actors_of_published_links(
     scripted_cli(monkeypatch, matching_world(tmp_path))
     real = pipeline.build_view
 
-    def publishing(collected: pipeline.Collected, *, generated_at: datetime) -> AtlasView:
+    def publishing(
+        collected: pipeline.Collected, *, generated_at: datetime, judge: object = None
+    ) -> AtlasView:
+        assert judge is None
         return real(collected, generated_at=generated_at, publish_prose=True)
 
     monkeypatch.setattr(cli, "build_view", publishing)
