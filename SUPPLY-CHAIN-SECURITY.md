@@ -47,6 +47,7 @@ clears the window and the exception can be removed.
 | Package | Version | Published | Reason | Approved by | Clears window |
 | --- | --- | --- | --- | --- | --- |
 | `next`, `@next/env` and eight `@next/swc-*` binaries | 16.3.6 | 2026-09-22 | 16.3.5 has the critical advisory GHSA-vcvr-r3jv-pc5j; 16.3.6 is the first fixed version (note 1) | Lensa Billion, by merging PRs #5 and #8 on 2026-10-02 | 2026-10-06 |
+| `source-map-js` (transitive: postcss, `@tailwindcss/node`, jsdom's css-tree) | 1.2.2 | 2026-09-30 | 1.2.1 has the high advisory GHSA-68fv-2mgg-jv7q (CVE-2026-93749); 1.2.2 is the first fixed version and `make audit-frontend` fails on every branch until it is taken (note 2) | The owner, by merging PR #89 | 2026-10-14 |
 
 Notes:
 
@@ -60,3 +61,20 @@ Notes:
    no advisory affects 16.3.6. The rest of the tree resolved under the policy first; one
    `npm install next@16.3.6 --min-release-age=0` then changed only these ten packages.
    16.3.7 and 16.3.8 fix no advisory, so they are not taken.
+
+2. **source-map-js 1.2.2.** [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)
+   (CVSS 7.5): a crafted indexed source map makes `SourceMapConsumer` spin the event loop,
+   a denial of service, in versions 1.0.0 to 1.2.1. In this repository the package runs
+   only at build and test time (postcss and Tailwind on our own CSS, jsdom's css-tree in
+   Vitest), never on input from outside, so the exposure is to the audit gate rather than
+   to users; the exception keeps that gate honest instead of ignoring it for eight days.
+   Verified before installing: the GitHub compare `v1.2.1...v1.2.2` of
+   `7rulnik/source-map-js` holds four commits (the CVE fix #79, a CSP fix #29, the
+   changelog and the version bump) touching `lib/` and `test/` only; the package has no
+   install scripts (and `ignore-scripts` is on regardless); the lockfile's integrity
+   `sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==`
+   equals the registry's; postcss's range `^1.2.1` resolves to it, so `package.json` is
+   unchanged and no other package moved. The package carries no npm provenance
+   attestation; it is published by the maintainer account `7rulnik`, as every earlier
+   version was. The exception was installed with `npm update source-map-js
+   --min-release-age=0` and expires when the version clears the window.
