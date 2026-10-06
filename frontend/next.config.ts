@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // frontend/Dockerfile ships only the traced files under .next/standalone and runs its
+  // server.js; `next dev` and `next build` are unaffected.
+  output: "standalone",
   rewrites() {
     return [
       {

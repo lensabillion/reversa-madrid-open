@@ -690,3 +690,13 @@ facts instead of presenting raw diagnostics as the main page content. `make chec
 1,150 backend tests with 100% branch coverage, 96 frontend tests, production build,
 and both dependency audits. Browser expansion and collapse preserved all diagnostics.
 PR CI is recorded on the bead.
+
+## Containers — 6 October 2026
+
+`make up` (bead `rev-rd33`) builds `backend/Dockerfile` and `frontend/Dockerfile` through
+`compose.yaml` and serves the API (loopback port 8000) and the explorer (port 3000, which
+proxies `/api/v1` to the backend inside the compose network). Base images are pinned by
+digest; the backend installs from `uv.lock` into a non-root image with a `/health`
+check, the frontend ships Next.js's standalone trace. `make check-containers` builds,
+starts, probes and stops both, and CI's Containers job runs it on every pull request.
+`INFLUENCE_DATA` picks the host directory mounted at `/data` (default `data/`).

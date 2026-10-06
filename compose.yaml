@@ -1,0 +1,25 @@
+# One command builds and runs the API with the explorer: `make up` (docker compose up
+# --build). The explorer proxies /api/v1/* to the backend over the compose network, so
+# the browser talks to one origin and the API port stays on the loopback interface.
+#
+# INFLUENCE_DATA names the host directory mounted at /data: the repository's data/ by
+# default (what `make atlas` and `make lineage` write), or mock-data/ for the committed
+# snapshots: INFLUENCE_DATA=./mock-data make up
+services:
+  backend:
+    build: ./backend
+    volumes:
+      - ${INFLUENCE_DATA:-./data}:/data:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        INFLUENCE_API_URL: http://backend:8000
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
