@@ -1,4 +1,4 @@
-"""`GET /api/v1/atlas/{slug}/findings`: the report's five questions for one law, as data.
+"""`report.law_findings`: the report's five questions for one law, as data.
 
 The worlds are `test_report`'s: the full world writes every file the report reads, the bare
 world only the collected bundle. Each finding must carry exactly the report's own lines.
@@ -6,19 +6,18 @@ world only the collected bundle. Each finding must carry exactly the report's ow
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+import pytest
 from test_pipeline import AI_ACT, SLUG
 from test_report import bare, forecast, full_world, markdown
 
-from influence.api import create_app
 from influence.schemas.findings import LawFindings
 from influence.services import report
 
 
 def findings(root: Path, slug: str = SLUG) -> LawFindings:
-    response = TestClient(create_app(atlas_data_root=root)).get(f"/api/v1/atlas/{slug}/findings")
-    assert response.status_code == 200, response.text
-    return LawFindings.model_validate(response.json())
+    # Through JSON and back, as a reader of the file would see it.
+    answer = report.law_findings(report.load_law(root, slug))
+    return LawFindings.model_validate_json(answer.model_dump_json())
 
 
 def test_every_computed_question_carries_the_report_headline_evidence_and_limitation(
@@ -113,10 +112,6 @@ def test_an_invalid_file_is_not_run_and_a_written_forecast_is_computed(tmp_path:
     assert [(e.file, e.field) for e in nxt.evidence] == [("data/laws/forecast.json", "forecasts")]
 
 
-def test_a_law_never_collected_is_404_and_a_malformed_slug_is_422(tmp_path: Path) -> None:
-    client = TestClient(create_app(atlas_data_root=tmp_path))
-
-    missing = client.get(f"/api/v1/atlas/{SLUG}/findings")
-    assert missing.status_code == 404
-    assert "make atlas" in missing.json()["detail"]
-    assert client.get("/api/v1/atlas/not a slug!/findings").status_code == 422
+def test_a_law_never_collected_names_the_command_that_collects_it(tmp_path: Path) -> None:
+    with pytest.raises(report.ReportError, match="make atlas"):
+        report.load_law(tmp_path, SLUG)

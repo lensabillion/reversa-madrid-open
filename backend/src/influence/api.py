@@ -1,4 +1,4 @@
-"""Assemble the HTTP API: the health route and the read-only views of the law bundles."""
+"""Assemble the HTTP API: the health route and the read-only lineage views of the law bundles."""
 
 from importlib.metadata import version
 from pathlib import Path
@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from influence.extraction.cli import default_data_root
-from influence.routers import atlas, health, lineage
+from influence.routers import health, lineage
 
 # Installed metadata makes pyproject.toml the single source for the API version.
 VERSION = version("influence")
@@ -27,7 +27,6 @@ def create_app(atlas_data_root: Path | None = None) -> FastAPI:
     app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_methods=("GET",))
     app.state.atlas_data_root = atlas_data_root or default_data_root()
     app.include_router(health.router)
-    app.include_router(atlas.router)
     app.include_router(lineage.router)
     return app
 

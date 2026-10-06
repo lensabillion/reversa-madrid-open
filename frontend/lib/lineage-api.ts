@@ -1,5 +1,6 @@
-import type { AtlasSourceSpan } from "./atlas";
-import { type AtlasLayerCoverage, readAtlasJson } from "./atlas-api";
+import { readJson } from "./api-client";
+import type { LayerCoverage } from "./coverage";
+import type { SourceSpan } from "./source-span";
 
 /**
  * The lineage read API: `GET /api/v1/lineage` lists the laws with a built lineage view, and
@@ -38,7 +39,7 @@ export interface AdoptedPhraseRecord {
   /** Folded words (lower case, alphanumeric) joined by spaces; `final_spans` quote the original. */
   text: string;
   words: number;
-  final_spans: readonly AtlasSourceSpan[];
+  final_spans: readonly SourceSpan[];
   similarity: number | null;
   judge_probability: number | null;
   /** Credit keys of everyone credited with it; the phrase is joint when there are several. */
@@ -78,7 +79,7 @@ export interface OriginMatchRecord {
   actor_id: string | null;
   organisation: string | null;
   published_at: string | null;
-  span: AtlasSourceSpan;
+  span: SourceSpan;
   kind: LineageMatchKind;
   similarity: number | null;
   words: number;
@@ -129,7 +130,7 @@ export interface LineageView {
   generated_at: string;
   method: string;
   method_revision: string;
-  coverage: readonly AtlasLayerCoverage[];
+  coverage: readonly LayerCoverage[];
   /** `unknown` when the proposal or the final act is missing; `reason` then says which. */
   status: LineageStatus;
   reason: string | null;
@@ -151,10 +152,10 @@ export function lineageViewUrl(slug: string): string {
 
 /** Reads `GET /api/v1/lineage`; with `useResource`, the URL keys and cancels the request. */
 export function readLineageLaws(url: string, signal: AbortSignal): Promise<LineageLawList> {
-  return readAtlasJson(url, signal);
+  return readJson(url, signal);
 }
 
-/** Reads `GET /api/v1/lineage/{slug}`; a law without a view answers 404 as an `AtlasApiError`. */
+/** Reads `GET /api/v1/lineage/{slug}`; a law without a view answers 404 as an `ApiError`. */
 export function readLineageView(url: string, signal: AbortSignal): Promise<LineageView> {
-  return readAtlasJson(url, signal);
+  return readJson(url, signal);
 }

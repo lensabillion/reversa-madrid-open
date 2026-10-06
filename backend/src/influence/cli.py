@@ -242,7 +242,6 @@ def _build_view(result: CollectResult) -> int:
     _print_coordination(coordination)
     print(f"view:     {path.absolute()}")
     print(f"clusters: {clusters.absolute()}")
-    print(f"explorer: http://localhost:3000/atlas?law={view.slug}")
     return 0
 
 

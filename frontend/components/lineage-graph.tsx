@@ -13,8 +13,8 @@ import {
   sliceGraph,
   type TablerLevel,
 } from "../lib/lineage-graph";
-import { retryStyle } from "./atlas-law-browser";
 import { KindLegend } from "./lineage-kind";
+import { retryStyle } from "./view-state";
 
 const count = new Intl.NumberFormat("en-US");
 /** Nodes per column before "show more": enough to read a hub, few enough to read its lines. */

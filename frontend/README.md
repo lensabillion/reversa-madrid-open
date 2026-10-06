@@ -2,11 +2,10 @@
 
 The Next.js web app that shows what the pipeline wrote. It reads the
 [backend API](../backend/README.md) through a same-origin proxy (`/api/v1/…`, in
-`next.config.ts`) and renders two explorers: `/lineage` (the home page redirects there),
+`next.config.ts`) and renders one explorer, `/lineage` (the home page redirects there),
 which starts from the final law and traces each adopted phrase to the amendments that
-carried it and the submissions that said it first, and `/atlas`, which shows the Atlas
-view that `make atlas` writes. Both are described below. The app scores and ranks nothing
-of its own: every link, count and ranking is read from the view the backend wrote.
+carried it and the submissions that said it first. The app scores and ranks nothing of
+its own: every link, count and ranking is read from the view the backend wrote.
 
 ## Run
 
@@ -27,17 +26,18 @@ There is no sample-data fallback: an unavailable service shows an error with Ret
 
 ## Code
 
-- `app/lineage/page.tsx`, `app/atlas/page.tsx`: the two routes; `app/page.tsx` redirects to `/lineage`
-- `components/lineage-*.tsx`, `lib/lineage*.ts`: the lineage explorer (below)
-- `components/atlas-*.tsx`, `lib/atlas*.ts`: the Atlas explorer (below)
-- `components/highlighted-text.tsx`: merges overlapping evidence spans using Unicode code-point offsets
+- `app/lineage/page.tsx`: the route; `app/page.tsx` redirects to it
+- `components/lineage-*.tsx`, `lib/lineage*.ts`: the explorer (below)
+- `components/view-state.tsx`: the loading, empty and error messages and the retry link style
+- `lib/api-client.ts`: `readJson` and `ApiError`, the backend's own explanation of a non-2xx answer
+- `lib/coverage.ts`, `lib/source-span.ts`: the coverage rows and quoted spans the view carries
 - `lib/use-resource.ts`: loading, errors, retries and cancellation shared by API consumers
-- `lib/source-context.ts`: the text shown around a quoted span
 - `next.config.ts`: the same-origin API proxy and the standalone build output
 
 React renders source text as text, never HTML. The first brief's evidence workspace
-(`/workspace`: the GDPR amendment browser, the text comparison and the PDF upload) was
-removed on 6 October 2026 with the routes it called.
+(`/workspace`) was removed on 6 October 2026 with the routes it called, and the ask-first
+`/atlas` page with its `/api/v1/atlas` routes the same day; `make atlas` still writes
+`atlas.json` for the forecast and the report.
 
 ## Verify
 
@@ -123,116 +123,3 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
 `backend/tests/fixtures/lineage/view.json`, which the backend writes from its offline test
 world. Checked once by hand in headless Chromium: the production build against the real
 backend serving that view. Not verified: a real law's run.
-
-## Atlas Explorer Page
-
-`/atlas` shows the Atlas view (`make atlas`) for the laws the pipeline has built. No link
-leads to it any more; it is reached by its URL. It reads three backend endpoints, through
-the same `/api/v1/…` proxy:
-
-| Endpoint | Answer |
-| --- | --- |
-| `GET /api/v1/atlas` | `{"laws": [...]}`: slug, procedure, title, run and published-link count per law |
-| `GET /api/v1/atlas/{slug}` | One law's `atlas-view-1` view: coverage, `atlas-1` bundle, graph snapshot, rankings, limitations, and `modes` (absent in older files, read as none); 404 when the law has no run |
-| `GET /api/v1/atlas/{slug}/coordinated` | The law's clusters of near-identical amendments (`backend/src/influence/schemas/coordinated.py`); 404 when the law has no cluster file |
-
-The selected law lives in the URL (`/atlas?law=2021-0106-COD`), so a reload or a shared
-link reopens it. The view becomes `AtlasWorkspace` props: the snapshot as the graph,
-`atlasLinkViews(bundle)` as the evidence, one sentence per coverage layer that is not
-complete, and a compact data notice. For `passage-v0`, the notice visibly states that
-counts represent passages rather than distinct requests. The exact method and every
-backend limitation remain in a collapsed native disclosure, with bounded scrolling and
-long-ID wrapping. Other extraction methods receive a neutral summary. No limitations
-being supplied is not presented as proof of complete coverage. Rankings keep the
-backend's order; their rows link no sources yet, and every report section shows its
-labelled gap, because no report has been generated.
-
-Every state is explicit: loading, no laws built yet (with the `make atlas LAW='…'` command),
-no run for the requested law (the backend's 404 detail), and request failures (the
-backend's `detail`, with Retry). If the adapter rejects the bundle, for example a quote
-that does not match its source text, the page shows the message and nothing else from that
-run: it never renders partial or repaired evidence.
-
-Above the workspace, a **law overview** makes any law readable, including one whose run
-published no link:
-
-- **Mode labels** (plan §6, for example "Negotiation in progress") as chips under the title.
-- With no published link, a sentence says so and points to **Coordinated amendments**,
-  which need no consultation request. The workspace still opens on the graph, whose
-  **source layer** badges (one per coverage layer, `AtlasSourceLayers`) say why it is empty.
-
-The workspace's fourth view, **Coordinated amendments**, lists near-identical wording tabled
-by Members of different groups: the headline "N of M clusters span political groups" with
-the compared, too-short and not-comparable counts, then each cluster in the API's order
-(25 at a time) with its groups, and per amendment the committee, date, groups, authors,
-target provision and the inserted wording quoted exactly (spans joined with " … ").
-**Compare side by side** lays one cluster's amendments in columns. The API's limitations
-are shown verbatim. The explorer counts and formats; it does not score, rank or reorder,
-and it never says who drafted the wording. Its states are loading, no clusters, no cluster
-file (unknown, not zero, with `make atlas LAW='<procedure>'`), and an error with Retry.
-`coordinatedView` checks every field of the response and rejects the whole file on the
-first fault, so a malformed answer shows an error instead of a partial list.
-
-- `components/atlas-coverage.tsx`: source layer badges, the empty-graph reason and mode labels
-- `components/atlas-coordinated.tsx`: the coordinated amendments panel and its states
-- `lib/atlas-coordinated.ts`: the route's types, boundary check and reader
-- `app/atlas/page.tsx`: the route; a Suspense boundary lets the shell prerender
-- `components/atlas-law-browser.tsx`: law selector, URL state, view-to-props mapping, states
-- `lib/atlas-api.ts`: endpoint types and readers; a non-2xx answer throws `AtlasApiError`
-
-`tests/atlas-page.test.tsx` feeds the page the committed `atlas-1` fixtures through a mocked
-`fetch`, with a stand-in for Next.js's search-params hook. Checked once by hand in headless
-Chromium: the production build against the real backend serving a view that
-`services/pipeline.py` built from the backend's offline test world. The law opened, its
-graph and quoted phrase rendered, a law without a view showed the 404 detail, and Back
-returned to the law. Not verified: a real law's run. The law overview and the coordinated
-amendments panel are covered by `tests/atlas-coverage.test.tsx`,
-`tests/atlas-coordinated.test.tsx` and `tests/atlas-page.test.tsx` with a mocked `fetch`.
-Checked once by hand in a browser with `next dev` against a stand-in API that served a
-synthetic view without links and the AI Act's real cluster file (269 clusters, 0.6 MB): the
-badges, modes, headline, side-by-side comparison and the no-cluster-file message rendered.
-That check predates merging the overview with the graph view's source layers, which is
-covered by the tests only. Not verified: the real backend's two routes together in a browser.
-
-## Atlas Components and Agent 3 Handoff
-
-`AtlasWorkspace` opens on an explanation and a graph: who requested a change, which
-amendment matched it, and what appeared in the final law. Separate views provide the
-source evidence and descriptive outcome counts. The home route redirects to
-`/lineage`; `/atlas` renders `AtlasWorkspace` from the backend (see
-[Atlas Explorer Page](#atlas-explorer-page)).
-The local `/atlas-preview` route is an uncommitted, explicitly synthetic rehearsal.
-
-- `AtlasGraph` draws supplied snapshot nodes and edges, with selectable connections and
-  supporting quotations. A final outcome connects the request to its article; the UI
-  does not infer an amendment-to-article causal edge. Missing outcomes add no edge.
-- `AtlasExplorer` filters assessed links by law/actor/request text, each individual
-  topic and procedure year. Published links and audit candidates have separate views.
-- `AtlasEvidence` shows the request, original legal wording, amendment and final text,
-  with URLs, pages, dates, assessment methods and limits. Unknown wording differs from
-  known empty wording. Exact Unicode code-point quotes are checked before highlighting.
-- `lib/atlas.ts` maps schema-validated `atlas-1` records into display props. It checks
-  joins, ownership, source spans and source versions;
-  it never decides publication or outcomes. Passage-local offsets are normalized.
-  It supports all four assessment states, joint actors and multiple law subjects.
-
-The adapter is a typed projection, not a runtime decoder for arbitrary API JSON.
-Its four-column evidence view can represent one source field per column and one final
-outcome per request. Unsupported multi-field or multi-source evidence and multiple final
-outcomes fail explicitly instead of silently dropping records. The integration owner
-must extend this presentation before routing such bundles to it. Shared schemas are
-owned upstream and are not changed here.
-
-`AtlasAnalysis` presents pipeline-supplied ordering and counts: full, partial,
-not-reflected and unknown outcomes. Full wins are shown against assessed requests;
-unknowns are excluded from that denominator and retained in total observed coverage.
-An all-unknown sample has no rate. Getting a requested outcome does not prove causation.
-Report findings need usable citations; a usable URL does not itself establish accuracy.
-Absent findings and forecasts remain labelled gaps.
-
-Tracking: `rev-oodw` (explorer/graph display), `rev-1jc4` (analysis presentation),
-`rev-i006` (backend graph), `rev-5yy6` (backend aggregation), `rev-qn6b` (live integration).
-Shared contracts and synthetic fixtures arrived in PR #25. Agent 2's PR #27 adds
-retrieval, which still needs verification and outcome assessment before publication.
-Real data, any-law runtime, calibrated precision, spend-adjusted rankings, forecasting
-and the generated public report remain separate acceptance gates.

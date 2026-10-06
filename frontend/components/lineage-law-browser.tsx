@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { AtlasSourceSpan } from "../lib/atlas";
-import { AtlasApiError } from "../lib/atlas-api";
+import { ApiError } from "../lib/api-client";
 import {
   type LineageCreditRow,
   type LineageCreditTable,
@@ -34,8 +32,8 @@ import {
   phraseFacets,
   rankOrganisations,
 } from "../lib/lineage-insights";
+import type { SourceSpan } from "../lib/source-span";
 import { useResource } from "../lib/use-resource";
-import { coverageNote, retryStyle, StateMessage, sentence } from "./atlas-law-browser";
 import { LineageGraphExplorer } from "./lineage-graph";
 import {
   Channels,
@@ -47,6 +45,7 @@ import {
 } from "./lineage-insights";
 import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 import { LineageMethod } from "./lineage-method";
+import { coverageNote, retryStyle, StateMessage, sentence } from "./view-state";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
 /** Phrases shown before "Show more"; the AI Act has hundreds, and each card is tall. */
@@ -66,7 +65,7 @@ async function readLawView(url: string, signal: AbortSignal): Promise<LawViewRes
   try {
     return { found: true, view: await readLineageView(url, signal) };
   } catch (error: unknown) {
-    if (error instanceof AtlasApiError && error.status === 404) {
+    if (error instanceof ApiError && error.status === 404) {
       return { found: false, detail: error.detail };
     }
     throw error;
@@ -83,15 +82,7 @@ function day(value: string | null): string {
 }
 
 /** The quote's left rule takes its method's color: teal lexical, violet semantic. */
-function Quote({
-  span,
-  label,
-  kind,
-}: {
-  span: AtlasSourceSpan;
-  label: string;
-  kind: LineageMatchKind;
-}) {
+function Quote({ span, label, kind }: { span: SourceSpan; label: string; kind: LineageMatchKind }) {
   return (
     <blockquote
       className={`border-l-4 ${kindStyle[kind].border} bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900`}
@@ -678,8 +669,6 @@ export function LineageLawBrowser() {
     params.set("law", slug);
     window.history.pushState(null, "", `?${params.toString()}`);
   }
-  const navStyle =
-    "rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700";
   return (
     <div className="min-h-dvh bg-stone-50 text-stone-900">
       <header className="flex h-[76px] items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
@@ -688,11 +677,6 @@ export function LineageLawBrowser() {
           <span className="hidden h-5 w-px bg-stone-300 sm:block" />
           <span className="hidden text-sm text-stone-500 sm:block">Lineage explorer</span>
         </div>
-        <nav aria-label="Other views" className="flex gap-1">
-          <Link href="/atlas" className={navStyle}>
-            Atlas explorer
-          </Link>
-        </nav>
       </header>
       <nav
         aria-label="Collected laws"

@@ -1,4 +1,4 @@
-import type { AtlasLayer, AtlasLayerCoverage, AtlasLayerStatus } from "../lib/atlas-api";
+import type { Layer, LayerCoverage, LayerStatus } from "../lib/coverage";
 import type { LineageView } from "../lib/lineage-api";
 import { KindBadge } from "./lineage-kind";
 
@@ -71,7 +71,7 @@ interface DataSource {
   url: string;
   gives: string;
   /** The coverage rows this source fills, each with the unit its count is in. */
-  layers: readonly { layer: AtlasLayer; unit: string }[];
+  layers: readonly { layer: Layer; unit: string }[];
 }
 
 const SOURCES: readonly DataSource[] = [
@@ -118,7 +118,7 @@ const SOURCES: readonly DataSource[] = [
   },
 ];
 
-const statusText: Record<AtlasLayerStatus, string> = {
+const statusText: Record<LayerStatus, string> = {
   complete: "complete",
   partial: "partial",
   missing: "missing at the source",
@@ -128,8 +128,8 @@ const statusText: Record<AtlasLayerStatus, string> = {
 };
 
 function coverageLine(
-  coverage: readonly AtlasLayerCoverage[],
-  layer: AtlasLayer,
+  coverage: readonly LayerCoverage[],
+  layer: Layer,
   unit: string,
 ): { text: string; complete: boolean; reason: string | null } {
   const row = coverage.find((item) => item.layer === layer);
@@ -145,7 +145,7 @@ function coverageLine(
 }
 
 /** The public sources behind the steps, with what this law's run took from each. */
-function Sources({ coverage }: { coverage: readonly AtlasLayerCoverage[] }) {
+function Sources({ coverage }: { coverage: readonly LayerCoverage[] }) {
   return (
     <section aria-labelledby="lineage-sources" className="space-y-3">
       <div className="max-w-3xl space-y-1">

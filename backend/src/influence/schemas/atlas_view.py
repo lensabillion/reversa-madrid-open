@@ -1,4 +1,4 @@
-"""The explorer's view of one law: what `GET /api/v1/atlas/{slug}` returns.
+"""The Atlas view of one law: what `influence atlas` writes to `atlas.json`.
 
 It carries the shared `atlas-1` records the frontend adapter validates again (the bundle's
 keys are the camelCase names of `AtlasBundle` in `frontend/lib/atlas.ts`), the graph

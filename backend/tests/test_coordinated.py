@@ -4,19 +4,18 @@
 the similarity of two variants can be worked out by hand in each test.
 """
 
+import json
 import random
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from hypothesis import given
 from hypothesis import strategies as st
 from test_collect import make_world, scripted_cli
 from test_parltrack import committee_record, mep_record, write_dump
 
 from influence import cli
-from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.schemas.atlas import Actor, Amendment, LawRecord, span_matches
 from influence.schemas.coordinated import CoordinatedView
@@ -454,7 +453,7 @@ def test_the_command_keeps_the_bundle_when_the_clusters_cannot_be_written(
 # --- The atlas command and the API -----------------------------------------------------------
 
 
-def test_the_atlas_command_writes_the_clusters_beside_the_view_and_the_api_serves_them(
+def test_the_atlas_command_writes_the_clusters_beside_the_view(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     coordinated_world(tmp_path, monkeypatch)
@@ -475,11 +474,9 @@ def test_the_atlas_command_writes_the_clusters_beside_the_view_and_the_api_serve
     # One run, one clock: the clusters belong to the view they are served beside.
     assert (written.run_id, written.generated_at) == (view.run_id, view.generated_at)
 
-    client = TestClient(create_app(atlas_data_root=tmp_path))
-    served = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
-    assert served.status_code == 200
-    body = served.json()
-    assert CoordinatedView.model_validate(body) == written
+    read = coordinated.read_coordination(tmp_path, SLUG)
+    assert read == written
+    body = json.loads(written.model_dump_json())
     assert set(body) == {
         "schema_version",
         "procedure_id",
@@ -508,34 +505,25 @@ def test_the_atlas_command_writes_the_clusters_beside_the_view_and_the_api_serve
         "political_groups",
         "inserted",
     }
-    (listed,) = client.get("/api/v1/atlas").json()["laws"]
-    assert (listed["slug"], listed["cross_group_clusters"]) == (SLUG, 1)
+    (listed,) = pipeline.list_views(tmp_path).laws
+    assert (listed.slug, listed.cross_group_clusters) == (SLUG, 1)
 
 
-def test_the_api_answers_unknown_malformed_and_broken_clusters(
+def test_reading_unknown_and_broken_clusters(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    client = TestClient(create_app(atlas_data_root=tmp_path))
-
-    missing = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
-    assert missing.status_code == 404
-    assert missing.json()["detail"] == (
-        f"No coordinated amendments for {SLUG}: run `make atlas LAW=...` for that law first"
-    )
-    assert client.get("/api/v1/atlas/not-a-law/coordinated").status_code == 422
+    assert coordinated.read_coordination(tmp_path, SLUG) is None
 
     coordinated_world(tmp_path, monkeypatch)
     assert cli.main(["atlas", AI_ACT, "--data-root", str(tmp_path)]) == 0
     (tmp_path / "laws" / SLUG / coordinated.VIEW_FILE).write_text("{}")
-    broken = client.get(f"/api/v1/atlas/{SLUG}/coordinated")
-    assert broken.status_code == 500
-    assert "are invalid" in broken.json()["detail"]
+    with pytest.raises(coordinated.CoordinationError, match="are invalid"):
+        coordinated.read_coordination(tmp_path, SLUG)
     # A broken cluster file leaves the law listed with an unknown count, and says why.
-    listing = client.get("/api/v1/atlas")
-    assert listing.status_code == 200
-    (listed,) = listing.json()["laws"]
-    assert (listed["slug"], listed["cross_group_clusters"]) == (SLUG, None)
-    (invalid,) = listing.json()["invalid"]
-    assert invalid["slug"] == SLUG
-    assert "are invalid" in invalid["reason"]
-    assert client.get(f"/api/v1/atlas/{SLUG}").status_code == 200
+    listing = pipeline.list_views(tmp_path)
+    (listed,) = listing.laws
+    assert (listed.slug, listed.cross_group_clusters) == (SLUG, None)
+    (invalid,) = listing.invalid
+    assert invalid.slug == SLUG
+    assert "are invalid" in invalid.reason
+    assert pipeline.read_view(tmp_path, SLUG) is not None
