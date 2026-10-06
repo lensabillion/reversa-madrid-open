@@ -370,7 +370,7 @@ Open decisions are not settled until the project owner agrees.
 | No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
 | Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
 | Remove the first brief's surfaces: the demo routes, `make submit`, the rehearsal scripts, `backend/validation/` and the evidence workspace | Decided 2026-10-06 by the owner | Bead `rev-xyd0`. Nothing in the Atlas pipeline calls them. The comparison, scoring and PDF-extraction services and the LobbyPlag reader stay because parts 1 and 4 and the practice loop import them |
-| D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
+| D6: open licence and public repository | Decided 2026-10-06: the owner asked for the licence; Apache-2.0 for the code and documentation, as the bead proposed. The repository has been public since 3 October | Bead `rev-nzqr`. Derived data keeps its sources' terms (Parltrack ODbL, EU reuse policy); the report is CC BY 4.0. Tracked files and the whole history were scanned for keys, tokens and `.env` files on 2026-10-06: none found; `data/` and `attic/` were never committed |
 
 ## Next Work in Competition Order
 
