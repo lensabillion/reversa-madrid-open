@@ -5,7 +5,7 @@ title: "D6: choose an open licence and make the repository public, after checkin
 kind: task
 status: in_progress
 priority: 1
-version: 2
+version: 3
 delegate: unknown@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,7 +13,11 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-03T08:53:52.630Z
-updated_at: 2026-10-06T13:43:29.126Z
+updated_at: 2026-10-06T13:46:47.732Z
 started_at: 2026-10-06T13:43:29.125Z
 ---
 Brief rule: code in a public repo with an open licence. The repo is PRIVATE with no LICENSE (gh, 2026-10-03). Owner decision, outward-facing. Proposed: Apache-2.0 for code; ODbL for graph data derived from Parltrack (ODbL); CC BY 4.0 for the report. Before publishing: scan git history for secrets and personal data; data/ and attic/ were never committed.
+
+## Notes
+
+PR https://github.com/lensabillion/reversa-madrid-open/pull/87 opened 2026-10-06: LICENSE (Apache-2.0, verbatim, sha256 cfc7749b…), README licence section, D6 row decided, skill step 6 updated. History scan for keys/.env/data: none found. The remote branch ¨transfer¨ holds docs/brief/Written Report (29).pdf (1.5 MB) off main; decide whether it may be public, then delete the branch.
