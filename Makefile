@@ -22,7 +22,8 @@ NPM := cd frontend && npm
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
 	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
-	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense
+	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense \
+	up down check-containers
 
 # Audits come last: they need network access, and the local gates fail faster.
 check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
@@ -164,3 +165,21 @@ fix-frontend: frontend-env  ## Apply Biome formatting and fixes, including unsaf
 
 dev-frontend: frontend-env  ## Serve the web app at http://localhost:3000, reloading on changes.
 	$(NPM) run dev
+
+# Containers (compose.yaml): backend/Dockerfile and frontend/Dockerfile, both pinned by
+# digest. The explorer proxies /api/v1 to the backend inside the compose network.
+up:  ## Build both images and run the API with the explorer at http://localhost:3000: make up [INFLUENCE_DATA=./mock-data]
+	docker compose up --build
+
+down:  ## Stop and remove the containers that `make up` or `make check-containers` started.
+	docker compose down
+
+# One request per line, so a failure names the probe; `make down` then cleans up (CI runs
+# it in a step that always runs). Not part of `make check`: it needs a Docker daemon.
+check-containers:  ## Build both images, start them, probe the API and the explorer's proxy, then stop them (needs Docker).
+	docker compose build
+	docker compose up --detach --wait --wait-timeout 120
+	curl --fail --silent --show-error http://127.0.0.1:8000/health
+	curl --fail --silent --show-error --output /dev/null http://127.0.0.1:3000/lineage
+	curl --fail --silent --show-error http://127.0.0.1:3000/api/v1/lineage
+	docker compose down

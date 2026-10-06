@@ -1,0 +1,27 @@
+name: Containers
+
+# No path filters: a check that does not run must not look like a check that passed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Read-only token: the job builds and probes images, and pushes nothing.
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: Containers build and serve the API and the explorer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Actions are pinned to full commit SHAs: a tag can be moved to other code, a SHA cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The same target a contributor with Docker runs locally.
+      - run: make check-containers
+      # A failed probe leaves the containers running; stop them whatever happened above.
+      - if: always()
+        run: make down
