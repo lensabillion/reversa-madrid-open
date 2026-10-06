@@ -692,9 +692,6 @@ export function LineageLawBrowser() {
           <Link href="/atlas" className={navStyle}>
             Atlas explorer
           </Link>
-          <Link href="/workspace" className={navStyle}>
-            Evidence workspace
-          </Link>
         </nav>
       </header>
       <nav

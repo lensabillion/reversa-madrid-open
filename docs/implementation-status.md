@@ -37,6 +37,9 @@ remain different targets. Similar wording alone proves neither.
 ## Implemented and Evaluated
 
 Everything below was built for the first brief. The third column says what it becomes.
+On 6 October 2026 the first brief's own surfaces (the LobbyPlag demo routes, `/score`,
+`/compare`, `/documents/extract`, `make submit`, the rehearsal scripts and the evidence
+workspace) were removed (bead `rev-xyd0`); the rows stay as the record of what they became.
 
 | Capability | Evidence | Becomes, under the Atlas architecture | Limit |
 | --- | --- | --- | --- |
@@ -366,6 +369,7 @@ Open decisions are not settled until the project owner agrees.
 | D5: organizer questions of the first brief | **Superseded**; the remaining question is answered: the organizers allow code written before today (3 October) | Bead `rev-qvmx`, closed |
 | No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
 | Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
+| Remove the first brief's surfaces: the demo routes, `make submit`, the rehearsal scripts, `backend/validation/` and the evidence workspace | Decided 2026-10-06 by the owner | Bead `rev-xyd0`. Nothing in the Atlas pipeline calls them. The comparison, scoring and PDF-extraction services and the LobbyPlag reader stay because parts 1 and 4 and the practice loop import them |
 | D6: open licence and public repository | **Open**; outward-facing, owner only. Proposed: Apache-2.0 code, ODbL graph data (Parltrack-derived), CC BY 4.0 report | Bead `rev-nzqr`; the repository is private with no licence (`gh`, 2026-10-03) |
 
 ## Next Work in Competition Order
@@ -690,3 +694,15 @@ facts instead of presenting raw diagnostics as the main page content. `make chec
 1,150 backend tests with 100% branch coverage, 96 frontend tests, production build,
 and both dependency audits. Browser expansion and collapse preserved all diagnostics.
 PR CI is recorded on the bead.
+
+## First Brief Removed — 6 October 2026
+
+Removed (bead `rev-xyd0`): the routes `/api/v1/demo`, `/amendments`, `/organizations`,
+`/score`, `/compare` and `/documents/extract` with their routers, the `DemoService` the
+API booted (503 without `data/lobbyplag`), `influence submit` with its schemas, service,
+golden files and `make submit`, `tests/rehearse_*.py`, `backend/validation/`, and the
+frontend's `/workspace` page with the text-comparison and PDF-upload components. The API
+now serves `/health` and the Atlas and lineage views only, all `GET`. Kept because the
+Atlas imports them: `services/scoring.py` and `services/comparison.py` (part 4's lexical
+signal and the practice harness), `services/documents.py` (part 1's attachment
+extraction) and `repositories/lobbyplag.py` (the practice loop's labels).

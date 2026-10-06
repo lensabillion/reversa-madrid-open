@@ -1,4 +1,4 @@
-"""Liveness route independent of the optional demo dataset."""
+"""Liveness route: it reads no data."""
 
 from importlib.metadata import version
 

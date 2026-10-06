@@ -1,7 +1,7 @@
 # Practice Harness
 
 The practice harness is the architecture's **practice loop**: it checks part 4's scores the
-way the hidden test will, before a change reaches `pairs.csv`. It labels LobbyPlag's public
+way the hidden test will, before a change reaches the published links. It labels LobbyPlag's public
 GDPR candidates, splits them into folds, scores every pair out of fold, and measures each
 scorer on 2,000 simulated hidden tests of 30 real pairs and 30 decoys. Every scorer change
 reports these numbers before and after, on the same folds and seeds (`AGENTS.md`, "Model

@@ -12,13 +12,14 @@ explains the design from first principles; the
 [implementation status](../docs/implementation-status.md) records what is verified,
 decided and next.
 
-Parts of this backend were built for the superseded first brief and are kept where they
-still serve: the LobbyPlag (GDPR, 2013) evidence routes below, the lexical comparison that
-part 4 builds on, and the `influence submit` pairs command (see "Submission Command").
-The [frozen semantic experiment](evaluation/README.md) records the lexical baseline's
-failure cases and a local reranker comparison.
+Two pieces built for the superseded first brief remain because the Atlas uses them: the
+lexical comparison (`services/scoring.py`, `services/comparison.py`) that part 4 builds
+on, and the practice harness over LobbyPlag's labelled pairs. The first brief's HTTP
+routes, its `influence submit` command and the evidence workspace were removed on
+6 October 2026. The [frozen semantic experiment](evaluation/README.md) records the lexical
+baseline's failure cases and a local reranker comparison.
 
-## Run With Public Data
+## Run
 
 Use the repository's Python 3.14 and uv toolchain. From the repository root:
 
@@ -28,37 +29,19 @@ make dev-backend
 ```
 
 The API is at `http://127.0.0.1:8000`, interactive documentation at `/docs`, and the
-machine-readable contract at `/openapi.json`. `/health` and `/api/v1/score` work without
-downloaded data. Data routes require these five LobbyPlag files in `data/lobbyplag/`:
-`amendments.json`, `proposals.json`, `plags.json`, `documents.json`, and `lobbyists.json`.
-The directory is ignored by Git.
-
-For a fresh checkout, download the public snapshot pinned to an upstream commit:
-
-```sh
-mkdir -p data/lobbyplag
-(for name in amendments proposals plags documents lobbyists; do
-  curl --fail --location --output "data/lobbyplag/$name.json" \
-    "https://raw.githubusercontent.com/lobbyplag/lobbyplag-data/6880188eb528b5eb00cf7efdadfccdd3d5e73795/data/$name.json" || exit 1
-done)
-```
-
-Confirm `/api/v1/demo` succeeds after downloading. The loader checks schemas, unique
-identifiers, and references across all five files; a partial snapshot returns 503.
-These files contain extracted text and source metadata, not the original PDF documents.
-Source: [LobbyPlag data](https://github.com/lobbyplag/lobbyplag-data/tree/6880188eb528b5eb00cf7efdadfccdd3d5e73795).
-
-Set `INFLUENCE_DATA_DIR` to an absolute directory to use another snapshot or a packaged
-installation. The default resolves the repository's `data/lobbyplag` from the editable
-source tree. Each application instance loads its snapshot on the first data request and
-keeps it in memory. Restart after replacing files. Failed loads remain retryable.
-
-```sh
-INFLUENCE_DATA_DIR=/absolute/path/to/lobbyplag make dev-backend
-```
+machine-readable contract at `/openapi.json`. `/health` reads no data. The view routes
+read the law bundles that `make atlas` and `make lineage` write under `data/laws/`
+(`INFLUENCE_DATA_ROOT` points elsewhere, for example at `mock-data/`); a law without a
+view answers 404 with the command that builds it. `make up` serves the same API from a
+container (root README).
 
 The local frontend origins `http://localhost:3000` and `http://127.0.0.1:3000` are allowed
-by CORS. This is a local public-data demo without authentication or deployment hardening.
+by CORS for GET requests; the explorer normally reaches the API through Next.js's
+same-origin proxy and needs no CORS. There is no authentication: every route reads public
+data and writes nothing.
+
+The practice loop's LobbyPlag snapshot (`make fetch-lobbyplag`, into `data/lobbyplag/`) is
+read by the practice commands only, never by the API.
 
 ## Setup Command (Atlas Part 1 Inputs)
 
@@ -603,159 +586,59 @@ A missing file is a line such as "Not run: `data/laws/2021-0106-COD/lineage.json
 run `make lineage LAW='2021/0106(COD)'`", never a zero. `--out` is resolved from `backend/`
 when run through `make`. Tested offline (`tests/test_report.py`); not yet run on a real law.
 
-## Submission Command
-
-`influence submit` is the 19:00 command: architecture parts 1–4 in one run, without the
-web server. It reads the supplied pairs (part 1), compares each with the `/compare`
-service (parts 2–3), and passes that score through as `influence_score` (part 4) until a
-trained combiner exists. From the repository root:
-
-```sh
-make submit PAIRS=/absolute/or/relative/pairs.jsonl OUT=outputs/2026-10-03
-# equivalent: uv run --directory backend --locked influence submit \
-#   --pairs /absolute/pairs.jsonl --out /absolute/outputs --expected-pairs 60
-```
-
-The input is our own normalized contract, because the organizers' format is not yet known
-(decision D5): a UTF-8 [JSON Lines](https://jsonlines.org/) file, one object per line.
-
-```json
-{"pair_id": "P01", "amendment": {"old": "Keep data for 30 days.", "new": "Keep data for 90 days."}, "submission": {"old": null, "new": "Data should be kept for 90 days."}}
-```
-
-`old: null` means the original wording is unknown, exactly as in `/compare`; both originals
-known selects edit comparison, otherwise whole passages are compared. At 19:00 a small
-adapter converts whatever arrives into this shape. `pair_id` must be non-empty, without
-surrounding whitespace, control characters or line separators, and unique.
-
-The whole file is validated before anything is scored. Every problem is reported at once
-on stderr with its line number and `pair_id`: invalid JSON, schema errors, blank lines,
-duplicate identifiers, an empty file, a pair count other than `--expected-pairs` (default
-60, from the brief), and texts over the scorer's limits of 12,000 characters or 800 tokens.
-Texts are never truncated. Any problem exits with status 1 and writes nothing; usage
-errors exit with status 2.
-
-`OUT` receives two files. `pairs.csv` has the header `pair_id,influence_score` and one row
-per input pair in input order, with each score written as the shortest decimal that parses
-back to the identical float (so ranking ties are neither created nor lost), never in
-exponent form. `pairs.evidence.jsonl` holds one line per pair: `pair_id`,
-`influence_score` and the full comparison result (mode, method, score, evidence spans,
-negation conflict, limitations). Before writing, the command checks that the scored IDs
-equal the input IDs in order and that every score is a finite number in [0, 1]. Both files
-are staged in `OUT`, fsynced and renamed into place, evidence first and `pairs.csv` last:
-a failure leaves no partial file and any previous `pairs.csv` unchanged.
-
-Not handled yet: a whole lobby paper over the 800-token limit fails loudly until the
-passage finder (plan step 3, `rev-aapn`) selects the relevant passage; `proposals.csv` is
-plan step 4 (`rev-e5xh`). Rehearse the command on 60 public LobbyPlag pairs with
-`uv run --directory backend --locked python tests/rehearse_submission.py
-/absolute/path/to/lobbyplag`; the [recorded run](validation/submission-rehearsal-2026-10-02.json)
-took 0.16 seconds per complete command on an Apple M5, including interpreter start-up.
-
 ## HTTP Contract
 
 | Method and path | Result |
 | --- | --- |
-| `GET /health` | Existing status and installed package version |
-| `GET /api/v1/demo` | Snapshot counts and coverage caveat |
-| `GET /api/v1/amendments` | Stable, paginated summaries |
-| `GET /api/v1/amendments/{id}` | Old/new amendment text and up to 20 candidate sources |
-| `GET /api/v1/organizations` | Recorded proposal, verified-link and distinct amendment counts |
-| `POST /api/v1/score` | Deterministic changed-text similarity and source-offset evidence |
-| `POST /api/v1/compare` | Explicit edit or whole-passage comparison when originals may be unknown |
-| `POST /api/v1/documents/extract` | Page-preserving extraction from PDF or UTF-8 text |
+| `GET /health` | `{"status": "ok", "version": ...}`; reads no data |
+| `GET /api/v1/atlas`, `GET /api/v1/atlas/{slug}`, `GET /api/v1/atlas/{slug}/coordinated` | The Atlas views: see "Atlas Command and View API" |
+| `GET /api/v1/lineage`, `GET /api/v1/lineage/{slug}` | The lineage views: see "Lineage View API" |
 
-List parameters are `q` (committee, amendment number or author; at most 200 characters),
-`offset` (nonnegative), `limit` (1–100, default 20), and `verified_only` (default false).
-Multiple search words must all match. Detail sources sort verified first, then by stable
-candidate identifier; `total_sources` exposes truncation. They are historical candidates,
-not newly retrieved recommendations. Counts are observed coverage, not organization win
-rates or proof of causation.
-
-Unknown entities return 404. Missing/unreadable files and invalid snapshots return 503
-with a structured `detail.code`; filesystem paths are not exposed. A candidate outside
-the English scorer's language or input limits retains its source evidence and historical
-label, with `score: null` and an explicit `score_unavailable_reason`. Invalid requests
-return FastAPI's 422 validation response. OpenAPI defines each successful response schema.
-
-Example request, using a deliberately small synthetic edit:
-
-```sh
-curl --fail http://127.0.0.1:8000/api/v1/score \
-  -H 'Content-Type: application/json' \
-  -d '{"amendment":{"old":"Keep data for 30 days.","new":"Keep data for 90 days."},"submission":{"old":"Keep data for 30 days.","new":"Keep data for 90 days."}}'
-```
-
-### User-Supplied Text
-
-`/compare` accepts `amendment` and `submission`, each with `old: string | null` and
-`new: string`. Null means original wording is unavailable; an empty string means a
-known empty original. When both originals are known, the response uses `mode: edits`
-and `method: lexical-delta-v1`. Otherwise it compares both full passages with
-`mode: passages` and `method: lexical-passage-v1`; a one-sided original is not used.
-The response states that limitation and does not invent changed-text spans. Evidence
-offsets reference `new` in passage mode. Both modes remain lexical similarity, not
-influence or adoption probabilities, and use the existing character/token bounds.
-
-```sh
-curl --fail http://127.0.0.1:8000/api/v1/compare \
-  -H 'Content-Type: application/json' \
-  -d '{"amendment":{"old":null,"new":"Keep data for 90 days."},"submission":{"old":null,"new":"Keep data for 90 days."}}'
-```
+A slug without a written view answers 404 with the command that builds it; an unreadable
+view answers 500 with the reason. Invalid parameters return FastAPI's 422 validation
+response. OpenAPI defines each successful response schema.
 
 ### PDF and Text Extraction
 
-Send raw file bytes to `/documents/extract` with `Content-Type: application/pdf`,
-`text/plain`, or `text/markdown`. It returns `format`, numbered `pages` with extracted
-`text`, `warnings`, `character_count`, `glyphs_guessed` and `glyphs_unresolved`. PDF
-ligature code points (U+FB00 to U+FB06) expand to their letters. A ligature glyph that
-the PDF font maps to no character comes out of pypdf as U+0000 (`signi\0cant`); it is
-restored as fi, fl, ff, ffi or ffl when the spelling appears elsewhere in the document or
-a known word part covers it, and otherwise replaced by a space. Both counts carry a
-warning, and Have Your Say attachments record them in `extraction_method`
-(`pypdf+glyph_repair:guessed=N,unresolved=M`) and in the asks coverage reason. The
-repair runs before passages are cut, so every span indexes the repaired text.
-Extraction does not guess which columns are
-original/proposed wording or select evidence passages. The same service can be called
-by a future batch adapter without HTTP. Files are processed in memory and are not saved.
+`services/documents.py` (`extract_document`) turns a PDF or UTF-8 text into numbered pages
+for part 1, which reads Have Your Say attachments through it. It returns `format`,
+numbered `pages` with extracted `text`, `warnings`, `character_count`, `glyphs_guessed`
+and `glyphs_unresolved`. PDF ligature code points (U+FB00 to U+FB06) expand to their
+letters. A ligature glyph that the PDF font maps to no character comes out of pypdf as
+U+0000 (`signi\0cant`); it is restored as fi, fl, ff, ffi or ffl when the spelling appears
+elsewhere in the document or a known word part covers it, and otherwise replaced by a
+space. Both counts carry a warning, and Have Your Say attachments record them in
+`extraction_method` (`pypdf+glyph_repair:guessed=N,unresolved=M`) and in the asks
+coverage reason. The repair runs before passages are cut, so every span indexes the
+repaired text. Extraction does not guess which columns are original/proposed wording or
+select evidence passages.
 
-```sh
-curl --fail http://127.0.0.1:8000/api/v1/documents/extract \
-  -H 'Content-Type: application/pdf' --data-binary @public-submission.pdf
-```
-
-Limits: 8 MiB uploaded, 100 PDF pages, 500,000 extracted characters, 2 MiB expanded
-content per page and 16 MiB aggregate page streams. Oversized input returns 413,
-unsupported media 415, and invalid/encrypted/empty documents 422 with a safe
-`detail.code` and message. PDFs with no text return `ocr_required`; mixed blank pages
-remain present with warnings. OCR is not performed. Multi-column/table reading order
-requires inspection, because PDF extraction cannot guarantee visual order.
-
-`pypdf==6.19.0` is the one added dependency, pinned through the repository's 14-day
-package-age policy. Its context-local decompression limits contain common expansion
-cases and external image conversion is disabled. These limits are not a hard memory or
-CPU sandbox: this is a local public-document demo, not an internet-facing upload service.
+Limits: 8 MiB of input, 100 PDF pages, 500,000 extracted characters, 2 MiB expanded
+content per page and 16 MiB aggregate page streams. Oversized, invalid, encrypted or
+empty documents raise `DocumentExtractionError` with a stable `code`
+(`document_too_large`, `too_many_pages`, `text_too_large`, `pdf_stream_too_large`,
+`invalid_pdf`, `encrypted_pdf`, `empty_document`, `invalid_utf8`); a PDF with no text is
+`ocr_required`, and OCR is not performed. Multi-column and table reading order cannot be
+guaranteed by PDF extraction. pypdf's context-local decompression limits contain common
+expansion cases and external image conversion is disabled; these limits are not a hard
+memory or CPU sandbox.
 
 ## Separation of Responsibilities
 
-`api.py` assembles the application, per-app lazy dataset provider, CORS, and error
-translation. `dependencies.py` connects that provider to FastAPI. `routers/` declares
-routes and validates HTTP parameters; it contains no matching or data-joining logic.
-`schemas/` defines immutable typed request and response objects. `repositories/lobbyplag.py`
-parses and validates the local source files, with no network calls or data writes.
-`services/demo.py` joins and aggregates those records. `services/scoring.py` is a pure
-function that can also be called by a future batch command without an HTTP server.
-`cli.py` is that batch command: a thin `argparse` layer over `services/submission.py`,
-which calls the same comparison service as `/compare`.
+`api.py` assembles the application: CORS and the three route groups (`health`, `atlas`,
+`lineage`). `routers/` declares routes and validates HTTP parameters; it contains no
+matching or data-joining logic. `schemas/` defines immutable typed records. `services/`
+holds the pipeline's parts, each callable without the web server, because `cli.py` (a thin
+`argparse` layer) and the batch command call them directly. `repositories/` reads the
+public sources (Parltrack, CELLAR, Have Your Say, the Transparency Register) and, for the
+practice loop only, LobbyPlag's snapshot; none of them calls the network at request time
+or writes outside `data/`.
 
-There is one concrete repository and one scoring implementation. No database, vector
-store, model-provider abstraction, or background job system is necessary for this corpus.
-Historical `verified` values are returned separately and never supplied to the scorer.
-Raw file fields that this demo does not use are ignored; required fields and relationships
-are validated before a snapshot becomes available. The upstream candidate file contains
-repeated identifiers. Rows with the same candidate identifier, amendment, proposal and
-verification value are coalesced; conflicts are rejected. `duplicate_candidate_rows`
-reports the coalesced count, and candidate/verified counts refer to unique records.
+LobbyPlag's candidate file repeats identifiers: rows with the same candidate identifier,
+amendment, proposal and verification value are coalesced and conflicts are rejected
+(`repositories/lobbyplag.py`), so candidate and verified counts refer to unique records.
+Its historical `verified` values are labels for the practice loop and are never supplied
+to a scorer.
 
 ## Scoring and the ML Decision
 
@@ -891,25 +774,8 @@ the next work, and each needs a probed response shape first.
 Run `make check-backend` for locked dependencies, Ruff, strict basedpyright, unit/API
 tests, gate probes, and 100% line and branch coverage. Run `make check` for the entire
 repository, including frontend build and vulnerability audits. Tests use small synthetic
-snapshots and do not require the downloaded public corpus or network access.
-
-Rehearse the real snapshot from the repository root:
-
-```sh
-uv run --directory backend --locked python tests/rehearse_demo.py /absolute/path/to/lobbyplag
-```
-
-The [recorded run](validation/rehearsal-2026-10-02.json) preserves input hashes, counts,
-timings and runtime details. On an Apple M5 (10 CPU cores), loading took 0.029 seconds,
-all 4,867 details took 0.854 seconds, and 60 repeated HTTP requests for one sample pair
-took 0.072 seconds. There were 1,933 computed scores, 24 non-English sources
-with explicit unavailable scores, and no sources omitted by the detail limit. These are
-single-run smoke measurements, not an accuracy evaluation or the complete competition
-pipeline's timing. The five input files matched the pinned upstream snapshot byte for byte.
-
-The implementation and validation evidence are tracked in **rev-ic1h**. The remaining
-competition evaluation and adoption work is tracked in **rev-p2rd**, **rev-zzur** and
-**rev-104q**. This README describes the delivered backend; tbd remains the work tracker.
+snapshots and do not require the downloaded public corpus or network access. tbd remains
+the work tracker; this README describes the delivered backend.
 
 ## Atlas Graph and Outcome Consumers
 

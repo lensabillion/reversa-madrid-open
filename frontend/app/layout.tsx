@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Influence · Evidence workspace",
-  description: "Compare legal texts and inspect public amendment evidence.",
+  title: "Influence Atlas",
+  description:
+    "Who shapes EU law: asks traced to amendments and to the final text, with the evidence side by side.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

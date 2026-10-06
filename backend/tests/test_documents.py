@@ -1,12 +1,9 @@
-"""Document extraction checks actual PDF bytes and explicit upload failures."""
+"""Document extraction checks actual PDF bytes and explicit extraction failures."""
 
-import asyncio
 from io import BytesIO
 from pathlib import Path
 
 import pytest
-from fastapi import HTTPException, Request
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from pypdf import PdfWriter, get_configuration
 from pypdf.generic import (
@@ -17,10 +14,7 @@ from pypdf.generic import (
     NameObject,
     NumberObject,
 )
-from starlette.types import Message
 
-from influence.api import create_app
-from influence.routers import documents as router
 from influence.schemas.documents import DocumentFormat, ExtractedDocument
 from influence.services import documents
 from influence.services.documents import (
@@ -121,36 +115,6 @@ def test_failed_documents_do_not_fabricate_text(
     assert error.value.code == code
 
 
-def test_http_raw_text_and_pdf_contract() -> None:
-    client = TestClient(create_app())
-    for media in ("text/plain; charset=utf-8", "text/markdown"):
-        response = client.post(
-            "/api/v1/documents/extract", content=b"# Legal text", headers={"Content-Type": media}
-        )
-        assert response.status_code == 200
-        assert response.json()["pages"] == [{"page": 1, "text": "# Legal text"}]
-    response = client.post(
-        "/api/v1/documents/extract",
-        content=make_pdf(("Proposed clause",)),
-        headers={"Content-Type": "application/pdf"},
-    )
-    assert response.status_code == 200
-    assert response.json()["format"] == "pdf"
-    assert response.json()["pages"] == [{"page": 1, "text": "Proposed clause"}]
-
-
-def test_http_rejects_unsupported_types_and_malformed_uploads() -> None:
-    client = TestClient(create_app())
-    unsupported = client.post("/api/v1/documents/extract", content=b"text")
-    assert unsupported.status_code == 415
-    assert unsupported.json()["detail"]["code"] == "unsupported_media_type"
-    invalid = client.post(
-        "/api/v1/documents/extract", content=b"bad PDF", headers={"Content-Type": "application/pdf"}
-    )
-    assert invalid.status_code == 422
-    assert invalid.json()["detail"]["code"] == "invalid_pdf"
-
-
 def test_upload_and_text_size_limits() -> None:
     with pytest.raises(DocumentExtractionError, match="8 MiB") as error:
         extract_document(b"x" * (documents.MAX_UPLOAD_BYTES + 1), "text")
@@ -192,56 +156,6 @@ def test_pdf_stream_limits_before_extraction(monkeypatch: pytest.MonkeyPatch) ->
     assert error.value.code == "pdf_stream_too_large"
 
 
-def test_http_stream_cap_and_service_limit_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(router, "MAX_UPLOAD_BYTES", 8)
-    client = TestClient(create_app())
-    response = client.post(
-        "/api/v1/documents/extract",
-        content=iter((b"abcde", b"fghi")),
-        headers={"Content-Type": "text/plain"},
-    )
-    assert response.status_code == 413
-    assert response.json()["detail"]["code"] == "document_too_large"
-    monkeypatch.setattr(documents, "MAX_TEXT_CHARACTERS", 2)
-    response = client.post(
-        "/api/v1/documents/extract", content=b"abc", headers={"Content-Type": "text/plain"}
-    )
-    assert response.status_code == 413
-    assert response.json()["detail"]["code"] == "text_too_large"
-
-
-def test_stream_stops_before_reading_remainder(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(router, "MAX_UPLOAD_BYTES", 8)
-    events: list[Message] = [
-        {"type": "http.request", "body": b"12345", "more_body": True},
-        {"type": "http.request", "body": b"6789", "more_body": True},
-        {"type": "http.request", "body": b"do not read", "more_body": False},
-    ]
-
-    async def receive() -> Message:
-        return events.pop(0)
-
-    request = Request({"type": "http", "headers": [(b"content-type", b"text/plain")]}, receive)
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(router.extract(request))
-    assert error.value.status_code == 413
-    assert len(events) == 1
-
-
-def test_extraction_runs_off_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
-    def check_thread(content: bytes, format: DocumentFormat) -> ExtractedDocument:
-        with pytest.raises(RuntimeError, match="no running event loop"):
-            asyncio.get_running_loop()
-        return extract_document(content, format)
-
-    monkeypatch.setattr(router, "extract_document", check_thread)
-    response = TestClient(create_app()).post(
-        "/api/v1/documents/extract", content=b"actual text", headers={"Content-Type": "text/plain"}
-    )
-    assert response.status_code == 200
-    assert response.json()["pages"] == [{"page": 1, "text": "actual text"}]
-
-
 def test_unsupported_pdf_filter_is_an_explicit_error() -> None:
     body = make_pdf(("clause",), compressed=True).replace(b"/FlateDecode", b"/BogusFilerX")
     with pytest.raises(DocumentExtractionError) as error:
@@ -249,22 +163,12 @@ def test_unsupported_pdf_filter_is_an_explicit_error() -> None:
     assert error.value.code == "invalid_pdf"
 
 
-def test_document_contract_is_frozen_and_openapi_describes_raw_media() -> None:
+def test_document_contract_is_frozen() -> None:
     result = extract_document(b"clause", "text")
     with pytest.raises(ValidationError, match="frozen"):
         result.pages[0].text = "other"
     with pytest.raises(ValidationError, match="Extra inputs"):
         ExtractedDocument.model_validate({**result.model_dump(), "guessed_original": ""})
-    schema = TestClient(create_app()).get("/openapi.json").json()
-    upload = schema["paths"]["/api/v1/documents/extract"]["post"]
-    assert set(upload["requestBody"]["content"]) == {
-        "application/pdf",
-        "text/plain",
-        "text/markdown",
-    }
-    assert upload["responses"]["200"]["content"]["application/json"]["schema"] == {
-        "$ref": "#/components/schemas/ExtractedDocument"
-    }
 
 
 def test_committed_organizers_brief_preserves_challenge_pages() -> None:
