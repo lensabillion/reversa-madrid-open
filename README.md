@@ -56,9 +56,16 @@ comes from public sources and is rebuilt by these commands. `make check` runs ev
 
 ## Licence
 
-The licence is pending the project owner's decision (D6 in
-[implementation status](docs/implementation-status.md#decisions)). Until it is decided,
-the repository has no LICENSE file.
+The code and documentation in this repository are licensed under the
+[Apache License, Version 2.0](LICENSE) (decision D6 in
+[implementation status](docs/implementation-status.md#decisions)). Everything the
+pipeline writes under `data/`, and the snapshots under `mock-data/`, is derived from
+public sources and stays under those sources' terms: Parltrack's dumps are
+[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/), and EUR-Lex texts and
+Have Your Say feedback fall under the
+[Commission's reuse policy](https://eur-lex.europa.eu/content/legal-notice/legal-notice.html).
+The public report, once published, is offered under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ## Where to Start
 

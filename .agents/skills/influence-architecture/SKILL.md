@@ -97,8 +97,8 @@ Design rules that come with it:
    (45 points), and insight, report and ambition are built on top of it.
    If you are asked for other work before then, name the trade-off to the user first.
 6. **Leave open decisions open.** The Decisions table in `docs/implementation-status.md`
-   lists them. Do not settle one in code: no language-model calls before the judge is
-   decided (D1), and no licence or public release before D6.
+   lists them. Do not settle one in code: for example, no language-model calls before
+   the judge is decided (D1).
    Build so the decision can land later, and ask.
 7. **Measure scoring changes.** A change to parts 3, 4, 5 or 7 is accepted on
    practice-loop evidence, reported before and after on the same folds, samples and seeds
