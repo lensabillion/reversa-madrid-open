@@ -5,11 +5,16 @@
 # INFLUENCE_DATA names the host directory mounted at /data: the repository's data/ by
 # default (what `make atlas` and `make lineage` write), or mock-data/ for the committed
 # snapshots: INFLUENCE_DATA=./mock-data make up
+#
+# INFLUENCE_VIEW_MAX_AGE is how many seconds browsers and caches may reuse a lineage view
+# before revalidating it (default 3600); the API refuses to start on an invalid value.
 services:
   backend:
     build: ./backend
     volumes:
       - ${INFLUENCE_DATA:-./data}:/data:ro
+    environment:
+      INFLUENCE_VIEW_MAX_AGE: ${INFLUENCE_VIEW_MAX_AGE:-3600}
     ports:
       - "127.0.0.1:8000:8000"
 

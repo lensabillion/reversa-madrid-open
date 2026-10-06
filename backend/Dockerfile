@@ -37,8 +37,10 @@ COPY --from=builder /opt/influence /opt/influence
 # /data is where `influence atlas` and `influence lineage` write; compose mounts the
 # repository's data/ (or mock-data/) there. The default is explicit because the
 # installed package's "beside the source" fallback has no meaning inside an image.
+# INFLUENCE_VIEW_MAX_AGE is the seconds a browser or cache may reuse a lineage view.
 ENV PATH=/opt/influence/bin:$PATH \
     INFLUENCE_DATA_ROOT=/data \
+    INFLUENCE_VIEW_MAX_AGE=3600 \
     PYTHONUNBUFFERED=1
 
 USER influence
