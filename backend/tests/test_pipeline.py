@@ -29,7 +29,6 @@ from influence.schemas.atlas import (
     id_part,
     span_matches,
 )
-from influence.schemas.atlas_view import AtlasLawList
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN
 from influence.services import assessment, modes, pipeline
 from influence.services.pipeline import PipelineError
@@ -301,19 +300,12 @@ def test_the_view_is_written_with_the_frontend_names_and_read_back_equal(tmp_pat
     assert "document_texts" not in raw["bundle"]
     assert raw["schema_version"] == "atlas-view-1"
     assert pipeline.read_view(tmp_path, SLUG) == view
-    (summary,) = pipeline.list_views(tmp_path).laws
-    assert (summary.slug, summary.title, summary.published_links) == (
-        SLUG,
-        "Artificial Intelligence Act",
-        1,
-    )
-    # No `coordinated.json` beside the view: not computed, which is not zero clusters.
-    assert summary.cross_group_clusters is None
+    assert view.title == "Artificial Intelligence Act"
+    assert sum(link.status == "published" for link in view.bundle.links) == 1
 
 
 def test_absent_and_invalid_views(tmp_path: Path) -> None:
     assert pipeline.read_view(tmp_path, SLUG) is None
-    assert pipeline.list_views(tmp_path).laws == ()
     (tmp_path / "laws" / SLUG).mkdir(parents=True)
     (tmp_path / "laws" / SLUG / pipeline.VIEW_FILE).write_text("{}")
     with pytest.raises(PipelineError, match="invalid"):
@@ -366,15 +358,13 @@ def built(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_the_written_view_is_listed_and_read_back(tmp_path: Path) -> None:
+def test_the_written_view_is_read_back(tmp_path: Path) -> None:
     root = built(tmp_path)
 
-    listing = pipeline.list_views(root)
     view = pipeline.read_view(root, SLUG)
 
-    assert listing.laws[0].slug == SLUG
-    assert listing.laws[0].cross_group_clusters is None
     assert view is not None
+    assert view.slug == SLUG
     # The JSON shape, as the file holds it and the forecast and report read it.
     body = json.loads(view.model_dump_json(by_alias=True))
     assert body["modes"] == []
@@ -394,18 +384,11 @@ def test_the_written_view_is_listed_and_read_back(tmp_path: Path) -> None:
 
 
 def test_reading_unknown_and_broken_views(tmp_path: Path) -> None:
-    assert pipeline.list_views(tmp_path) == AtlasLawList(laws=(), invalid=())
     assert pipeline.read_view(tmp_path, "2099-0001-COD") is None
     (tmp_path / "laws" / SLUG).mkdir(parents=True)
     (tmp_path / "laws" / SLUG / pipeline.VIEW_FILE).write_text("{}")
-    with pytest.raises(PipelineError):
+    with pytest.raises(PipelineError, match="is invalid"):
         pipeline.read_view(tmp_path, SLUG)
-    # Regression: one invalid view hid every other law from the list. It is listed apart.
-    listing = pipeline.list_views(tmp_path)
-    assert listing.laws == ()
-    (invalid,) = listing.invalid
-    assert invalid.slug == SLUG
-    assert "is invalid" in invalid.reason
 
 
 # --- The command ----------------------------------------------------------------------------
@@ -721,18 +704,6 @@ def test_only_a_view_of_another_run_or_an_unreadable_one_is_removed(tmp_path: Pa
     (result.bundle / pipeline.VIEW_FILE).write_text("{}")
     assert pipeline.remove_stale_view(result.bundle, run_id)
     assert not (result.bundle / pipeline.VIEW_FILE).exists()
-
-
-def test_one_invalid_view_does_not_hide_the_valid_ones(tmp_path: Path) -> None:
-    root = built(tmp_path)
-    broken = root / "laws" / "2099-0001-COD"
-    broken.mkdir()
-    (broken / pipeline.VIEW_FILE).write_text("{}")
-
-    listing = pipeline.list_views(root)
-
-    assert [law.slug for law in listing.laws] == [SLUG]
-    assert [entry.slug for entry in listing.invalid] == ["2099-0001-COD"]
 
 
 # --- Part 4's inputs from part 3: the ask's direction and the proposal's wording -----------

@@ -39,7 +39,6 @@ from influence.schemas.atlas import (
     Outcome,
     OutputFile,
     Passage,
-    PublicPosition,
     RunManifest,
     SourceDocument,
     SourceSpan,
@@ -83,7 +82,6 @@ DOC_CITY = document_id("hys_attachment", "fixture0003")
 DOC_ACME = document_id("hys_feedback", "9000004")
 DOC_UNDATED = document_id("hys_attachment", "fixture0005")
 DOC_LABELS = document_id("hys_feedback", "9000006")
-DOC_STATEMENT = document_id("public_statement", "makers-press-2098-11")
 DOC_AMENDMENTS_A = document_id("parltrack", "fixture-a-amendments")
 DOC_AMENDMENTS_B = document_id("parltrack", "fixture-b-amendments")
 DOC_PROPOSAL_A = document_id("cellar", "52099PC0001")
@@ -118,10 +116,6 @@ TEXTS = {
         "Label Alliance asks that Article 3 require the energy grade to be printed in a "
         "font no smaller than the product name."
     ),
-    DOC_STATEMENT: (
-        "Widget Makers Europe said today that it supports strong traceability rules for "
-        "every widget sold in the Union."
-    ),
     DOC_PROPOSAL_A: (
         "Article 5\n1. Providers shall keep technical logs.\n\n"
         "Article 9\n2. The authority shall publish the assessment."
@@ -149,10 +143,6 @@ AM2_NEW = "The authority may publish the assessment."
 AM3_OLD = "The label shall state the energy grade."
 AM3_NEW = (
     "The label shall state the energy grade, printed in a font no smaller than the product name."
-)
-SIX_MONTHS = (
-    "providers shall keep technical logs for at least six months after placing the widget "
-    "on the market"
 )
 
 
@@ -185,7 +175,6 @@ class AtlasFixture:
     candidates: tuple[Candidate, ...]
     links: tuple[LinkAssessment, ...]
     outcomes: tuple[Outcome, ...]
-    positions: tuple[PublicPosition, ...]
     forecasts: tuple[Forecast, ...]
     graphs: tuple[GraphSnapshot, ...]
     manifests: tuple[RunManifest, ...]
@@ -204,7 +193,6 @@ class AtlasFixture:
             "candidates": self.candidates,
             "links": self.links,
             "outcomes": self.outcomes,
-            "positions": self.positions,
             "forecasts": self.forecasts,
             "graphs": self.graphs,
             "manifests": self.manifests,
@@ -327,14 +315,6 @@ def _documents() -> tuple[SourceDocument, ...]:
         _document(DOC_ACME, LAW_A, "hys_feedback", f"{base}/feedback/9000004", _when(2, 7)),
         _document(DOC_UNDATED, LAW_A, "hys_attachment", f"{base}/download/0005", None),
         _document(DOC_LABELS, LAW_B, "hys_feedback", f"{base}/feedback/9000006", _when(7, 1)),
-        _document(
-            DOC_STATEMENT,
-            None,
-            "public_statement",
-            f"{base}/press/2098-11",
-            datetime(2098, 11, 20, 9, 0, tzinfo=UTC),
-            title="Press release",
-        ),
         _document(DOC_AMENDMENTS_A, LAW_A, "parltrack", f"{base}/amendments-a", _when(4, 1)),
         _document(DOC_AMENDMENTS_B, LAW_B, "parltrack", f"{base}/amendments-b", _when(9, 1)),
         _document(DOC_PROPOSAL_A, LAW_A, "cellar", f"{base}/celex/52099PC0001", _when(1, 10)),
@@ -941,22 +921,6 @@ def _outcomes() -> tuple[Outcome, ...]:
     )
 
 
-def _positions() -> tuple[PublicPosition, ...]:
-    return (
-        PublicPosition(
-            position_id="position:makers-press-2098-11",
-            actor_id=MAKERS,
-            document_id=DOC_STATEMENT,
-            span=_doc_span(DOC_STATEMENT, "supports strong traceability rules"),
-            stated_at=datetime(2098, 11, 20, 9, 0, tzinfo=UTC),
-            attribution="self_statement",
-            topic="4.60.08 Safety of products",
-            procedure_id=LAW_A,
-            direction="stricter",
-        ),
-    )
-
-
 def _forecasts() -> tuple[Forecast, ...]:
     return (
         Forecast(
@@ -1102,7 +1066,6 @@ def build_fixture() -> AtlasFixture:
         candidates=_candidates(),
         links=links,
         outcomes=_outcomes(),
-        positions=_positions(),
         forecasts=_forecasts(),
         graphs=_graphs(links),
         manifests=_manifests(),
