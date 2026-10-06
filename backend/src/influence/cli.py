@@ -20,10 +20,9 @@ validates the forecast on the completed laws and forecasts the named open laws' 
 (`data/laws/forecast.json`). `influence batch` runs collect and those steps over many laws, named
 or every procedure amended since a date, resumably, into `data/laws/batch.json`.
 `influence report <law> [<law> ...]` reads those files, without
-collecting, and writes the public report (`data/laws/report.md`). `influence submit` is
-the first brief's pairs command, kept until part 4 replaces it. Exit status: 0 when every
-output was written, 1 on any input, source or output failure, 2 on a command-line usage
-error.
+collecting, and writes the public report (`data/laws/report.md`). Exit status: 0 when
+every output was written, 1 on any input, source or output failure, 2 on a command-line
+usage error.
 """
 
 import argparse
@@ -106,12 +105,9 @@ from influence.services.report import (
     write_report,
 )
 from influence.services.setup import GROUPS, SetupError, SetupFile, SetupGroup, setup_data
-from influence.services.submission import SubmissionError, run_submission
 
 JEV_KEY_VARIABLE = "TYPESAFE_API_KEY"
 
-# The brief's hidden test supplies 60 amendment-submission pairs.
-EXPECTED_PAIRS = 60
 # Clusters `influence coordinated` prints; the file holds all of them.
 CLUSTERS_SHOWN = 10
 # Political groups and actors `influence directions` prints; the file holds all of them.
@@ -175,31 +171,6 @@ def _setup(data_root: Path | None, groups: tuple[SetupGroup, ...], *, refresh: b
         return 1
     print(f"Set up {root.absolute()} in {perf_counter() - started:.1f} s")
     _print_setup(root, done)
-    return 0
-
-
-def _submit(pairs: Path, out: Path, expected_pairs: int) -> int:
-    started = perf_counter()
-    try:
-        run = run_submission(pairs, out, expected_pairs)
-    except SubmissionError as error:
-        print(f"error: {error.summary}", file=sys.stderr)
-        for problem in error.problems:
-            print(f"  {problem}", file=sys.stderr)
-        print("Nothing was written. Fix the input (or its adapter) and rerun.", file=sys.stderr)
-        return 1
-    except OSError as error:
-        print(f"error: cannot write outputs in {out}: {error}", file=sys.stderr)
-        print(f"{out / 'pairs.csv'} was not replaced.", file=sys.stderr)
-        return 1
-    elapsed = perf_counter() - started
-    modes = Counter(item.comparison.mode for item in run.scored)
-    print(
-        f"Scored {len(run.scored)} pairs in {elapsed:.2f} s "
-        f"(comparison modes: edits {modes['edits']}, passages {modes['passages']})"
-    )
-    print(f"pairs.csv: {run.files.pairs_csv.absolute()}")
-    print(f"evidence:  {run.files.evidence.absolute()}")
     return 0
 
 
@@ -982,26 +953,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     report.add_argument(
         "--seed", type=int, default=DEFAULT_SEED, help=f"sample seed (default {DEFAULT_SEED})"
     )
-    submit = commands.add_parser(
-        "submit",
-        help="score supplied pairs into pairs.csv",
-        description="Score every supplied pair and write pairs.csv with its evidence.",
-    )
-    submit.add_argument(
-        "--pairs",
-        type=Path,
-        required=True,
-        help='JSON Lines file: {"pair_id", "amendment": {"old", "new"}, "submission": {...}}',
-    )
-    submit.add_argument(
-        "--out", type=Path, required=True, help="output directory, created when missing"
-    )
-    submit.add_argument(
-        "--expected-pairs",
-        type=_count,
-        default=EXPECTED_PAIRS,
-        help=f"exact number of pairs the input must hold (default {EXPECTED_PAIRS})",
-    )
     args = parser.parse_args(argv)
     if args.command == "setup":
         return _setup(
@@ -1070,14 +1021,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             cast("int", args.links),
             cast("int", args.seed),
         )
-    if args.command in after:
-        return _collect(
-            " ".join(cast("list[str]", args.query)),
-            cast("Path | None", args.data_root),
-            refresh=cast("bool", args.refresh),
-            attachments=not cast("bool", args.no_attachments),
-            then=after[cast("str", args.command)],
-        )
-    return _submit(
-        cast("Path", args.pairs), cast("Path", args.out), cast("int", args.expected_pairs)
+    return _collect(
+        " ".join(cast("list[str]", args.query)),
+        cast("Path | None", args.data_root),
+        refresh=cast("bool", args.refresh),
+        attachments=not cast("bool", args.no_attachments),
+        then=after[cast("str", args.command)],
     )

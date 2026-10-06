@@ -20,7 +20,7 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend submit setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
 	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense \
 	up down check-containers
@@ -123,14 +123,6 @@ batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 
 report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
 	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
 	$(BACKEND) influence report "$(LAW)" $(ARGS)
-
-# First brief only: the 19:00 pairs command. $(BACKEND) runs inside backend/, so paths are
-# made absolute here. EXPECTED_PAIRS is passed only when set, so the command's own default
-# (60) stays the one copy.
-submit:  ## Score PAIRS (JSON Lines) into OUT/pairs.csv: make submit PAIRS=<file> OUT=<dir>
-	$(if $(PAIRS),,$(error PAIRS is required: make submit PAIRS=<file> OUT=<dir>))
-	$(if $(OUT),,$(error OUT is required: make submit PAIRS=<file> OUT=<dir>))
-	$(BACKEND) influence submit --pairs "$(abspath $(PAIRS))" --out "$(abspath $(OUT))" $(if $(EXPECTED_PAIRS),--expected-pairs $(EXPECTED_PAIRS))
 
 # The snapshot is pinned to a commit and verified against recorded SHA-256 digests.
 fetch-lobbyplag:  ## Download and verify LobbyPlag's data into data/lobbyplag/ (needs network).

@@ -1,10 +1,8 @@
 """Unknown originals must never be reported as known empty redlines."""
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from influence.api import create_app
 from influence.schemas.comparison import ComparisonRequest, InputText
 from influence.services.comparison import compare_texts
 
@@ -59,28 +57,13 @@ def test_input_contract_reuses_scorer_bounds(text: str) -> None:
         InputText(old=None, new=text)
 
 
-def test_comparison_http_contract_without_dataset() -> None:
-    client = TestClient(create_app())
-    payload = {
-        "amendment": {"old": None, "new": "retain data"},
-        "submission": {"old": None, "new": "retain data"},
-    }
-    response = client.post("/api/v1/compare", json=payload)
-    assert response.status_code == 200
-    assert response.json()["mode"] == "passages"
-    assert response.json()["score"] == 1.0
-    assert client.post("/api/v1/compare", json={"amendment": {"new": "text"}}).status_code == 422
-
-
 @pytest.mark.parametrize("reverse", [False, True])
 def test_deletion_with_unknown_other_original_is_validation_error(reverse: bool) -> None:
     texts = [{"old": "deleted", "new": ""}, {"old": None, "new": "deleted"}]
     if reverse:
         texts.reverse()
-    client = TestClient(create_app())
-    response = client.post("/api/v1/compare", json={"amendment": texts[0], "submission": texts[1]})
-    assert response.status_code == 422
-    assert "Supply both originals" in response.text
+    with pytest.raises(ValidationError, match="Supply both originals"):
+        ComparisonRequest.model_validate({"amendment": texts[0], "submission": texts[1]})
 
 
 def test_known_deletions_still_compare() -> None:

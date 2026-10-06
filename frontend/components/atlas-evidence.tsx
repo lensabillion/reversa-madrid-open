@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { TextSpan } from "../lib/api";
 import { sourceContext } from "../lib/source-context";
-import { HighlightedText } from "./highlighted-text";
+import { HighlightedText, type TextSpan } from "./highlighted-text";
 
 /** Display-only props: the GraphSnapshot adapter supplies source excerpts and verdicts. */
 export interface AtlasExcerpt {

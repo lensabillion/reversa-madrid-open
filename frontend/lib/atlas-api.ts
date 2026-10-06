@@ -2,7 +2,7 @@ import type { AtlasBundle, AtlasSourceSpan } from "./atlas";
 
 /**
  * The Atlas read API: `GET /api/v1/atlas` lists the laws with a built Atlas run, and
- * `GET /api/v1/atlas/{slug}` returns one law's view. Like `lib/api.ts`, these types describe
+ * `GET /api/v1/atlas/{slug}` returns one law's view. These types describe
  * the backend's JSON; they are not a runtime decoder. `lib/atlas.ts` checks the bundle.
  */
 

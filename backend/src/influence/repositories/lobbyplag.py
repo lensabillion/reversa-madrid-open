@@ -16,10 +16,6 @@ class DatasetInvalidError(Exception):
     """A dataset failed schema or relational validation."""
 
 
-class EntityNotFoundError(Exception):
-    """The requested entity is absent from a valid dataset."""
-
-
 class RawRecord(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore", strict=True)
     uid: str = Field(min_length=1)
@@ -173,12 +169,6 @@ class DemoRepository:
             len(raw_candidates) - len(candidates),
             len(merged_tallies),
         )
-
-    def amendment(self, amendment_id: str) -> RawAmendment:
-        try:
-            return self.amendments[amendment_id]
-        except KeyError as error:
-            raise EntityNotFoundError(f"Unknown amendment {amendment_id}") from error
 
     def organization_for(self, proposal: RawProposal) -> RawOrganization:
         organization_id = self.documents[proposal.doc_uid].lobbyist

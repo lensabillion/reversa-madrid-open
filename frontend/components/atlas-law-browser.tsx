@@ -314,12 +314,6 @@ export function AtlasLawBrowser() {
           >
             Lineage explorer
           </Link>
-          <Link
-            href="/workspace"
-            className="rounded-sm px-3 py-2 text-xs font-medium text-stone-500 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-          >
-            Evidence workspace
-          </Link>
         </nav>
       </header>
       <nav

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import type { TextSpan } from "../lib/api";
+import type { TextSpan } from "../components/highlighted-text";
 import {
   CONTEXT_CODE_POINTS,
   MIN_OMITTED_CODE_POINTS,

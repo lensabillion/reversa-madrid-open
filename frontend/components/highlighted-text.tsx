@@ -1,4 +1,9 @@
-import type { TextSpan } from "../lib/api";
+/** A quoted stretch of a text; offsets count Unicode code points, not UTF-16 units. */
+export interface TextSpan {
+  start: number;
+  end: number;
+  text: string;
+}
 
 /** Merge overlapping evidence spans and retain the original text and Unicode offsets. */
 export function HighlightedText({

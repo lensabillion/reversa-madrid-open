@@ -1,4 +1,4 @@
-import type { TextSpan } from "./api";
+import type { TextSpan } from "../components/highlighted-text";
 
 /** Code points of context kept on each side of a cited span (about nine lines in one column). */
 export const CONTEXT_CODE_POINTS = 300;
