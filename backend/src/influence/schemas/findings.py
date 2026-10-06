@@ -1,8 +1,8 @@
 """The report's five questions for one law, as data the explorer's Outcomes tab can show.
 
-`influence report` writes these answers as Markdown; `GET /api/v1/atlas/{slug}/findings`
-returns the same lines, split into a headline, details, evidence references and the
-limitation, so the explorer and the report never disagree on a number.
+`influence report` writes these answers as Markdown; `report.law_findings` returns the
+same lines, split into a headline, details, evidence references and the limitation, so
+a reader of the data and the report never disagree on a number.
 """
 
 from typing import Literal

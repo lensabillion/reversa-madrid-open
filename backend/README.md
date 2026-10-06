@@ -206,7 +206,7 @@ formats (`tests/test_collect.py`, 50 tests). It has not been run on real sources
 cloud session that wrote it, whose network policy blocks the EU hosts, so its real-data
 counts and timings are not measured yet.
 
-## Atlas Command and View API (Parts 3 to 8)
+## Atlas Command (Parts 3 to 7)
 
 `influence atlas <law>` (`make atlas LAW='2021/0106(COD)'`) runs `influence collect`, then
 `services/pipeline.py` over the collected bundle, then writes `atlas.json` beside it. It
@@ -227,14 +227,9 @@ adds no logic of its own; it calls each part's code in order:
 | Counts | `services/atlas_analysis.py`, final-act rows in its order | `rankings` |
 | Mode labels | `services/modes.py` from the law's typed coverage and status | `modes` |
 
-The view keeps every record the shown links reach and nothing else, so the frontend
-adapter (`frontend/lib/atlas.ts`) re-validates exactly what the graph shows.
-
-| Endpoint | Answer |
-| --- | --- |
-| `GET /api/v1/atlas` | `{"laws": [{slug, procedure_id, title, run_id, published_links, cross_group_clusters}]}` for every law with an `atlas.json`. `cross_group_clusters` counts the clusters of the law's `coordinated.json` that span political groups, and is `null` when the law has no such file (not computed, which is not zero). 500 when a view or a clusters file on disk is invalid |
-| `GET /api/v1/atlas/{slug}` | The `AtlasView` (`schemas/atlas_view.py`, `atlas-view-1`): `coverage`, `modes`, `bundle` with the keys of the frontend's `AtlasBundle` (`documentTexts` in camelCase), `snapshot`, `rankings`, `limitations`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
-| `GET /api/v1/atlas/{slug}/coordinated` | The `CoordinatedView` (`schemas/coordinated.py`), field names in snake_case: `counts`, `clusters` (each with `cross_group`, `political_groups`, `members` and their quoted `inserted` spans), the method's thresholds and `limitations`. 404 when the law has no `coordinated.json`; 422 for a malformed slug; 500 when the file on disk is invalid |
+The view keeps every record the shown links reach and nothing else. Nothing serves it over
+HTTP since 6 October 2026: `make forecast`, `make directions`, `make report`, `make batch`
+and the blind audit read `atlas.json` from disk.
 
 `modes` holds the mode labels of [the plan, section 6](../docs/plan.md#6-typed-partial-results):
 what a gap in the law's layers means for a reader. Each is derived from the coverage rows
@@ -591,7 +586,6 @@ when run through `make`. Tested offline (`tests/test_report.py`); not yet run on
 | Method and path | Result |
 | --- | --- |
 | `GET /health` | `{"status": "ok", "version": ...}`; reads no data |
-| `GET /api/v1/atlas`, `GET /api/v1/atlas/{slug}`, `GET /api/v1/atlas/{slug}/coordinated` | The Atlas views: see "Atlas Command and View API" |
 | `GET /api/v1/lineage`, `GET /api/v1/lineage/{slug}` | The lineage views: see "Lineage View API" |
 
 A slug without a written view answers 404 with the command that builds it; an unreadable
@@ -872,7 +866,7 @@ cd backend
 uv run --locked python benchmarks/lineage_jev.py --law ../data/laws/2021-0106-COD            # dry run, no call
 uv run --locked python benchmarks/lineage_jev.py --law ../data/laws/2021-0106-COD \
   --execute --env-file .env --max-cost-usd 1                                                   # calls Jev
-# Verbatim + Jev links -> data/laws/<slug>/atlas.json, served at /atlas unchanged.
+# Verbatim + Jev links -> data/laws/<slug>/atlas.json, in the atlas-view-1 shape.
 uv run --locked python benchmarks/lineage_view.py --law ../data/laws/2021-0106-COD
 ```
 

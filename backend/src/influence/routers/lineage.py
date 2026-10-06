@@ -1,17 +1,25 @@
 """Read-only lineage views: the laws `influence lineage` has built, and one law's view."""
 
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import Path as PathParameter
 
-from influence.routers.atlas import DataRoot
 from influence.schemas.atlas_view import SLUG_PATTERN
 from influence.schemas.lineage import LineageLawList, LineageView
 from influence.services.lineage_views import list_lineage_views, read_lineage_view
 from influence.services.pipeline import PipelineError
 
 router = APIRouter(prefix="/api/v1")
+
+
+def get_data_root(request: Request) -> Path:
+    """The law bundles' root, set on the app by `create_app`."""
+    return cast("Path", request.app.state.atlas_data_root)
+
+
+DataRoot = Annotated[Path, Depends(get_data_root)]
 
 
 @router.get("/lineage")

@@ -35,10 +35,6 @@ def test_only_view_routes_remain() -> None:
 
     assert set(paths) == {
         "/health",
-        "/api/v1/atlas",
-        "/api/v1/atlas/{slug}",
-        "/api/v1/atlas/{slug}/coordinated",
-        "/api/v1/atlas/{slug}/findings",
         "/api/v1/lineage",
         "/api/v1/lineage/{slug}",
     }
@@ -48,11 +44,11 @@ def test_only_view_routes_remain() -> None:
 def test_cors_allows_only_local_frontend() -> None:
     client = TestClient(create_app())
     local = client.options(
-        "/api/v1/atlas",
+        "/api/v1/lineage",
         headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
     )
     external = client.options(
-        "/api/v1/atlas",
+        "/api/v1/lineage",
         headers={"Origin": "https://example.com", "Access-Control-Request-Method": "GET"},
     )
 

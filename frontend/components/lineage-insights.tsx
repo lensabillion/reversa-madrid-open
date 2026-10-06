@@ -11,9 +11,9 @@ import {
   type OrganisationRanking,
   type OrganisationRow,
 } from "../lib/lineage-insights";
-import { retryStyle } from "./atlas-law-browser";
 import { KindBadge, KindLegend, KindSplitBar, kindStyle } from "./lineage-kind";
 import type { LawTab } from "./lineage-law-browser";
+import { retryStyle } from "./view-state";
 
 const count = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 });

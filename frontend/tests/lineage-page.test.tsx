@@ -416,7 +416,6 @@ test("an unreachable API fails the law list and the law explicitly, and Retry re
   fireEvent.click(screen.getByRole("button", { name: "Retry law" }));
   await openTab("Evidence");
   expect(await screen.findByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
-  expect(screen.getByRole("link", { name: "Atlas explorer" }).getAttribute("href")).toBe("/atlas");
 });
 
 test("choosing the open law again adds no history entry", async () => {

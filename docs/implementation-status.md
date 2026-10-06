@@ -353,7 +353,7 @@ Open decisions are not settled until the project owner agrees.
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
 | Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
 | Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |
-| The explorer reads the lineage view (`/lineage`), not the Atlas view | Asked by the owner 2026-10-03; decided when the owner merges the PR (bead `rev-658l`) | Lineage starts from the final law, so every shown claim is wording that reached the law; `/atlas` and `make atlas` stay until a separate change removes them |
+| The explorer reads the lineage view (`/lineage`), not the Atlas view | Decided 2026-10-03 (bead `rev-658l`); the `/atlas` page and the `/api/v1/atlas` routes were removed 2026-10-06 (bead `rev-x7bn`) | Lineage starts from the final law, so every shown claim is wording that reached the law. `make atlas` and `atlas.json` stay because the forecast, the report, the actor directions and the blind audit read them; whether that pipeline stays is a separate, open decision |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |
@@ -716,3 +716,12 @@ now serves `/health` and the Atlas and lineage views only, all `GET`. Kept becau
 Atlas imports them: `services/scoring.py` and `services/comparison.py` (part 4's lexical
 signal and the practice harness), `services/documents.py` (part 1's attachment
 extraction) and `repositories/lobbyplag.py` (the practice loop's labels).
+
+## Atlas Page Removed — 6 October 2026
+
+The ask-first explorer page `/atlas`, its components and libraries (6,900 lines), the
+`/api/v1/atlas` routes and the `explorer:` line `make atlas` printed are gone (bead
+`rev-x7bn`). "Atlas" now names the product only. The lineage page keeps the four pieces it
+shared with that code, moved into `lib/api-client.ts`, `lib/coverage.ts`,
+`lib/source-span.ts` and `components/view-state.tsx`. `make atlas` and `atlas.json`
+stay as inputs of the forecast, the report, the actor directions and the blind audit.

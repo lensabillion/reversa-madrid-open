@@ -1,4 +1,3 @@
-import type { AtlasSourceSpan } from "./atlas";
 import type {
   AmendmentAdoptionRecord,
   CreditRecord,
@@ -7,6 +6,7 @@ import type {
   LineageView,
   OriginMatchRecord,
 } from "./lineage-api";
+import type { SourceSpan } from "./source-span";
 
 /** An amendment that carries a phrase; adoption details exist only for adopted wording. */
 export interface LineageAmendmentRow {
@@ -29,7 +29,7 @@ export interface LineageOriginRow {
   /** `null` for a citizen or an unnamed attachment: the explorer never invents a name. */
   organisation: string | null;
   publishedAt: string | null;
-  quote: AtlasSourceSpan;
+  quote: SourceSpan;
   words: number;
   precedes: boolean | null;
   isCitation: boolean;
@@ -46,7 +46,7 @@ export interface LineagePhraseRow {
   /** Folded words; the quotations keep the original casing and punctuation. */
   text: string;
   words: number;
-  finalQuotes: readonly AtlasSourceSpan[];
+  finalQuotes: readonly SourceSpan[];
   amendments: readonly LineageAmendmentRow[];
   origins: readonly LineageOriginRow[];
   /** At least one origin counts: a dated document that came first and is not a citation. */

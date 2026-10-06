@@ -1,4 +1,4 @@
-"""Feed the existing explorer (`/atlas`) with lineage instead of part 3's BM25 verdicts.
+"""Build an `atlas.json` from lineage instead of part 3's BM25 verdicts.
 
 Two kinds of link, both from a consultation passage's ask to an amendment whose inserted
 wording reached the final act (`lineage.adopt`):
@@ -12,8 +12,8 @@ wording reached the final act (`lineage.adopt`):
 
 Everything after the links (outcomes, bundle, graph, rankings) is the pipeline's own code:
 `build_view` runs with its candidate search and verdicts replaced by these links, so the
-explorer needs no change. The file it writes is the same `atlas.json` that
-`GET /api/v1/atlas/{slug}` serves.
+forecast, the report and the actor directions need no change. The file it writes is the
+same `atlas.json` that `make atlas` writes.
 
 From backend: uv run --locked python benchmarks/lineage_view.py --law ../data/laws/2021-0106-COD
 """

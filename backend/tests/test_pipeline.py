@@ -12,7 +12,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from test_collect import FEEDBACK, World, make_world, scripted_cli
 from test_collect import LATER as OTHER_LAW
 from test_collect import RECENT as RECENT_DAY
@@ -20,7 +19,6 @@ from test_hys import Json, as_json, feedback, feedback_page
 from test_parltrack import Record, committee_record, mep_record, write_dump
 
 from influence import cli
-from influence.api import create_app
 from influence.extraction.records import StageStore
 from influence.repositories import hys
 from influence.schemas.atlas import (
@@ -31,6 +29,7 @@ from influence.schemas.atlas import (
     id_part,
     span_matches,
 )
+from influence.schemas.atlas_view import AtlasLawList
 from influence.schemas.scoring import MAX_TOKENS, TOKEN_PATTERN
 from influence.services import assessment, modes, pipeline
 from influence.services.pipeline import PipelineError
@@ -354,30 +353,30 @@ def test_an_mep_missing_from_the_dump_still_has_an_identity(tmp_path: Path) -> N
     assert result.manifest.stages[1].counts["meps_not_in_dump"] == 1
 
 
-# --- The API --------------------------------------------------------------------------------
+# --- The written view ----------------------------------------------------------------------
 
 
-def built(tmp_path: Path) -> TestClient:
+def built(tmp_path: Path) -> Path:
     world = matching_world(tmp_path)
     result = world.collect()
     view = pipeline.build_view(
         pipeline.load_collected(result.bundle), generated_at=LATER, publish_prose=True
     )
     pipeline.write_view(view, result.bundle)
-    return TestClient(create_app(atlas_data_root=tmp_path))
+    return tmp_path
 
 
-def test_the_api_lists_built_laws_and_serves_a_view(tmp_path: Path) -> None:
-    client = built(tmp_path)
+def test_the_written_view_is_listed_and_read_back(tmp_path: Path) -> None:
+    root = built(tmp_path)
 
-    listing = client.get("/api/v1/atlas")
-    view = client.get(f"/api/v1/atlas/{SLUG}")
+    listing = pipeline.list_views(root)
+    view = pipeline.read_view(root, SLUG)
 
-    assert listing.status_code == 200
-    assert listing.json()["laws"][0]["slug"] == SLUG
-    assert listing.json()["laws"][0]["cross_group_clusters"] is None
-    assert view.status_code == 200
-    body = view.json()
+    assert listing.laws[0].slug == SLUG
+    assert listing.laws[0].cross_group_clusters is None
+    assert view is not None
+    # The JSON shape, as the file holds it and the forecast and report read it.
+    body = json.loads(view.model_dump_json(by_alias=True))
     assert body["modes"] == []
     assert set(body["bundle"]) == {
         "laws",
@@ -394,30 +393,25 @@ def test_the_api_lists_built_laws_and_serves_a_view(tmp_path: Path) -> None:
     assert LawRecord.model_validate(body["bundle"]["laws"][0]).procedure_id == AI_ACT
 
 
-def test_the_api_answers_unknown_malformed_and_broken_views(tmp_path: Path) -> None:
-    client = TestClient(create_app(atlas_data_root=tmp_path))
-
-    assert client.get("/api/v1/atlas").json() == {"laws": [], "invalid": []}
-    missing = client.get("/api/v1/atlas/2099-0001-COD")
-    assert missing.status_code == 404
-    assert "make atlas" in missing.json()["detail"]
-    assert client.get("/api/v1/atlas/not-a-law").status_code == 422
+def test_reading_unknown_and_broken_views(tmp_path: Path) -> None:
+    assert pipeline.list_views(tmp_path) == AtlasLawList(laws=(), invalid=())
+    assert pipeline.read_view(tmp_path, "2099-0001-COD") is None
     (tmp_path / "laws" / SLUG).mkdir(parents=True)
     (tmp_path / "laws" / SLUG / pipeline.VIEW_FILE).write_text("{}")
-    assert client.get(f"/api/v1/atlas/{SLUG}").status_code == 500
-    # Regression: one invalid view made the list a 500 for every law. It is listed apart.
-    listing = client.get("/api/v1/atlas")
-    assert listing.status_code == 200
-    assert listing.json()["laws"] == []
-    (invalid,) = listing.json()["invalid"]
-    assert invalid["slug"] == SLUG
-    assert "is invalid" in invalid["reason"]
+    with pytest.raises(PipelineError):
+        pipeline.read_view(tmp_path, SLUG)
+    # Regression: one invalid view hid every other law from the list. It is listed apart.
+    listing = pipeline.list_views(tmp_path)
+    assert listing.laws == ()
+    (invalid,) = listing.invalid
+    assert invalid.slug == SLUG
+    assert "is invalid" in invalid.reason
 
 
 # --- The command ----------------------------------------------------------------------------
 
 
-def test_the_atlas_command_collects_builds_and_points_at_the_explorer(
+def test_the_atlas_command_collects_and_builds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = matching_world(tmp_path)
@@ -429,7 +423,6 @@ def test_the_atlas_command_collects_builds_and_points_at_the_explorer(
     assert status == 0
     # The command does not publish prose matches: the match is shown as unconfirmed.
     assert "Atlas: 0 published, 1 unconfirmed" in output
-    assert f"explorer: http://localhost:3000/atlas?law={SLUG}" in output
     assert pipeline.read_view(tmp_path, SLUG) is not None
 
 
@@ -731,16 +724,15 @@ def test_only_a_view_of_another_run_or_an_unreadable_one_is_removed(tmp_path: Pa
 
 
 def test_one_invalid_view_does_not_hide_the_valid_ones(tmp_path: Path) -> None:
-    client = built(tmp_path)
-    broken = tmp_path / "laws" / "2099-0001-COD"
+    root = built(tmp_path)
+    broken = root / "laws" / "2099-0001-COD"
     broken.mkdir()
     (broken / pipeline.VIEW_FILE).write_text("{}")
 
-    listing = client.get("/api/v1/atlas")
+    listing = pipeline.list_views(root)
 
-    assert listing.status_code == 200
-    assert [law["slug"] for law in listing.json()["laws"]] == [SLUG]
-    assert [entry["slug"] for entry in listing.json()["invalid"]] == ["2099-0001-COD"]
+    assert [law.slug for law in listing.laws] == [SLUG]
+    assert [entry.slug for entry in listing.invalid] == ["2099-0001-COD"]
 
 
 # --- Part 4's inputs from part 3: the ask's direction and the proposal's wording -----------
