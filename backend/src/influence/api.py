@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from influence.extraction.cli import default_data_root
+from influence.logging_setup import configure_logging
 from influence.routers import health, lineage
 
 # Installed metadata makes pyproject.toml the single source for the API version.
@@ -23,6 +24,8 @@ def create_app(atlas_data_root: Path | None = None) -> FastAPI:
     `INFLUENCE_DATA_ROOT` or the repository's `data/`, as the commands do. Every route
     reads; nothing is written through HTTP.
     """
+    # First, so a wrong INFLUENCE_LOG_LEVEL stops startup before anything is served.
+    configure_logging()
     app = FastAPI(title="Influence Atlas API", version=VERSION)
     app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_methods=("GET",))
     app.state.atlas_data_root = atlas_data_root or default_data_root()
