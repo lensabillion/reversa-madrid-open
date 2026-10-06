@@ -40,6 +40,13 @@ make channels LAW='AI Act'        # how the law was lobbied: consultation, timin
 make directions LAW='AI Act'      # which way each amendment moves the law
 ```
 
+With Docker installed, one command builds and serves the API and the explorer:
+
+```sh
+make up                                # http://localhost:3000, reading data/
+INFLUENCE_DATA=./mock-data make up     # the committed snapshots instead of data/
+```
+
 `LAW` takes a procedure number (`2021/0106(COD)`), a CELEX or COM reference, a common
 name (`'AI Act'`, `'DSA'`) or a title. Every output is written under
 `data/laws/<procedure>/` (for the AI Act, `data/laws/2021-0106-COD/`): `atlas.json`,

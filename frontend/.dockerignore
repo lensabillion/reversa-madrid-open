@@ -1,0 +1,6 @@
+# The build installs its own node_modules and writes its own .next; tests and docs are
+# not part of the served application.
+node_modules
+.next
+tests
+*.md

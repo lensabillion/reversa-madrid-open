@@ -1,0 +1,15 @@
+# Only pyproject.toml, uv.lock, .python-version and src/ are copied into the image; this
+# keeps the build context small and, above all, keeps .env (the Jev key) out of it.
+.env
+.env.*
+.venv
+.coverage
+.hypothesis
+.pytest_cache
+.ruff_cache
+__pycache__
+benchmarks
+evaluation
+models
+tests
+validation
