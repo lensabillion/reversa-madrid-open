@@ -52,6 +52,11 @@ export interface GraphOptions {
   semantic: boolean;
 }
 
+export interface GraphScope extends GraphOptions {
+  focus: GraphFocus;
+  limit: number;
+}
+
 /** `art:32024R1689:article-99-11` → `Art. 99(11)`; `recital-3` → `Recital 3`. */
 export function provisionLabel(recordId: string): string {
   const local = recordId.split(":").at(-1) ?? recordId;
@@ -95,6 +100,9 @@ function tablersOf(
   }
   if (level === "group") {
     const groups = new Set(adoption.author_groups.map((group) => group ?? "Group unknown"));
+    if (groups.size === 0) {
+      groups.add("Group unknown");
+    }
     return [...groups].map((group) => ({
       id: `tabler:group:${group}`,
       label: group,
@@ -227,7 +235,22 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
     const claimsInFocus = focusClaims;
     edges = graph.edges.flatMap((edge) => {
       const shared = edge.claimIds.filter((id) => claimsInFocus.has(id));
-      return shared.length === 0 ? [] : [{ ...edge, claimIds: shared }];
+      return shared.length === 0
+        ? []
+        : [
+            {
+              ...edge,
+              claimIds: shared,
+              phraseIds: [
+                ...new Set(
+                  shared.flatMap((id) => {
+                    const claim = graph.claims.get(id);
+                    return claim === undefined ? [] : [claim.phraseId];
+                  }),
+                ),
+              ].sort(),
+            },
+          ];
     });
     if (focus.kind === "node") {
       // Keep paths through the focused node: on its own column, only itself.
@@ -278,7 +301,7 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
   return {
     columns,
     edges: drawn,
-    claimIds: [...(focusClaims ?? new Set(drawn.flatMap((edge) => edge.claimIds)))].sort(),
+    claimIds: completeRenderedClaims(graph, drawn),
     phraseIds: [
       ...new Set(
         drawn
@@ -290,4 +313,62 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
       ),
     ].sort(),
   };
+}
+
+/**
+ * A claim is visible only if both edges of its path survive the scope and clipping,
+ * through the same tabler. Linear in rendered edge/support memberships plus
+ * O(n log n) sorting of visible support IDs; bounded by one saved law view.
+ */
+function completeRenderedClaims(graph: LineageGraph, edges: readonly GraphEdge[]): string[] {
+  const starts = new Map<string, Set<string>>();
+  const finishes = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    const source = graph.nodes.get(edge.source)?.column;
+    const target = graph.nodes.get(edge.target)?.column;
+    const matches =
+      source === "organisation" && target === "tabler"
+        ? starts
+        : source === "tabler" && target === "provision"
+          ? finishes
+          : null;
+    if (matches === null) {
+      continue;
+    }
+    const tabler = source === "tabler" ? edge.source : edge.target;
+    for (const id of edge.claimIds) {
+      const seen = matches.get(id) ?? new Set<string>();
+      seen.add(tabler);
+      matches.set(id, seen);
+    }
+  }
+  return [...starts]
+    .filter(([id, tablers]) => [...tablers].some((tabler) => finishes.get(id)?.has(tabler)))
+    .map(([id]) => id)
+    .sort();
+}
+
+/** The graph and sample both consume this exact rendered-path selection. */
+export function visibleClaims(
+  graph: LineageGraph,
+  slice: GraphSlice,
+): readonly SupportedLineageClaim[] {
+  return slice.claimIds.flatMap((id) => {
+    const claim = graph.claims.get(id);
+    return claim === undefined ? [] : [claim];
+  });
+}
+
+export function describeGraphScope(scope: GraphScope, graph: LineageGraph): string {
+  const methods =
+    [scope.lexical ? "lexical" : null, scope.semantic ? "semantic" : null]
+      .filter((method) => method !== null)
+      .join(" + ") || "no methods";
+  const focus =
+    scope.focus === null
+      ? "overview"
+      : scope.focus.kind === "node"
+        ? (graph.nodes.get(scope.focus.id)?.label ?? scope.focus.id)
+        : scope.focus.id;
+  return `${methods} · ${scope.tablers === "group" ? "political groups" : "Members"} · ${focus} · up to ${scope.limit} nodes per column`;
 }

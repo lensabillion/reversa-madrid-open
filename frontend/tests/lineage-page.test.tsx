@@ -188,13 +188,39 @@ test("the tabled tab, the evidence filter and the search change which phrases ar
   expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
 });
 
-test("sampling is explicitly unavailable during support integration", async () => {
+test("sample uses the graph scope and one claim per coauthored support", async () => {
   window.history.replaceState(null, "", `/lineage?law=${slug}`);
   serve(view);
+  vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
+    if (array instanceof Uint32Array) {
+      array[0] = 42;
+    }
+    return array;
+  });
   render(<LineagePage />);
+  await openTab("Graph");
+  fireEvent.click(screen.getByRole("radio", { name: "Members" }));
+  fireEvent.click(screen.getByRole("button", { name: /Acme Unknown Lobby: 1 phrases/ }));
   await openTab("Check 3 links");
-  expect(screen.getByText(/Carrier-supported inspection sampling is unavailable/)).toBeDefined();
-  expect(screen.queryByRole("button", { name: "Draw 3 links" })).toBeNull();
+  expect(screen.getByText(/1 of 1 displayed experimental associations/)).toBeDefined();
+  expect(screen.getByText(/Graph scope:/).textContent).toContain("Members");
+  expect(screen.getByText(/Graph scope:/).textContent).toContain("Acme Unknown Lobby");
+  fireEvent.click(screen.getByRole("button", { name: "Draw 3 links" }));
+  expect(screen.getByText(/Seed 42/)).toBeDefined();
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  await openTab("Graph");
+  expect((screen.getByRole("radio", { name: "Members" }) as HTMLInputElement).checked).toBe(true);
+  await openTab("Check 3 links");
+  expect(screen.getByText(/Seed 42/)).toBeDefined();
+  await openTab("Graph");
+  fireEvent.click(screen.getByRole("checkbox", { name: "Lexical lines" }));
+  await openTab("Check 3 links");
+  expect(screen.getByText(/0 of 0 displayed experimental associations/)).toBeDefined();
+  expect(screen.queryByRole("article")).toBeNull();
+  expect(screen.queryByText(/Seed 42/)).toBeNull();
+  expect((screen.getByRole("button", { name: "Draw 3 links" }) as HTMLButtonElement).disabled).toBe(
+    true,
+  );
 });
 
 test("a long list is paged, and an undated or citing submission is labelled as such", async () => {
@@ -499,4 +525,9 @@ test("legacy carrier evidence is unavailable but saved quotations remain inspect
   await openTab("Evidence");
   expect(await screen.findByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
   expect(screen.getAllByRole("blockquote")).toHaveLength(2);
+  await openTab("Check 3 links");
+  expect(
+    screen.getAllByText(/This legacy snapshot lacks carrier-specific evidence/).length,
+  ).toBeGreaterThan(0);
+  expect(screen.queryByRole("button", { name: "Draw 3 links" })).toBeNull();
 });

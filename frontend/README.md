@@ -113,13 +113,16 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   apart from word-for-word ones. Only matches dated before the amendment count, and the view
   keeps only those, so no tile repeats that constant 100%.
 - **Graph** (`buildLineageGraph`, `sliceGraph`, `components/lineage-graph.tsx`): organisation
-  → who tabled the amendment (political groups, or Members) → final-act provision, drawn
-  from adopted wording an organisation said first. The overview shows the 12 largest nodes
-  per column; clicking a node or a line keeps only the paths that share its phrases and
-  lists their evidence. Teal lines are lexical, dashed violet ones semantic.
-- **Check three links at random** (`drawLinks`): the jury's check built in. It draws three
-  adopted phrases a submission said first, with a seeded generator whose seed is shown, so a
-  draw can be repeated.
+  → exact amendment tabler → final-act occurrence. Each saved support ID identifies one
+  experimental association. The overview shows the 12 largest nodes per column; focus uses
+  support IDs rather than merged phrase IDs. Methods, tabler level, focus and node limit are
+  shared with the inspection sample. Legacy snapshots without carrier supports remain
+  inspectable in Evidence; their current graph and organisation associations are unavailable.
+- **Check three associations** (`visibleClaims`, `drawClaims`): draws up to three of the
+  associations with a complete rendered organisation → tabler → final path after method
+  filters, focus and node clipping. A coauthored support counts once. Stable support-ID
+  ordering and a seeded Fisher–Yates draw make the sample reproducible; the seed and scope
+  are displayed, and changing scope clears the draw. Inspection is not an accuracy audit.
 
 - `app/lineage/page.tsx`: the route; a Suspense boundary lets the shell prerender
 - `components/lineage-law-browser.tsx`: law selector, URL state, the view, every state

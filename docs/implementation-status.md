@@ -27,6 +27,20 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Sampling the Displayed Associations — 7 October 2026
+
+R5 (`rev-ha8p`) shares graph method/tabler/focus settings and node clipping with the
+random-check tab. Its unit is a unique support identifier with a complete rendered
+organisation → same tabler → final-provision path. Coauthors do not multiply its selection
+probability. Sorting identifiers before a seeded shuffle makes the draw reproducible;
+the UI shows the population, sample size, seed and scope. Scope changes reset the draw.
+Unsupported legacy claims remain unavailable. This sample is for inspection, not a
+precision estimate or an independent audit.
+
+The frontend gate passed 84 tests in seven files, Biome, strict types and a production
+build. Independent Astra review checked complete paths, clipping, focus, deduplication and
+refresh lifecycle. Semantic support integration remains the separately tested R3 layer.
+
 ### Exact Lexical Carrier Evidence — 7 October 2026
 
 The R2 backend repair (`rev-0q9m`) emits `lineage-2`: accepted amendment/final runs and

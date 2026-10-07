@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { LineageCreditTable, LineagePhraseRow, PreparedLineage } from "../lib/lineage";
+import type { LineageCreditTable, PreparedLineage, SupportedLineageClaim } from "../lib/lineage";
 import type { LineageView } from "../lib/lineage-api";
 import {
   type ChannelCount,
-  drawLinks,
+  drawClaims,
   type FunnelStep,
   type LineageChannels,
   type OrganisationRanking,
@@ -634,20 +634,25 @@ function randomSeed(): number {
 }
 
 /**
- * The jury's check, built in: draw three published links at random and read each one's
+ * The jury's check, built in: draw up to three displayed experimental associations and read each one's
  * submission, amendment and final wording side by side. The seed is shown so a draw can be
- * repeated; `renderLink` draws the same card the evidence list uses.
+ * repeated; `renderLink` draws the exact support card the focused graph uses.
  */
 export function LinkCheck({
   pool,
   renderLink,
+  scopeLabel,
+  seed,
+  onSeed,
 }: {
-  pool: readonly LineagePhraseRow[];
-  renderLink: (phrase: LineagePhraseRow) => React.ReactNode;
+  pool: readonly SupportedLineageClaim[];
+  scopeLabel: string;
+  seed: number | null;
+  onSeed: (seed: number) => void;
+  renderLink: (claim: SupportedLineageClaim) => React.ReactNode;
 }) {
-  const [seed, setSeed] = useState<number | null>(null);
   const drawn = useMemo(
-    () => (seed === null ? [] : drawLinks(pool, LINKS_DRAWN, seed)),
+    () => (seed === null ? [] : drawClaims(pool, LINKS_DRAWN, seed)),
     [pool, seed],
   );
   return (
@@ -658,15 +663,16 @@ export function LinkCheck({
             Inspect three experimental associations
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-stone-600">
-            Draws {LINKS_DRAWN} of the {count.format(pool.length)} adopted phrases a submission said
-            word for word before the amendments: what the organisation asked, the amendment that
-            carried it, and the final act, side by side. This inspection is not an accuracy audit.
+            {Math.min(LINKS_DRAWN, pool.length)} of {count.format(pool.length)} displayed
+            experimental associations. Each saved support counts once, including coauthored
+            amendments. This inspection is not an accuracy audit.
           </p>
+          <p className="text-xs text-stone-500">Graph scope: {scopeLabel}</p>
         </div>
         <button
           type="button"
           disabled={pool.length === 0}
-          onClick={() => setSeed(randomSeed())}
+          onClick={() => onSeed(randomSeed())}
           className="rounded-sm bg-teal-900 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:bg-stone-300"
         >
           {seed === null ? `Draw ${LINKS_DRAWN} links` : "Draw again"}
@@ -674,8 +680,7 @@ export function LinkCheck({
       </div>
       {pool.length === 0 && (
         <p className="text-sm text-stone-600">
-          No adopted phrase has a submission dated before its amendments, so there is no link to
-          draw.
+          No complete association path is visible in this graph scope, so there is nothing to draw.
         </p>
       )}
       {seed !== null && (

@@ -22,6 +22,15 @@ import {
   readLineageView,
 } from "../lib/lineage-api";
 import {
+  buildLineageGraph,
+  describeGraphScope,
+  type GraphScope,
+  type GraphSlice,
+  type LineageGraph,
+  sliceGraph,
+  visibleClaims,
+} from "../lib/lineage-graph";
+import {
   anyPhrase,
   filterPhrases,
   type LineageChannels,
@@ -34,11 +43,12 @@ import {
 } from "../lib/lineage-insights";
 import type { SourceSpan } from "../lib/source-span";
 import { useResource } from "../lib/use-resource";
-import { LineageGraphExplorer } from "./lineage-graph";
+import { GRAPH_NODES_PER_COLUMN, LineageGraphExplorer } from "./lineage-graph";
 import {
   Channels,
   FiveQuestions,
   LineageFunnel,
+  LinkCheck,
   questionsFor,
   WhoShaped,
 } from "./lineage-insights";
@@ -511,6 +521,8 @@ type Prepared =
       lineage: PreparedLineage;
       organisations: OrganisationRanking;
       channels: LineageChannels;
+      graph: LineageGraph;
+      slice: GraphSlice;
     }
   | { ok: false; error: string };
 
@@ -519,11 +531,26 @@ export type LawTab = "summary" | "who" | "how" | "graph" | "evidence" | "check" 
 
 function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
   const [tab, setTab] = useState<LawTab>("summary");
+  const [scope, setScope] = useState<GraphScope>({
+    tablers: "group",
+    lexical: true,
+    semantic: true,
+    focus: null,
+    limit: GRAPH_NODES_PER_COLUMN,
+  });
+  const [inspectionSeed, setInspectionSeed] = useState<number | null>(null);
+  function changeScope(next: GraphScope) {
+    setScope(next);
+    setInspectionSeed(null);
+  }
   const prepared = useMemo<Prepared>(() => {
     try {
       const lineage = prepareLineage(view);
+      const graph = buildLineageGraph(view, scope);
       return {
         ok: true,
+        graph,
+        slice: sliceGraph(graph, scope.focus, scope.limit),
         lineage,
         organisations: rankOrganisations(view),
         channels: lineageChannels(view),
@@ -531,7 +558,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
     } catch (error: unknown) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [view]);
+  }, [view, scope]);
   if (!prepared.ok) {
     return (
       <StateMessage announce="alert" title={`The lineage data for ${view.title} is invalid`}>
@@ -547,7 +574,8 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       </StateMessage>
     );
   }
-  const { lineage, organisations, channels } = prepared;
+  const { lineage, organisations, channels, graph, slice } = prepared;
+  const pool = visibleClaims(graph, slice);
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
@@ -630,18 +658,28 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
         {tab === "how" && <Channels channels={channels} />}
         {tab === "graph" && (
           <LineageGraphExplorer
-            view={view}
+            graph={graph}
+            slice={slice}
+            scope={scope}
+            onScopeChange={changeScope}
             renderClaim={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
           />
         )}
         {tab === "evidence" && <Phrases lineage={lineage} />}
-        {tab === "check" && (
-          <p role="status" className="text-sm leading-6 text-amber-900">
-            Carrier-supported inspection sampling is unavailable until it uses the displayed graph's
-            support IDs and scope. Saved quotations remain inspectable in Evidence; this is not a
-            completed accuracy audit.
-          </p>
-        )}
+        {tab === "check" &&
+          (graph.unavailableReason !== null ? (
+            <p role="status" className="text-sm leading-6 text-amber-900">
+              {graph.unavailableReason}
+            </p>
+          ) : (
+            <LinkCheck
+              seed={inspectionSeed}
+              onSeed={setInspectionSeed}
+              pool={pool}
+              scopeLabel={describeGraphScope(scope, graph)}
+              renderLink={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+            />
+          ))}
         {tab === "method" && <LineageMethod view={view} />}
       </div>
       <details

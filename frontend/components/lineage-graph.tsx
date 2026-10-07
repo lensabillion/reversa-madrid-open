@@ -1,17 +1,16 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { SupportedLineageClaim } from "../lib/lineage";
-import type { LineageView } from "../lib/lineage-api";
 import {
-  buildLineageGraph,
   type GraphColumn,
   type GraphEdge,
   type GraphFocus,
   type GraphNode,
+  type GraphScope,
+  type GraphSlice,
   graphColumns,
-  sliceGraph,
-  type TablerLevel,
+  type LineageGraph,
 } from "../lib/lineage-graph";
 import { KindLegend } from "./lineage-kind";
 import { retryStyle } from "./view-state";
@@ -178,29 +177,25 @@ function NodeBox({
  * the paths through it (only the supports they share) and lists their exact evidence below.
  */
 export function LineageGraphExplorer({
-  view,
+  graph,
+  slice,
+  scope,
+  onScopeChange,
   renderClaim,
 }: {
-  view: LineageView;
+  graph: LineageGraph;
+  slice: GraphSlice;
+  scope: GraphScope;
+  onScopeChange: (scope: GraphScope) => void;
   renderClaim: (claim: SupportedLineageClaim) => ReactNode;
 }) {
-  const [tablers, setTablers] = useState<TablerLevel>("group");
-  const [lexical, setLexical] = useState(true);
-  const [semantic, setSemantic] = useState(true);
-  const [focus, setFocus] = useState<GraphFocus>(null);
-  const [limit, setLimit] = useState(GRAPH_NODES_PER_COLUMN);
+  const { tablers, lexical, semantic, focus, limit } = scope;
   const [hover, setHover] = useState<string | null>(null);
   const [shownPhrases, setShownPhrases] = useState(PHRASES_SHOWN);
   const [query, setQuery] = useState("");
 
-  const graph = useMemo(
-    () => buildLineageGraph(view, { tablers, lexical, semantic }),
-    [view, tablers, lexical, semantic],
-  );
-  const slice = useMemo(() => sliceGraph(graph, focus, limit), [graph, focus, limit]);
-
   function choose(next: GraphFocus) {
-    setFocus(next);
+    onScopeChange({ ...scope, focus: next });
     setShownPhrases(PHRASES_SHOWN);
   }
 
@@ -309,8 +304,7 @@ export function LineageGraphExplorer({
               name="graph-tablers"
               checked={tablers === "group"}
               onChange={() => {
-                setTablers("group");
-                choose(null);
+                onScopeChange({ ...scope, tablers: "group", focus: null });
               }}
             />
             Political groups
@@ -321,8 +315,7 @@ export function LineageGraphExplorer({
               name="graph-tablers"
               checked={tablers === "member"}
               onChange={() => {
-                setTablers("member");
-                choose(null);
+                onScopeChange({ ...scope, tablers: "member", focus: null });
               }}
             />
             Members
@@ -333,7 +326,9 @@ export function LineageGraphExplorer({
           <input
             type="checkbox"
             checked={lexical}
-            onChange={(event) => setLexical(event.target.checked)}
+            onChange={(event) =>
+              onScopeChange({ ...scope, lexical: event.target.checked, focus: null })
+            }
           />
           Lexical lines
         </label>
@@ -341,7 +336,9 @@ export function LineageGraphExplorer({
           <input
             type="checkbox"
             checked={semantic}
-            onChange={(event) => setSemantic(event.target.checked)}
+            onChange={(event) =>
+              onScopeChange({ ...scope, semantic: event.target.checked, focus: null })
+            }
           />
           Semantic lines
         </label>
@@ -438,7 +435,7 @@ export function LineageGraphExplorer({
         {graphColumns.some((column) => slice.columns[column].hidden > 0) && (
           <button
             type="button"
-            onClick={() => setLimit((value) => value + GRAPH_NODES_PER_COLUMN)}
+            onClick={() => onScopeChange({ ...scope, limit: limit + GRAPH_NODES_PER_COLUMN })}
             className={retryStyle}
           >
             Show {GRAPH_NODES_PER_COLUMN} more per column
@@ -447,7 +444,7 @@ export function LineageGraphExplorer({
         {limit > GRAPH_NODES_PER_COLUMN && (
           <button
             type="button"
-            onClick={() => setLimit(GRAPH_NODES_PER_COLUMN)}
+            onClick={() => onScopeChange({ ...scope, limit: GRAPH_NODES_PER_COLUMN })}
             className={retryStyle}
           >
             Fewer

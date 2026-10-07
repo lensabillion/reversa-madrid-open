@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { LineageView, OriginMatchRecord } from "../lib/lineage-api";
-import { buildLineageGraph, provisionLabel, sliceGraph } from "../lib/lineage-graph";
+import { buildLineageGraph, provisionLabel, sliceGraph, visibleClaims } from "../lib/lineage-graph";
 import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 const view = fixtureSupportedView();
@@ -132,6 +132,9 @@ test("focus keeps only paths through the node, and the overview cuts each column
   const overview = sliceGraph(graph, null, 1);
   expect(overview.columns.organisation.shown).toHaveLength(1);
   expect(overview.columns.organisation.hidden).toBe(1);
+  expect(overview.claimIds).toHaveLength(1);
+  expect(visibleClaims(graph, overview).map((claim) => claim.claimId)).toEqual(overview.claimIds);
+  expect(visibleClaims(graph, focused).map((claim) => claim.claimId)).toEqual(["support:other"]);
   const [edge] = graph.edges;
   if (edge === undefined) {
     throw new Error("No edge");
@@ -147,4 +150,37 @@ test("coauthors share one support claim and legacy views remain unavailable", ()
   const legacy = buildLineageGraph(fixtureView(), all);
   expect(legacy.unavailableReason).toContain("carrier-specific");
   expect(legacy.edges).toEqual([]);
+});
+
+test("a support needs both rendered edges through the same tabler", () => {
+  const graph = buildLineageGraph(view, all);
+  const starts = graph.edges.filter(
+    (edge) => graph.nodes.get(edge.source)?.column === "organisation",
+  );
+  const finishes = graph.edges.filter((edge) => graph.nodes.get(edge.source)?.column === "tabler");
+  const first = starts[0];
+  const different = finishes.find((edge) => edge.source !== first?.target);
+  if (first === undefined || different === undefined) {
+    throw new Error("Need two coauthors");
+  }
+  const disconnected = { ...graph, edges: [first, different] };
+  expect(sliceGraph(disconnected, null, 12).claimIds).toEqual([]);
+  expect(visibleClaims(disconnected, sliceGraph(disconnected, null, 12))).toEqual([]);
+  const complete = finishes.find((edge) => edge.source === first.target);
+  if (complete === undefined) {
+    throw new Error("Missing complete path");
+  }
+  expect(sliceGraph({ ...graph, edges: [first, complete] }, null, 12).claimIds).toHaveLength(1);
+});
+
+test("unknown author groups retain a complete supported path", () => {
+  const graph = buildLineageGraph(
+    { ...view, adoptions: [{ ...adoption, author_groups: [] }] },
+    { ...all, tablers: "group" },
+  );
+  expect([...graph.nodes.values()].some((node) => node.label === "Group unknown")).toBe(true);
+  expect(visibleClaims(graph, sliceGraph(graph, null, 12))).toHaveLength(1);
+  expect(
+    sliceGraph(buildLineageGraph(view, { ...all, lexical: false }), null, 12).claimIds,
+  ).toEqual([]);
 });
