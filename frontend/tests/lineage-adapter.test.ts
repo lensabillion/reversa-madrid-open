@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { collectSupportedClaims, prepareLineage } from "../lib/lineage";
 import type { LineageView, OriginMatchRecord } from "../lib/lineage-api";
-import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
+import { fixtureSemanticView, fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 function only<T>(rows: readonly T[]): T {
   expect(rows).toHaveLength(1);
@@ -258,4 +258,99 @@ test.each<Partial<OriginMatchRecord>>([
   expect(
     collectSupportedClaims({ ...view, origins: [{ ...only(view.origins), ...changes }] }).claims,
   ).toEqual([]);
+});
+
+function semanticTarget() {
+  const view = fixtureSemanticView();
+  const origin = view.origins.find(
+    (row) => row.kind === "semantic" && row.eligibility === "ask_first",
+  );
+  const support = origin?.supports?.[0];
+  if (origin === undefined || support?.judgment == null) {
+    throw new Error("Semantic server fixture lost its support");
+  }
+  return { view, origin, support, judgment: support.judgment };
+}
+
+test("accepts server semantic support with different submission words and the exact evidence pair", () => {
+  const { view, origin, support } = semanticTarget();
+  const claim = only(collectSupportedClaims({ ...view, origins: [origin] }).claims);
+  expect(claim.support).toEqual(support);
+  expect(support.submission_span.text).not.toBe(support.amendment_span.text);
+  expect(support.amendment_span).toEqual(claim.evidence.amendment_span);
+  expect(support.final_span).toEqual(claim.evidence.final_span);
+  expect(claim.support.judgment?.prompt_revision).toBe("adopted-origin-v1");
+  expect(
+    collectSupportedClaims({ ...view, origins: [{ ...origin, supports: [] }] }).claims,
+  ).toEqual([]);
+});
+
+test.each([
+  "kind",
+  "missing judgment",
+  "score",
+  "similarity",
+  "revision",
+  "model",
+  "sha",
+  "finite",
+  "range",
+  "amendment projection",
+  "final projection",
+  "multiple",
+])("rejects malformed semantic %s support", (broken) => {
+  const { view, origin, support, judgment } = semanticTarget();
+  const project = (span: typeof support.amendment_span) => ({
+    ...span,
+    start: span.start + 1,
+    text: [...span.text].slice(1).join(""),
+  });
+  const changed = {
+    ...support,
+    kind: broken === "kind" ? ("verbatim" as const) : ("semantic" as const),
+    judgment:
+      broken === "missing judgment"
+        ? null
+        : {
+            ...judgment,
+            score: broken === "score" ? 0.7 : judgment.score,
+            prompt_revision:
+              broken === "revision"
+                ? ("old" as unknown as typeof judgment.prompt_revision)
+                : judgment.prompt_revision,
+            model:
+              broken === "model" ? ("other" as unknown as typeof judgment.model) : judgment.model,
+            request_sha256: broken === "sha" ? "not a hash" : judgment.request_sha256,
+            actual_request:
+              broken === "finite" ? Number.NaN : broken === "range" ? 1.1 : judgment.actual_request,
+          },
+    amendment_span:
+      broken === "amendment projection" ? project(support.amendment_span) : support.amendment_span,
+    final_span: broken === "final projection" ? project(support.final_span) : support.final_span,
+  };
+  expect(() =>
+    collectSupportedClaims({
+      ...view,
+      origins: [
+        {
+          ...origin,
+          similarity: broken === "similarity" ? 0.7 : origin.similarity,
+          supports:
+            broken === "multiple" ? [support, { ...support, support_id: "another" }] : [changed],
+        },
+      ],
+    }),
+  ).toThrow(/association support/);
+});
+
+test("a lexical support cannot carry semantic judgment metadata", () => {
+  const view = fixtureSupportedView();
+  const origin = only(view.origins);
+  const support = only(origin.supports ?? []);
+  expect(() =>
+    collectSupportedClaims({
+      ...view,
+      origins: [{ ...origin, supports: [{ ...support, judgment: semanticTarget().judgment }] }],
+    }),
+  ).toThrow(/association support/);
 });

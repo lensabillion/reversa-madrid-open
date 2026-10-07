@@ -45,8 +45,8 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
       question:
         "Which earlier consultation documents have matching wording or a model-judged association?",
       rules: [
-        "The document has the same 8 or more words, or Jev judges it asks for the same legal change (each of four support dimensions meets the provisional 0.67 cutoff).",
-        "It was published before every amendment carrying the wording.",
+        "The document has the same 8 or more words, or Jev judges its request against the exact surviving amendment and final-law wording in their supplied contexts. Each of four directed support dimensions meets the provisional, uncalibrated 0.67 cutoff.",
+        "It was published before every amendment supporting that association.",
         "Quotes of legal titles and Official Journal references are not counted: same words, but not a request.",
       ],
       result: `${known(counts.documents_with_origin)} of ${known(counts.documents_read)} documents`,

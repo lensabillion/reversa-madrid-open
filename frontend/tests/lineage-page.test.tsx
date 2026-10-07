@@ -4,7 +4,12 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import LineagePage from "../app/lineage/page";
 import { PHRASES_PER_PAGE } from "../components/lineage-law-browser";
 import type { LineageLawList, LineageView } from "../lib/lineage-api";
-import { fixtureSourcesView, fixtureSupportedView, fixtureView } from "./lineage-fixture";
+import {
+  fixtureCombinedSemanticView,
+  fixtureSourcesView,
+  fixtureSupportedView,
+  fixtureView,
+} from "./lineage-fixture";
 
 // Next.js re-renders `useSearchParams` readers after `history.pushState`; outside its router,
 // this stand-in reads jsdom's URL and is notified by the pushState spy installed below.
@@ -545,4 +550,34 @@ test("loaded compact source metadata reaches exact graph cards without source fe
     "/api/v1/lineage",
     `/api/v1/lineage/${slug}`,
   ]);
+});
+
+test("semantic graph evidence shows exact target quotes and experimental judgment provenance", async () => {
+  const semanticView = fixtureCombinedSemanticView();
+  const origin = semanticView.origins.find(
+    (row) => row.kind === "semantic" && row.eligibility === "ask_first",
+  );
+  const support = origin?.supports?.[0];
+  if (origin === undefined || support?.judgment == null) {
+    throw new Error("Missing semantic fixture support");
+  }
+  serve({ ...semanticView, origins: [origin] });
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  render(<LineagePage />);
+  await openTab("Graph");
+  fireEvent.click(await screen.findByRole("button", { name: `${origin.organisation}: 1 phrases` }));
+  const card = await screen.findByRole("article", { name: `Association ${support.support_id}` });
+  expect(
+    within(card)
+      .getAllByRole("blockquote")
+      .map((quote) => quote.lastChild?.textContent),
+  ).toEqual([support.submission_span.text, support.amendment_span.text, support.final_span.text]);
+  expect(within(card).getAllByRole("link")).toHaveLength(3);
+  expect(within(card).getByRole("link", { name: "Open Parltrack dataset source" })).toBeDefined();
+  expect(within(card).getByText(/Experimental semantic judgment/)).toBeDefined();
+  expect(within(card).getByText(/adopted-origin-v1/)).toBeDefined();
+  expect(within(card).getByText(/Request SHA-256/).textContent).toContain(
+    support.judgment.request_sha256,
+  );
+  expect(within(card).getByText(/uncalibrated cutoff/)).toBeDefined();
 });

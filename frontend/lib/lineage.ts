@@ -6,6 +6,7 @@ import type {
   LineageHolderKind,
   LineageMatchKind,
   LineageView,
+  OriginJudgmentRecord,
   OriginMatchRecord,
   OriginSupportRecord,
 } from "./lineage-api";
@@ -350,6 +351,32 @@ function projectsFrom(parent: SourceSpan, child: SourceSpan): boolean {
   );
 }
 
+function validJudgment(judgment: OriginJudgmentRecord | null | undefined): boolean {
+  if (judgment === undefined || judgment === null) {
+    return false;
+  }
+  const answers = [
+    judgment.actual_request,
+    judgment.same_legal_change,
+    judgment.incompatible_legal_change,
+    judgment.shared_background,
+    judgment.score,
+  ];
+  return (
+    /^[a-f0-9]{64}$/.test(judgment.request_sha256) &&
+    judgment.prompt_revision === "adopted-origin-v1" &&
+    judgment.model === "jev-1.13.0" &&
+    answers.every((value) => Number.isFinite(value) && value >= 0 && value <= 1) &&
+    judgment.score ===
+      Math.min(
+        judgment.actual_request,
+        judgment.same_legal_change,
+        1 - judgment.incompatible_legal_change,
+        1 - judgment.shared_background,
+      )
+  );
+}
+
 /**
  * Joins saved support IDs to their own carrier and final occurrence. It never infers a
  * carrier from a merged phrase. Linear in records plus the quoted text checked at joins.
@@ -410,9 +437,12 @@ export function collectSupportedClaims(view: LineageView): SupportedLineageClaim
     ) {
       continue;
     }
-    if (origin.kind !== "verbatim" || (origin.supports ?? []).length === 0) {
+    if ((origin.supports ?? []).length === 0) {
       unsupportedOrigins += 1;
       continue;
+    }
+    if (origin.kind === "semantic" && origin.supports?.length !== 1) {
+      throw new Error(`Invalid semantic association support count: ${origin.document_id}`);
     }
     for (const support of origin.supports ?? []) {
       const carrier = carriers.get(support.adoption_evidence_id);
@@ -421,6 +451,10 @@ export function collectSupportedClaims(view: LineageView): SupportedLineageClaim
       }
       supportIds.add(support.support_id);
       if (
+        (support.kind ?? "verbatim") !== origin.kind ||
+        (origin.kind === "verbatim" && support.judgment != null) ||
+        (origin.kind === "semantic" &&
+          (!validJudgment(support.judgment) || origin.similarity !== support.judgment?.score)) ||
         carrier === undefined ||
         carrier.adoption.amendment_id !== support.amendment_id ||
         carrier.evidence.phrase_id !== origin.phrase_id ||
@@ -428,7 +462,10 @@ export function collectSupportedClaims(view: LineageView): SupportedLineageClaim
         support.submission_span.record_id !== origin.document_id ||
         !sameSpan(support.submission_span, origin.span) ||
         !projectsFrom(carrier.evidence.amendment_span, support.amendment_span) ||
-        !projectsFrom(carrier.evidence.final_span, support.final_span)
+        !projectsFrom(carrier.evidence.final_span, support.final_span) ||
+        (origin.kind === "semantic" &&
+          (!sameSpan(carrier.evidence.amendment_span, support.amendment_span) ||
+            !sameSpan(carrier.evidence.final_span, support.final_span)))
       ) {
         throw new Error(`Invalid association support: ${support.support_id}`);
       }

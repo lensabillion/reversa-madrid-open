@@ -63,9 +63,24 @@ export interface AdoptionEvidenceRecord {
   inserted_word_offsets: readonly number[];
 }
 
+/** Four directed answers for one exact surviving target, with reproducible request identity. */
+export interface OriginJudgmentRecord {
+  request_sha256: string;
+  prompt_revision: "adopted-origin-v1";
+  model: "jev-1.13.0";
+  actual_request: number;
+  same_legal_change: number;
+  incompatible_legal_change: number;
+  shared_background: number;
+  score: number;
+}
+
 /** Exact three-source projection of one accepted amendment carrier. */
 export interface OriginSupportRecord {
   support_id: string;
+  /** Omitted by R2 snapshots, where every support is verbatim. */
+  kind?: LineageMatchKind;
+  judgment?: OriginJudgmentRecord | null;
   adoption_evidence_id: string;
   amendment_id: string;
   submission_span: SourceSpan;

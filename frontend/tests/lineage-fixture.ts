@@ -25,3 +25,23 @@ export function fixtureSourcesView(): LineageView {
     ),
   ) as LineageView;
 }
+
+/** Version 2.1 fixture includes offline judgment-backed semantic target supports. */
+export function fixtureSemanticView(): LineageView {
+  return JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), "../backend/tests/fixtures/lineage/view-semantic-v2.1.json"),
+      "utf8",
+    ),
+  ) as LineageView;
+}
+
+/** Current producer fixture combines source provenance and targeted semantic supports. */
+export function fixtureCombinedSemanticView(): LineageView {
+  return JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), "../backend/tests/fixtures/lineage/view-semantic-sources-v2.1.json"),
+      "utf8",
+    ),
+  ) as LineageView;
+}

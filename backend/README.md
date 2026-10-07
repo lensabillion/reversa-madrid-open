@@ -285,16 +285,30 @@ that an origin has carrier evidence. Shared wording does not establish causality
 The four-law offline comparison is recorded in
 [the carrier rehearsal](../docs/reviews/lineage-carrier-rehearsal-2026-10-07.md).
 
-**Reworded origins with Jev** (`--jev`, `make lineage LAW='AI Act' ARGS='--jev'`). Verbatim
-search misses requests made in other words. With `--jev` (key in `TYPESAFE_API_KEY`;
-`--jev-max-usd`, default 1), `services/lineage_jev.py` takes each adopting amendment, lets
-part 3's BM25 shortlist the 5 consultation passages that share its rare changed words, and
-asks Jev PR #63's frozen four-question prompt for each pair (`services/jev_judge.py`).
-A pair whose four answers all clear 0.67 becomes an origin of kind `semantic`, quoting the
-whole passage, with `similarity` set to the weakest supporting answer and dated like a
-verbatim origin. Answers are cached under `data/cache/jev/` by request hash. BM25 bounds
-what Jev sees (recall@5 0.663 on LobbyPlag's verified pairs), and adoption itself stays
-word for word.
+**Reworded origins with Jev** (`--jev`, `make lineage LAW='AI Act' ARGS='--jev'`).
+Verbatim search misses requests made in other words. With `--jev` (key in
+`TYPESAFE_API_KEY`; `--jev-max-usd`, default 1), BM25 shortlists five consultation
+passages per adopting amendment. Each candidate is assessed separately for each exact
+surviving carrier interval, using the `adopted-origin-v1` prompt revision. Requests include
+the exact submission, amendment and final spans, insertion offsets, full supplied
+amendment old/new text and the containing final provision. Jev judges whether the request
+supports the incremental legal effect that survives in that target, rather than another
+change elsewhere in the amendment.
+
+The four directed support dimensions must each reach 0.67. This cutoff is an uncalibrated
+experimental policy, not an accuracy estimate. Accepted semantic origins carry the exact
+amendment/final evidence pair, request hash, model, prompt revision, four answers and score.
+A document/evidence pair keeps its strongest accepted candidate deterministically. Existing
+eligible lexical support suppresses only that same document/evidence pair. Adoption itself
+remains word for word; the model does not decide whether an amendment was adopted.
+
+Requests are bounded at 24,000 bytes. Optional proposal context may be omitted explicitly;
+required target/context is never truncated to fit. Oversized, missing-source, budget-skipped
+or failed judgments remain unassessed. The prompt revision is inside the cache key material,
+so old broad-amendment answers cannot answer the new target question. Old caches are retained.
+No model call runs through HTTP. The frozen 28-case synthetic diagnostic corpus and request
+manifest document 24 new and 23 distinct comparable legacy requests, plus four structural
+skips. See [the semantic diagnostic plan](../docs/reviews/lineage-semantic-diagnostics-2026-10-07.md).
 
 Counting follows `docs/plan.md` section 7. Every holder of a phrase is credited with the
 whole phrase and a shared one is flagged joint (no fractional credit); each credit carries
@@ -305,8 +319,7 @@ author. An author whose group is unknown credits no group (`phrases_without_grou
 document counts as an origin only when it is dated before every carrying amendment
 (`eligibility` "ask_first") and is not a citation. Without the proposal or the final act the
 view is `status: "unknown"` with its reason, and every count that could not be computed is
-null, never zero. The website retains its existing sample display; no independent
-precision audit is established by this cleanup.
+null, never zero. No independent precision audit is established by these structural fixes.
 
 ## Quotation Source Metadata
 

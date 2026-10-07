@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { LineageView, OriginMatchRecord } from "../lib/lineage-api";
 import { buildLineageGraph, provisionLabel, sliceGraph, visibleClaims } from "../lib/lineage-graph";
-import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
+import { fixtureSemanticView, fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 const view = fixtureSupportedView();
 const [origin] = view.origins;
@@ -44,7 +44,9 @@ test("later, citing, unnamed and switched-off matches draw nothing", () => {
   expect(without({ is_citation: true })).toBe(0);
   expect(without({ organisation: null })).toBe(0);
   expect(without({}, { ...all, lexical: false })).toBe(0);
-  expect(without({ kind: "semantic", similarity: 0.8 }, { ...all, lexical: false })).toBe(0);
+  expect(
+    without({ kind: "semantic", similarity: 0.8, supports: [] }, { ...all, lexical: false }),
+  ).toBe(0);
 });
 
 test("focus keeps only paths through the node, and the overview cuts each column", () => {
@@ -184,3 +186,67 @@ test("unknown author groups retain a complete supported path", () => {
     sliceGraph(buildLineageGraph(view, { ...all, lexical: false }), null, 12).claimIds,
   ).toEqual([]);
 });
+
+test("semantic paths use saved target supports and respect method switches", () => {
+  const semanticView = fixtureSemanticView();
+  const graph = buildLineageGraph(semanticView, { ...all, lexical: false });
+  expect(graph.claims.size).toBeGreaterThan(0);
+  expect([...graph.claims.values()].every((claim) => claim.origin.kind === "semantic")).toBe(true);
+  expect(graph.edges.every((edge) => edge.semantic && !edge.lexical)).toBe(true);
+  const combined = buildLineageGraph(semanticView, all);
+  expect(combined.edges.some((edge) => edge.semantic && edge.lexical)).toBe(true);
+  const lexical = buildLineageGraph(semanticView, { ...all, semantic: false });
+  expect(lexical.edges.every((edge) => edge.lexical && !edge.semantic)).toBe(true);
+  expect(
+    buildLineageGraph(semanticView, { ...all, lexical: false, semantic: false }).edges,
+  ).toEqual([]);
+});
+
+test.each(["verbatim", "semantic"] as const)(
+  "focused shared edges retain only their %s method",
+  (kind) => {
+    const fixture = fixtureSemanticView();
+    const lexical = fixture.origins.find(
+      (item) => item.kind === "verbatim" && item.eligibility === "ask_first",
+    );
+    const semantic = fixture.origins.find(
+      (item) => item.kind === "semantic" && item.eligibility === "ask_first",
+    );
+    if (lexical === undefined || semantic === undefined) {
+      throw new Error("Missing mixed-method origins");
+    }
+    const graph = buildLineageGraph(
+      { ...fixture, origins: [lexical, semantic] },
+      { ...all, tablers: "group" },
+    );
+    const shared = graph.edges.find((edge) => edge.lexical && edge.semantic);
+    const selected = kind === "verbatim" ? lexical : semantic;
+    const organisation = [...graph.nodes.values()].find(
+      (node) => node.column === "organisation" && node.label === selected.organisation,
+    );
+    if (shared === undefined || organisation === undefined) {
+      throw new Error("Missing shared edge or selected organisation");
+    }
+    const incoming = graph.edges.find((edge) => edge.source === organisation.id);
+    if (incoming === undefined) {
+      throw new Error("Missing organisation edge");
+    }
+    for (const focus of [
+      { kind: "node" as const, id: organisation.id },
+      { kind: "edge" as const, id: incoming.id },
+    ]) {
+      const sliced = sliceGraph(graph, focus, 12);
+      const retained = sliced.edges.find((edge) => edge.id === shared.id);
+      expect(retained).toBeDefined();
+      expect(retained?.claimIds).toEqual(incoming.claimIds);
+      expect(retained?.lexical).toBe(kind === "verbatim");
+      expect(retained?.semantic).toBe(kind === "semantic");
+      expect(
+        sliced.edges.every(
+          (edge) =>
+            edge.lexical === (kind === "verbatim") && edge.semantic === (kind === "semantic"),
+        ),
+      ).toBe(true);
+    }
+  },
+);

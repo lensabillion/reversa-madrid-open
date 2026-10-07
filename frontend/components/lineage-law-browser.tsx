@@ -300,6 +300,29 @@ export function ClaimCard({
             label="Submission wording"
             kind={origin.kind}
           />
+          {support.judgment != null && (
+            <details className="text-xs leading-5 text-stone-600">
+              <summary>
+                Experimental semantic judgment · {support.judgment.score.toFixed(2)}
+              </summary>
+              <p>
+                {support.judgment.model} · {support.judgment.prompt_revision}
+              </p>
+              <p>
+                Actual request {support.judgment.actual_request}; same surviving legal change{" "}
+                {support.judgment.same_legal_change}; incompatible change{" "}
+                {support.judgment.incompatible_legal_change}; shared background{" "}
+                {support.judgment.shared_background}.
+              </p>
+              <p>
+                Provisional, uncalibrated cutoff: 0.67. This is an association, not proof of
+                influence.
+              </p>
+              <p className="break-all font-mono">
+                Request SHA-256: {support.judgment.request_sha256}
+              </p>
+            </details>
+          )}
         </section>
         <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
           <h4 className={eyebrow}>Exact carrying amendment</h4>
