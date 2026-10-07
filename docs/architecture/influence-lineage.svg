@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1120" viewBox="0 0 1500 1120" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1120" viewBox="0 0 1500 1120" style="max-width:100%;height:auto" role="img" aria-labelledby="title description">
   <title id="title">influence — from public records to the lineage explorer</title>
   <desc id="description">Generation: setup downloads global Parltrack dumps, the Transparency Register and the Have Your Say index. Collection resolves one law, reads those global inputs and fetches proposal and final texts from CELLAR and EUR-Lex and consultation documents from Have Your Say. It saves JSONL records and a provenance and coverage manifest. The lineage engine compares final wording with the proposal, matches carrying amendments and traces consultation origins. An optional BM25 shortlist and Jev judgment with an answer cache adds reworded consultation origins only; final adoption always uses wording matching. The result is saved as data/laws/&lt;slug&gt;/lineage.json using schema lineage-1. Serving: FastAPI reads that snapshot through its lineage list and detail endpoints, Next.js proxies the read API, and the lineage website displays summary, graph, holders, evidence, a random sample and method. Browser GET requests never run collection or model calls. Shared wording is not proof of causal influence, and unknown inputs remain explicit.</desc>
   <defs>
@@ -39,7 +39,7 @@
   <circle cx="82" cy="182" r="18" fill="#228c83"/>
   <text x="82" y="188" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">1</text>
   <text x="114" y="189" class="lane">GENERATE THE SNAPSHOT</text>
-  <text x="1436" y="189" text-anchor="end" font-size="19" fill="#777d88">CLI · one law at a time</text>
+  <text x="1436" y="189" text-anchor="end" font-size="19" fill="#777d88">CLI · lineage collects and traces</text>
 
   <!-- The four generation steps. Source ownership stays inside setup and collection. -->
   <rect x="64" y="218" width="310" height="344" rx="18" class="card"/>
