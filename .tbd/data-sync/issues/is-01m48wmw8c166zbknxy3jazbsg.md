@@ -3,9 +3,9 @@ type: is
 id: is-01m48wmw8c166zbknxy3jazbsg
 title: "API log level from the environment: INFLUENCE_LOG_LEVEL"
 kind: feature
-status: in_progress
+status: closed
 priority: 2
-version: 6
+version: 7
 delegate: claude-code@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,10 +13,10 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-06T15:17:22.316Z
-updated_at: 2026-10-07T07:46:30.083Z
+updated_at: 2026-10-07T08:02:05.916Z
 started_at: 2026-10-06T15:20:34.426Z
-closed_at: 2026-10-07T07:45:51.220Z
-close_reason: "PR #94 merged by the owner 2026-10-07: INFLUENCE_LOG_LEVEL controls the influence and uvicorn loggers, fails fast on a bad value; ten checks green."
+closed_at: 2026-10-07T08:02:05.911Z
+close_reason: "PR #94 merged by the owner 2026-10-07: INFLUENCE_LOG_LEVEL controls the influence and uvicorn loggers and fails fast on a bad value; ten checks green."
 resolution: null
 duplicate_of: null
 ---
