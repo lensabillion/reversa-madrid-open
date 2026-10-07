@@ -2,12 +2,14 @@ import type {
   AdoptionEvidenceRecord,
   AmendmentAdoptionRecord,
   CreditRecord,
+  LineageEligibility,
   LineageHolderKind,
   LineageMatchKind,
   LineageView,
   OriginMatchRecord,
   OriginSupportRecord,
 } from "./lineage-api";
+import { indexLineageSources, type LineageSourceIndex } from "./lineage-sources";
 import type { SourceSpan } from "./source-span";
 
 /** An amendment that carries a phrase; adoption details exist only for adopted wording. */
@@ -29,9 +31,14 @@ export interface LineageAmendmentRow {
 /** A submission that says the phrase, with the exact quotation and its date order. */
 export interface LineageOriginRow {
   documentId: string;
+  /** Saved carrier IDs retained for stable legacy quotation identity. */
+  amendmentIds: readonly string[];
   /** `null` for a citizen or an unnamed attachment: the explorer never invents a name. */
   organisation: string | null;
   publishedAt: string | null;
+  eligibility: LineageEligibility;
+  earliestAmendmentOn: string | null;
+  similarity: number | null;
   quote: SourceSpan;
   words: number;
   precedes: boolean | null;
@@ -83,13 +90,18 @@ export interface PreparedLineage {
   tabled: readonly LineagePhraseRow[];
   credits: readonly LineageCreditTable[];
   supportedClaims: SupportedLineageClaims;
+  sources: LineageSourceIndex;
 }
 
 function originRow(origin: OriginMatchRecord): LineageOriginRow {
   return {
     documentId: origin.document_id,
+    amendmentIds: origin.amendment_ids,
     organisation: origin.organisation,
     publishedAt: origin.published_at,
+    eligibility: origin.eligibility,
+    earliestAmendmentOn: origin.earliest_amendment_on,
+    similarity: origin.similarity,
     quote: origin.span,
     words: origin.words,
     precedes: origin.precedes,
@@ -100,7 +112,7 @@ function originRow(origin: OriginMatchRecord): LineageOriginRow {
   };
 }
 
-function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
+function adoptionRow(adoption: AmendmentAdoptionRecord, phraseId: string): LineageAmendmentRow {
   return {
     amendmentId: adoption.amendment_id,
     stage: adoption.stage,
@@ -110,7 +122,7 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
     newWords: adoption.new_words,
-    evidence: adoption.evidence ?? [],
+    evidence: (adoption.evidence ?? []).filter((evidence) => evidence.phrase_id === phraseId),
   };
 }
 
@@ -199,7 +211,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       if (!adoptedIds.has(phraseId)) {
         throw new Error(`${adoption.amendment_id} names ${phraseId}, which the view does not list`);
       }
-      carry(phraseId, adoptionRow(adoption));
+      carry(phraseId, adoptionRow(adoption, phraseId));
     }
   }
   for (const phrase of view.tabled_phrases) {
@@ -208,6 +220,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     }
   }
   const origins = new Map<string, LineageOriginRow[]>();
+  const originIdentities = new Map<string, Map<string, LineageOriginRow>>();
   for (const origin of view.origins) {
     if (!adoptedIds.has(origin.phrase_id) && !tabledIds.has(origin.phrase_id)) {
       throw new Error(
@@ -221,18 +234,17 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     }
     const rows = origins.get(origin.phrase_id) ?? [];
     const row = originRow(origin);
-    // A reworded match is judged per amendment, so one passage can back the same phrase
-    // through several carrying amendments; the card shows that passage once.
-    const repeated = rows.find(
-      (other) =>
-        other.documentId === row.documentId &&
-        other.kind === row.kind &&
-        other.quote.start === row.quote.start &&
-        other.quote.end === row.quote.end,
-    );
+    // Equal quotations coalesce only when their saved target/presentation metadata agrees.
+    // A quotation can precede one carrier but follow another; keep those states separate.
+    const presentation = originPresentationKey(row);
+    const identities =
+      originIdentities.get(origin.phrase_id) ?? new Map<string, LineageOriginRow>();
+    const repeated = identities.get(presentation);
     if (repeated === undefined) {
       rows.push(row);
+      identities.set(presentation, row);
     } else {
+      repeated.amendmentIds = [...new Set([...repeated.amendmentIds, ...row.amendmentIds])].sort();
       repeated.supports = [
         ...new Map(
           [...repeated.supports, ...row.supports].map((support) => [support.support_id, support]),
@@ -240,6 +252,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       ];
     }
     origins.set(origin.phrase_id, rows);
+    originIdentities.set(origin.phrase_id, identities);
   }
 
   const adopted = view.adopted_phrases.map((phrase): LineagePhraseRow => {
@@ -292,6 +305,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     tabled: [...tabled].sort(byEvidence),
     credits,
     supportedClaims: collectSupportedClaims(view),
+    sources: indexLineageSources(view),
   };
 }
 
@@ -436,4 +450,38 @@ export function collectSupportedClaims(view: LineageView): SupportedLineageClaim
         : null,
     unsupportedOrigins,
   };
+}
+
+/**
+ * Exact quotation plus its saved carrier identity, without order-dependent row indices.
+ * O(n log n) for sorting one quotation's support/carrier IDs; usually a handful per row.
+ */
+export function originRowKey(origin: LineageOriginRow): string {
+  const carrierIds =
+    origin.supports.length > 0
+      ? origin.supports.map((support) => support.support_id)
+      : origin.amendmentIds;
+  return JSON.stringify([originPresentationKey(origin), [...new Set(carrierIds)].sort()]);
+}
+
+/** One shared identity tuple for deduplication and render-key discrimination. */
+function originPresentationKey(origin: LineageOriginRow): string {
+  return JSON.stringify([
+    origin.documentId,
+    origin.kind,
+    origin.quote.field,
+    origin.quote.start,
+    origin.quote.end,
+    origin.quote.page,
+    origin.quote.text,
+    origin.organisation,
+    origin.publishedAt,
+    origin.words,
+    origin.precedes,
+    origin.isCitation,
+    origin.countsAsOrigin,
+    origin.eligibility,
+    origin.earliestAmendmentOn,
+    origin.similarity,
+  ]);
 }

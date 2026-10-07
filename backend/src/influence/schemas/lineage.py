@@ -21,6 +21,7 @@ from influence.schemas.atlas import (
     SourceSpan,
     TimeEligibility,
 )
+from influence.schemas.lineage_sources import LineageDocument, LineageSourceRecord, SourceRecordKind
 from influence.schemas.scoring import TOKEN_PATTERN, FrozenModel
 
 LINEAGE_SCHEMA_VERSION = "lineage-2"
@@ -391,6 +392,25 @@ class LineageView(FrozenModel):
     origins: tuple[OriginMatch, ...] = ()
     credits: tuple[Credit, ...] = ()
     limitations: tuple[str, ...] = ()
+    documents: tuple[LineageDocument, ...] = ()
+    source_records: tuple[LineageSourceRecord, ...] = ()
+
+    def source_record_types(self) -> dict[str, SourceRecordKind]:
+        """Identify exposed quote records without guessing their source-document IDs."""
+        records: dict[str, SourceRecordKind] = {}
+        for phrase in self.adopted_phrases:
+            for span in phrase.final_spans:
+                records[span.record_id] = "article"
+        for adoption in self.adoptions:
+            for evidence in adoption.evidence:
+                records[evidence.amendment_span.record_id] = "amendment"
+                records[evidence.final_span.record_id] = "article"
+        for origin in self.origins:
+            records[origin.span.record_id] = "document_text"
+            for support in origin.supports:
+                records[support.amendment_span.record_id] = "amendment"
+                records[support.final_span.record_id] = "article"
+        return records
 
     @model_validator(mode="after")
     def references_resolve(self) -> Self:
@@ -506,6 +526,30 @@ class LineageView(FrozenModel):
                 raise ValueError("An origin's chronology uses only its supported carriers")
         if list(self.credits) != sorted(self.credits, key=credit_rank):
             raise ValueError("Credits are listed in `credit_rank` order")
+        return self
+
+    @model_validator(mode="after")
+    def source_metadata_resolves(self) -> Self:
+        documents = {document.document_id: document for document in self.documents}
+        records = {record.record_id: record for record in self.source_records}
+        if len(documents) != len(self.documents) or len(records) != len(self.source_records):
+            raise ValueError("Source document and record identifiers must be unique")
+        if not documents and not records:
+            return self  # Older snapshots did not embed source metadata.
+        required = self.source_record_types()
+        if set(records) != set(required):
+            raise ValueError("Source records must cover exactly the exposed quotations")
+        resolved: set[str] = set()
+        for record in records.values():
+            if record.record_type != required[record.record_id]:
+                raise ValueError("A source record type must match its quotation")
+            available = record.document_id in documents
+            if available == (record.unavailable_reason is not None):
+                raise ValueError("Source metadata is available or has a reason, never both")
+            if available:
+                resolved.add(record.document_id)
+        if set(documents) != resolved:
+            raise ValueError("Only referenced source document metadata is exposed")
         return self
 
 

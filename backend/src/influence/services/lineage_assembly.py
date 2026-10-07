@@ -24,6 +24,7 @@ from influence.services.collected import Collected
 from influence.services.jev_judge import JevJudge
 from influence.services.lineage import Rarity, adopt
 from influence.services.lineage_jev import reworded_origins
+from influence.services.lineage_sources import attach_sources
 from influence.services.origin import (
     CONSULTATION_KINDS,
     find_origins,
@@ -108,7 +109,7 @@ def build_lineage(
         read = len(documents)
         with_origin = len({origin.document_id for origin in origins if origin.counts_as_origin})
     law = collected.law
-    return LineageView(
+    view = LineageView(
         procedure_id=law.procedure_id,
         slug=procedure_slug(law.procedure_id),
         title=law.title,
@@ -127,6 +128,8 @@ def build_lineage(
         credits=adoption.credits,
         limitations=tuple(notes),
     )
+
+    return attach_sources(view, collected)
 
 
 def write_lineage(view: LineageView, bundle: Path) -> Path:

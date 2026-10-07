@@ -15,3 +15,13 @@ export function fixtureSupportedView(): LineageView {
     readFileSync(resolve(process.cwd(), "../backend/tests/fixtures/lineage/view-v2.json"), "utf8"),
   ) as LineageView;
 }
+
+/** Generated compact source contract from backend/tests/test_lineage_views.py. */
+export function fixtureSourcesView(): LineageView {
+  return JSON.parse(
+    readFileSync(
+      resolve(process.cwd(), "../backend/tests/fixtures/lineage/view-sources.json"),
+      "utf8",
+    ),
+  ) as LineageView;
+}

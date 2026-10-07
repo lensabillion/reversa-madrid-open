@@ -26,7 +26,7 @@ ADOPTED = f"Providers shall keep the logs {RARE}."
 # The frontend's tests read this view, so the TypeScript types are checked against real JSON.
 # Regenerate after a contract change: uv run --directory backend --locked python
 # tests/test_lineage_views.py
-FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-v2.json"
+FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-sources.json"
 
 
 def adopted_world(tmp_path: Path) -> Collected:
@@ -41,7 +41,11 @@ def adopted_world(tmp_path: Path) -> Collected:
         kind="article",
         text=ADOPTED,
     )
-    return replace(law, articles=(*law.articles, logs))
+    # Retrieval timestamps are now exposed; pin this synthetic world's clock.
+    documents = tuple(
+        document.model_copy(update={"retrieved_at": LATER}) for document in law.documents
+    )
+    return replace(law, articles=(*law.articles, logs), documents=documents)
 
 
 def built(tmp_path: Path) -> LineageView:
