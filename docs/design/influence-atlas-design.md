@@ -126,7 +126,7 @@ redistribution terms permit; otherwise publish retrieval instructions and excerp
 | Ask | Actor, procedure, cited passage, requested change, target provision, direction, scope, date, extraction method and uncertainty |
 | Amendment | Procedure, committee, number, authors, original/proposed wording, date, evidence spans |
 | ArticleVersion | Procedure, version stage/date, provision identifier, text and source spans |
-| PublicPosition | Actor, dated statement and source, topic, direction and scope; distinguish self-statement from news attribution |
+| PublicPosition | Actor, dated statement and source, topic, direction and scope; distinguish self-statement from news attribution. Not implemented: no part collected or read one, so the record was removed from `schemas/atlas.py` on 6 October 2026; it returns with the part that produces it |
 | EvidenceLink | Typed endpoints/relation, supporting spans, signals, method revision, time eligibility, assessment status and limitations |
 | Outcome | Ask, law stage, full/partial/not observed/unknown result, aligned final spans, completeness and method |
 | Forecast | Ask, as-of time, horizon/event definition, score type, reasons, feature snapshot and model revision |

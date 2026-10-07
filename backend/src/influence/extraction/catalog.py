@@ -15,9 +15,7 @@ what each one actually returns, and nothing parses a response shape before then.
 from collections.abc import Iterable
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-from influence.extraction.tables import TABLE_NAMES
+from pydantic import BaseModel, ConfigDict, Field
 
 type Verification = Literal["confirmed", "third_party", "unverified", "build_yourself"]
 type Scope = Literal["global", "per_law", "enrichment"]
@@ -33,16 +31,7 @@ class SourceSpec(BaseModel):
     # None where there is nothing to probe: the source is a crawl or is reached through
     # another source's document links rather than a base URL of its own.
     probe_url: str | None
-    target_tables: tuple[str, ...]
     notes: str
-
-    @field_validator("target_tables")
-    @classmethod
-    def _known_tables(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        unknown = sorted(set(value) - TABLE_NAMES)
-        if unknown:
-            raise ValueError(f"Unknown target tables: {', '.join(unknown)}")
-        return value
 
 
 SOURCES: tuple[SourceSpec, ...] = (
@@ -53,7 +42,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="global",
         verification="confirmed",
         probe_url="https://transparency-register.europa.eu/",
-        target_tables=("actors",),
         notes=(
             "Master actor table; every other source joins back to it. One bulk download, "
             "no key. A snapshot, not a history: deregistered bodies are absent, and "
@@ -67,7 +55,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="global",
         verification="confirmed",
         probe_url="https://data.europa.eu/",
-        target_tables=("meetings",),
         notes=(
             "Carries the registration id, so it yields an actor-to-law edge with no text "
             "matching. Senior officials only, so a missing meeting is not evidence of no "
@@ -81,7 +68,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="global",
         verification="confirmed",
         probe_url="https://www.integritywatch.eu/",
-        target_tables=("meetings",),
         notes=(
             "Where lobbying meets the people who table amendments. Organisation names are "
             "free text and only about half follow the register, so never join on name: "
@@ -96,7 +82,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="global",
         verification="confirmed",
         probe_url="https://data.europarl.europa.eu/api/v2/meps",
-        target_tables=("amendments",),
         notes=(
             "REST JSON, no key expected. The MEP roster is global and attributes "
             "amendments; plenary-documents is the structured amendment route. Committee "
@@ -110,7 +95,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="per_law",
         verification="unverified",
         probe_url="https://oeil.secure.europarl.europa.eu/",
-        target_tables=(),
         notes=(
             "The spine of the per-law pipeline and the step that writes the manifest. No "
             "documented API; expect HTML parsing. Non-COD procedures have different "
@@ -124,7 +108,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="per_law",
         verification="confirmed",
         probe_url="http://publications.europa.eu/resource/celex/32024R1689",
-        target_tables=("articles",),
         notes=(
             "SPARQL for discovery and identifier retrieval by CELEX for content. Split to "
             "one row per article, paragraph and recital with a stable unit id, then diff "
@@ -139,7 +122,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="per_law",
         verification="third_party",
         probe_url="https://ec.europa.eu/info/law/better-regulation/have-your-say",
-        target_tables=("asks",),
         notes=(
             "The richest text available and the 'what they ask' side. No official API; the "
             "publication id ends the initiative URL. Chunk attachments into one ask per "
@@ -154,7 +136,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="per_law",
         verification="unverified",
         probe_url=None,
-        target_tables=("amendments",),
         notes=(
             "The weakest link in the chain. Reached through sources D and E rather than a "
             "base URL. Committee documents repeat a two-column before/after layout that "
@@ -169,7 +150,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="enrichment",
         verification="unverified",
         probe_url="https://www.lobbyfacts.eu/",
-        target_tables=("actors",),
         notes="Historical register snapshots: 2019-era budgets and deregistered bodies.",
     ),
     SourceSpec(
@@ -179,7 +159,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="enrichment",
         verification="unverified",
         probe_url="https://www.consilium.europa.eu/en/documents-publications/public-register/",
-        target_tables=("articles",),
         notes="Council positions and compromise texts: the missing trilogue side.",
     ),
     SourceSpec(
@@ -189,7 +168,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="enrichment",
         verification="build_yourself",
         probe_url=None,
-        target_tables=("asks",),
         notes="Position papers and press releases; a targeted crawl of the top actors only.",
     ),
     SourceSpec(
@@ -199,7 +177,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="enrichment",
         verification="unverified",
         probe_url="https://www.gdeltproject.org/",
-        target_tables=(),
         notes="News coverage volume and framing per actor and topic; context, not evidence.",
     ),
     SourceSpec(
@@ -209,7 +186,6 @@ SOURCES: tuple[SourceSpec, ...] = (
         scope="enrichment",
         verification="unverified",
         probe_url="https://query.wikidata.org/sparql",
-        target_tables=("actors",),
         notes="Canonical identifiers and aliases for companies, to widen entity resolution.",
     ),
 )

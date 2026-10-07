@@ -247,17 +247,6 @@ def _scored_labels(
     return tuple(zip(scores, labels, strict=True))
 
 
-def precision_report(
-    scores: Sequence[float], labels: Sequence[bool], *, threshold: float, confidence: float = 0.95
-) -> PrecisionReport:
-    """Count all scores >= threshold, including every tie; report absent evidence as null."""
-    rows = _scored_labels(scores, labels)
-    if not isfinite(threshold) or not 0 <= threshold <= 1:
-        raise CalibrationError("Threshold must be a finite support value in [0,1]")
-    accepted = [label for score, label in rows if score >= threshold]
-    return _precision(sum(accepted), len(accepted), confidence)
-
-
 class ThresholdSelection(FrozenModel):
     threshold: float | None
     report: PrecisionReport

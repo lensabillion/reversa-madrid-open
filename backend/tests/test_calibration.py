@@ -11,7 +11,6 @@ from influence.services.calibration import (
     CalibrationError,
     FittedCombiner,
     fit_combiner,
-    precision_report,
     select_threshold,
 )
 
@@ -156,21 +155,6 @@ def test_prediction_numerical_overflow_is_explicit(fitted: FittedCombiner) -> No
         sums.score((3.0, 7.0))
 
 
-def test_wilson_report_matches_known_interval_and_keeps_empty_unknown() -> None:
-    report = precision_report([0.8] * 40, [True] * 40, threshold=0.8)
-    assert report.selected == report.correct == 40
-    assert report.precision == 1
-    assert report.lower == pytest.approx(0.9123783988)
-    assert report.upper == pytest.approx(1)
-    none = precision_report([0.2], [False], threshold=0.8)
-    assert none.selected == 0
-    assert none.precision is none.lower is none.upper is None
-    wider = precision_report([0.8] * 40, [True] * 40, threshold=0.8, confidence=0.99)
-    assert wider.lower is not None
-    assert report.lower is not None
-    assert wider.lower < report.lower
-
-
 def test_threshold_chooses_lowest_supported_cutoff_without_splitting_ties() -> None:
     scores, labels = [0.9] * 40 + [0.8] * 10 + [0.1] * 10, [True] * 50 + [False] * 10
     result = select_threshold(
@@ -207,9 +191,6 @@ def test_no_threshold_without_enough_precision_or_samples() -> None:
             scores, labels, development_id="insufficient", minimum_precision=0.9, minimum_samples=30
         )
         assert selection.threshold is None
-    audit = precision_report([0.9] * 10, [False] * 10, threshold=0.8)
-    assert audit.precision == 0
-    assert audit.lower == 0
 
 
 @pytest.mark.parametrize(
@@ -233,13 +214,14 @@ def test_invalid_development_data_fails(scores: Sequence[float], labels: Sequenc
 @pytest.mark.parametrize("confidence", [0, 1, nan])
 def test_invalid_confidence_fails_even_for_empty_samples(confidence: float) -> None:
     with pytest.raises(CalibrationError, match="Confidence"):
-        precision_report([], [], threshold=0.5, confidence=confidence)
-
-
-@pytest.mark.parametrize("threshold", [nan, inf, -0.1, 1.1])
-def test_invalid_threshold_fails(threshold: float) -> None:
-    with pytest.raises(CalibrationError, match="Threshold"):
-        precision_report([], [], threshold=threshold)
+        select_threshold(
+            [],
+            [],
+            development_id="dev",
+            minimum_precision=0.9,
+            minimum_samples=30,
+            confidence=confidence,
+        )
 
 
 def test_threshold_requires_explicit_targets_and_sample_provenance() -> None:

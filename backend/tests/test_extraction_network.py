@@ -12,11 +12,9 @@ from typing import override
 
 import pytest
 from extraction_fixtures import FETCHED_AT, FakeUrlResponse, RecordingFetcher
-from pydantic import ValidationError
 
 from influence.extraction import catalog, fetching, probe, pull
 from influence.extraction.cache import HttpCache, request_key
-from influence.extraction.catalog import SourceSpec
 from influence.extraction.fetching import (
     USER_AGENT,
     CachedFetcher,
@@ -416,17 +414,3 @@ def test_the_catalog_letters_ids_and_target_tables_are_unique_and_known() -> Non
     assert AMENDMENTS not in catalog.probeable(catalog.SOURCES)
     with pytest.raises(catalog.UnknownSourceError):
         catalog.source("Z")
-
-
-def test_a_source_cannot_declare_a_table_that_does_not_exist() -> None:
-    with pytest.raises(ValidationError, match="Unknown target tables: winners"):
-        SourceSpec(
-            letter="Z",
-            source_id="invented",
-            name="Invented",
-            scope="global",
-            verification="unverified",
-            probe_url=None,
-            target_tables=("winners",),
-            notes="",
-        )

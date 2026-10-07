@@ -392,8 +392,3 @@ def trace_outcomes(
         _stage_outcome(ask, amendment, link, versions, "parliament_position"),
         _stage_outcome(ask, amendment, link, versions, "final_act"),
     )
-
-
-def outcome_result(outcomes: Sequence[Outcome], stage: OutcomeStage) -> OutcomeResult | None:
-    """The result recorded for `stage`, or None when that stage was not assessed."""
-    return next((item.result for item in outcomes if item.stage == stage), None)

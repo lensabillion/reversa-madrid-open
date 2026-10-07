@@ -10,7 +10,6 @@ from hypothesis import strategies as st
 from influence.services.law_query import (
     LAW_ALIASES,
     LawQuery,
-    com_reference_from_celex,
     name_key,
     parse_query,
     resolve_title,
@@ -64,12 +63,6 @@ def test_parse_query_never_returns_an_empty_value(text: str) -> None:
         assert not text.split()
         return
     assert query.value
-
-
-def test_com_reference_from_celex() -> None:
-    assert com_reference_from_celex("52021PC0206") == "COM(2021)206"
-    assert com_reference_from_celex("52020PC0825") == "COM(2020)825"
-    assert com_reference_from_celex("32024R1689") is None
 
 
 def test_title_tokens_drop_filler_unless_nothing_else_remains() -> None:
