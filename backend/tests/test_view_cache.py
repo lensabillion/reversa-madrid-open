@@ -105,7 +105,7 @@ def test_a_view_carries_cache_control_etag_and_last_modified(tmp_path: Path) -> 
     assert served.headers["cache-control"] == f"public, max-age={lineage.VIEW_MAX_AGE}"
     assert served.headers["last-modified"] == MTIME_HTTP
     tag = served.headers["etag"]
-    assert re.fullmatch(r'"[0-9a-f]{32}"', tag), tag
+    assert re.fullmatch(r'W/"[0-9a-f]{32}"', tag), tag
     assert client.get(f"/api/v1/lineage/{SLUG}").headers["etag"] == tag
 
 
@@ -117,7 +117,8 @@ def test_a_matching_if_none_match_answers_304_with_the_same_headers_and_no_body(
     full = client.get(url)
     tag = full.headers["etag"]
 
-    for tags in ((tag,), (f"W/{tag}",), (f'"other", {tag}',), ('"other"', tag), ("*",)):
+    strong = tag.removeprefix("W/")
+    for tags in ((tag,), (strong,), (f'"other", {tag}',), ('"other"', tag), ("*",)):
         cached = client.get(url, headers=matching(*tags))
         assert cached.status_code == 304, tags
         assert cached.content == b""
@@ -126,6 +127,30 @@ def test_a_matching_if_none_match_answers_304_with_the_same_headers_and_no_body(
             assert cached.headers[header] == full.headers[header], (tags, header)
     for tags in (('"other"',), (tag.strip('"'),), (f'"{tag}"',)):
         assert client.get(url, headers=matching(*tags)).status_code == 200, tags
+
+
+def test_the_tag_is_the_same_for_the_gzip_and_the_plain_answer(tmp_path: Path) -> None:
+    """One weak tag names both representations, so a client that got either revalidates.
+
+    Vary tells caches the two answers differ by Accept-Encoding; a strong tag would have to
+    differ too, which is why the tag is weak.
+    """
+    client, _ = world(tmp_path)
+    url = f"/api/v1/lineage/{SLUG}"
+
+    plain = client.get(url, headers={"Accept-Encoding": "identity"})
+    compressed = client.get(url, headers={"Accept-Encoding": "gzip"})
+
+    assert "content-encoding" not in plain.headers
+    assert compressed.headers["content-encoding"] == "gzip"
+    assert "accept-encoding" in compressed.headers["vary"].lower()
+    assert plain.headers["etag"] == compressed.headers["etag"]
+    assert plain.headers["etag"].startswith('W/"')
+    revalidated = client.get(
+        url, headers=[("Accept-Encoding", "gzip"), *matching(plain.headers["etag"])]
+    )
+    assert revalidated.status_code == 304
+    assert "content-encoding" not in revalidated.headers
 
 
 def test_rewriting_a_view_changes_its_etag(tmp_path: Path) -> None:
