@@ -87,8 +87,12 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   three steps, each with its share as a 100-cell waffle beside the exact "N of M": new words
   traced word for word to an amendment (and in how many phrases), amendments that got wording
   in, and consultation documents that said that wording first, split into documents with a
-  word-for-word origin (teal) and documents found only by a reworded Jev match (violet). The
-  narrowing card width is the funnel's shape only. A count not computed reads "unknown" and
+  word-for-word origin (teal) and documents found only by a reworded Jev match (violet).
+  The document numerator counts distinct documents with an earlier, non-citation origin
+  for an adopted phrase; tabled-only origins are excluded. Both the method split and named
+  organisation detail use that adopted population. A document with both methods counts once
+  as word-for-word; an unknown view or uncomputed document counts keep these figures unknown.
+  The narrowing card width is the funnel's shape only. A count not computed reads "unknown" and
   draws no waffle.
 - **Method** (`components/lineage-method.tsx`): the pipeline in plain words as a four-step
   flowchart (compare the texts, find the amendment, find who said it first, rank and check),
