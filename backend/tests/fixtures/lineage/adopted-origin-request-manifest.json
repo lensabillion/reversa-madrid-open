@@ -1,0 +1,258 @@
+{
+  "corpus_sha256": "597d78a05fe42ab57eaf4bc2272ae6fe042295ddfae138a2dbfa7a6e453ad644",
+  "prompt_revision": "adopted-origin-v1",
+  "cases": [
+    {
+      "id": "S01",
+      "category": "positive_paraphrase",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "8928d73de5cdb3dd0cc757eaf4748f6c172a2259c88ff187c5996c20c05da42f",
+      "request_bytes": 3542,
+      "legacy_request_sha256": "55ba3f79185f0a58e0bcd59f6fb14c529507cc94d09826984af710b2b4f015a7"
+    },
+    {
+      "id": "S02",
+      "category": "rejected_sibling",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "bbcc2f609a2064be600755bcd7161ad74ad491a3aa41ffe54d3139d47cae52b5",
+      "request_bytes": 3625,
+      "legacy_request_sha256": "e15a1856e24e44358f9899cc94422cfe52a8e2eb1b1d6bd41136e9063c1599de"
+    },
+    {
+      "id": "S03",
+      "category": "two_targets_reports",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "7b2a1a012a723854b57bab3f709283394f18ffce783d24d69a496639ee1e80e2",
+      "request_bytes": 3799,
+      "legacy_request_sha256": "e07a07ce3df9ce3322b82984ef62d0c1791c446e17b3d68cb8eb1fea2815b0f5"
+    },
+    {
+      "id": "S04",
+      "category": "two_targets_wrong_target",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "4a04b9104210d6116cd1764904ea78fcc627a0e12adc01faf4aa8839165eb702",
+      "request_bytes": 3741,
+      "legacy_request_sha256": "e07a07ce3df9ce3322b82984ef62d0c1791c446e17b3d68cb8eb1fea2815b0f5"
+    },
+    {
+      "id": "S05",
+      "category": "compound_request_partial_adoption",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "f3731e84b0b5725f532c533125de44811597f76c81015a269fbcb2186fb1cc5c",
+      "request_bytes": 3641,
+      "legacy_request_sha256": "4dfe6259483dc497d2289232065305e71cfb2d3c6a2a51eec686568a4de114f8"
+    },
+    {
+      "id": "S06",
+      "category": "duration_difference",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "27863d66ab32cd1c5939ee2997af566d8b6e720130dd23843c7f86af2e0bb236",
+      "request_bytes": 3518,
+      "legacy_request_sha256": "38a8df9972e5a21d27da39311d50741db991afc50662885629cf184677fe7d03"
+    },
+    {
+      "id": "S07",
+      "category": "permission_not_duty",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "310fa8232f260870f5143b271a00c72e589236c848069451ac8cb902eed391e1",
+      "request_bytes": 3559,
+      "legacy_request_sha256": "eba12ceee16876e993908b33967b97653590b1a6d018e01823cdbfd4d94e169a"
+    },
+    {
+      "id": "S08",
+      "category": "duty_not_permission",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "3f47ff16b1d8bc422fa1b1d6f4bc6e7f5a45517c810ca517fdeab875809248d4",
+      "request_bytes": 3524,
+      "legacy_request_sha256": "b71a383588a2f89709d05a643845aeefac85c183030190bfaefbbbf9c769641d"
+    },
+    {
+      "id": "S09",
+      "category": "regulated_actor",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "6478810843c4648ef2d3cdcf2ac3a870c461ce0ea7b3fc6b9107cbe0517cfe35",
+      "request_bytes": 3543,
+      "legacy_request_sha256": "fcdad4f2ea73a32c6bce9bac97aa7a6694c3e51d4b0101dff1e430654b85edad"
+    },
+    {
+      "id": "S10",
+      "category": "scope_broader_than_request",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "a03069666a15d15bf3bc1e2cd26cf9162036bf3d3bde33fa34ecbd207fecd48a",
+      "request_bytes": 3687,
+      "legacy_request_sha256": "8158eab28be35e8705a09f71c5b8bd8ff7096ad1862995bccf701ce6c3bcd288"
+    },
+    {
+      "id": "S11",
+      "category": "condition_difference",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "d964ad4e2ea51d6f87f40bee9d339450b2ca83dc89574bdd911f5bd2017a4b34",
+      "request_bytes": 3578,
+      "legacy_request_sha256": "f0792bafb03a07039986d858fbda435c4b40a0ee20ba0cf11b2f319189a98d82"
+    },
+    {
+      "id": "S12",
+      "category": "deadline_difference",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "42d8c0f13e62f6a1dc4c6ae76d0d623d474e7edc7838aeda2c300ee7c8633490",
+      "request_bytes": 3574,
+      "legacy_request_sha256": "1b5d893b4b8b111d8f40bca9d7d152c9b70de85e9702fe56c37e1374ca97c5e2"
+    },
+    {
+      "id": "S13",
+      "category": "negated_request",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "a6df0b5f58c3f9489067577f4b222d600786d195d97164e36a27a569b2542758",
+      "request_bytes": 3700,
+      "legacy_request_sha256": "c517af8e2728bf233242cff54e34fdbae64bbc17951f7ad5f319d89f55702c15"
+    },
+    {
+      "id": "S14",
+      "category": "background_only",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "42928951149e21af5bf338e1fadab7712884a61b65ae84f38ebc602a984ba1c6",
+      "request_bytes": 3651,
+      "legacy_request_sha256": "979921f6162ea6e2da64d28776b4e431513972c0ac216453530ffeb4799bd5c0"
+    },
+    {
+      "id": "S15",
+      "category": "quoted_opponent",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "95a35cbdde842b845c080e93dac0d4a407cf00f33e5de2f5bae4c884e7f2294c",
+      "request_bytes": 3621,
+      "legacy_request_sha256": "4ee71740b543ea3bc2c3149c3eaaa387c9219af0b23a8d4e13f142d484464cbb"
+    },
+    {
+      "id": "S16",
+      "category": "endorsed_quotation",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "dd4ab19658ab68fac7e0e71f1afb5c1d96711a6b95f7fc2fa9ed9ca711c075e4",
+      "request_bytes": 3613,
+      "legacy_request_sha256": "5b77b6b72fcb0475764ff5641c4a0a0afb8e34da6b241e6a44d256b5eefaa14f"
+    },
+    {
+      "id": "S17",
+      "category": "positive_nonverbatim",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "3a869a8ca929fe0758323b1a3fdb6f696fb2613c7bcc22a31c59f17f8147b9c1",
+      "request_bytes": 3614,
+      "legacy_request_sha256": "7eb1808e7fb30f14ff847a048d71243ab9e73087cab7767d09aa0591ca578553"
+    },
+    {
+      "id": "S18",
+      "category": "unknown_original",
+      "expected_surviving_relation": "unknown",
+      "expected_request_skip": null,
+      "request_sha256": "0c9bd759336a1c8347c23d9ea81828ad6acc927eeb5c4a1523172f3d9f32c21c",
+      "request_bytes": 3493,
+      "legacy_request_sha256": "3fe5aa6e2d5cc85a6d3e0d9903aab2d0ef3f270c93117edd9229e155e9d331f6"
+    },
+    {
+      "id": "S19",
+      "category": "final_context_negation",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "59e481206dd5bef4bdcca650d1d265e7a8549a81f3ffc1aea6848468f161207f",
+      "request_bytes": 3574,
+      "legacy_request_sha256": "e039bf0d1c05263cd01181dd882ddaac2d11995675f45e8cdaa4045a6d9f0d57"
+    },
+    {
+      "id": "S20",
+      "category": "context_actor_preserved",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "2d8eeb8f8a6f79adc485ebf85ed06a7e82a773ac079038797c5c08b92cb59df1",
+      "request_bytes": 3707,
+      "legacy_request_sha256": "3f0c3aa4ce29526ff1e4d0e7e70fdd85be5a45f6dc5334bd3221f89810a9890f"
+    },
+    {
+      "id": "S21",
+      "category": "final_context_actor_changed",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "b3cc62bff1c07f7d1afb67eb3dead97ad8389392506ec07389316dc619f9b4ca",
+      "request_bytes": 3700,
+      "legacy_request_sha256": "541c8720025b5c381e81b490643a6632f9d2bf4477fa98860ce7b21a2b3db01f"
+    },
+    {
+      "id": "S22",
+      "category": "final_context_scope_changed",
+      "expected_surviving_relation": false,
+      "expected_request_skip": null,
+      "request_sha256": "93148587589c804f8e428a68b359bf75bad05ca9b81e9d3aff25c20ad86350b3",
+      "request_bytes": 3623,
+      "legacy_request_sha256": "3ac7b5a9a0db160005264ed9005623d91300e05a8941225d0992fdddc0a312e4"
+    },
+    {
+      "id": "S23",
+      "category": "repeated_words_new_scope",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "c4693b30ea0b43b65e1fa71767919b38283031d5c1ad390277d86ae751aa03fb",
+      "request_bytes": 3872,
+      "legacy_request_sha256": "b77f78a4338ea1963244c1c18c6545b6c82d8cbcd1cc075f479043bcb597f43d"
+    },
+    {
+      "id": "S24",
+      "category": "repeated_words_unchanged_occurrence",
+      "expected_surviving_relation": false,
+      "expected_request_skip": "no_adoption_evidence",
+      "request_sha256": null,
+      "request_bytes": null,
+      "legacy_request_sha256": null
+    },
+    {
+      "id": "S25",
+      "category": "insertion_outside_target",
+      "expected_surviving_relation": false,
+      "expected_request_skip": "no_adoption_evidence",
+      "request_sha256": null,
+      "request_bytes": null,
+      "legacy_request_sha256": null
+    },
+    {
+      "id": "S26",
+      "category": "pure_deletion_not_lexical_adoption",
+      "expected_surviving_relation": false,
+      "expected_request_skip": "no_adoption_evidence",
+      "request_sha256": null,
+      "request_bytes": null,
+      "legacy_request_sha256": null
+    },
+    {
+      "id": "S27",
+      "category": "punctuation_only_change",
+      "expected_surviving_relation": false,
+      "expected_request_skip": "no_adoption_evidence",
+      "request_sha256": null,
+      "request_bytes": null,
+      "legacy_request_sha256": null
+    },
+    {
+      "id": "S28",
+      "category": "positive_unicode_offsets",
+      "expected_surviving_relation": true,
+      "expected_request_skip": null,
+      "request_sha256": "278bbd4f8ca388a7f97385b6a4a18a2eba49a94daca2fe24f6855d233ea3ae98",
+      "request_bytes": 3599,
+      "legacy_request_sha256": "0e02ea6e7a987fb05cd152f6beb11b983a919dd1ede1af647a1f67178cf7fe1a"
+    }
+  ]
+}

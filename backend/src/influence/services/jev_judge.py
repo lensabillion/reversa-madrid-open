@@ -1,19 +1,9 @@
-"""The Jev judge's core: PR #63's frozen prompt, and a cached, budgeted runner for it.
+"""Budgeted Jev runner and explicit legacy/adopted-origin request revisions.
 
-Taken from `feat/jev-judge` (part 4's judge for the atlas) without its link rules, which
-depend on that branch's masking; lineage uses this core for its reworded origins.
-
-Owner decision D1, 3 October 2026: Jev (TypeSafe `jev-1.13.0`) judges every candidate on
-the live path. The state and the four questions are PR #63's `legal-change-v1` prompt,
-verbatim, because the publication cutoff was measured on Jev's answers to exactly these
-questions: on LobbyPlag's 272 practice pairs, requiring all four answers to clear 0.67
-selected 58 pairs, 57 of them verified copies (precision 0.983, Wilson 95% lower bound
-0.909). Changing a word of a question or of the state invalidates that measurement.
-
-A pair is published only when the rules allow it too: the ask came first, the rules found
-no opposite legal force, and the matched wording is mostly the submitter's own rather than
-text quoted from the Commission's proposal. Jev's answers are evidence that a request and
-an amendment make the same legal change; they are not proof that one caused the other.
+Lineage uses adopted-origin-v1 against exact accepted amendment/final occurrences.
+Its 0.67 cutoff is an uncalibrated experimental policy. The legacy legal-change-v1
+builder stays byte-stable for historical comparisons; its measured accuracy does not
+transfer to the new prompt. Model answers never establish authorship or causal influence.
 """
 
 import hashlib
@@ -23,11 +13,14 @@ from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 
 from influence.extraction.files import write_bytes_atomic
-from influence.schemas.atlas import Amendment, Ask
+from influence.schemas.atlas import Amendment, ArticleVersion, Ask, SourceSpan, span_matches
+from influence.schemas.lineage import AdoptionEvidence
+from influence.services.collected import PipelineError
 from influence.services.jev import (
     MAX_REQUEST_BYTES,
     REQUEST_TOKEN_RESERVE,
@@ -39,7 +32,11 @@ from influence.services.jev import (
     NoulQuestion,
 )
 
+# The adopted-origin prompt has no calibrated threshold: this remains an explicitly
+# provisional experimental policy, not PR #63's measured precision.
 CUTOFF = 0.67
+ADOPTED_PROMPT_REVISION = "adopted-origin-v1"
+type AdoptedSkip = Literal["missing_submission_source", "missing_final_source", "request_too_large"]
 # TypeSafe's input price as PR #63 recorded it; the cap is accounting, not a billing promise.
 PRICE_PER_TOKEN = 0.042 / 1_000_000
 RESERVE_USD = REQUEST_TOKEN_RESERVE * PRICE_PER_TOKEN
@@ -76,6 +73,39 @@ _QUESTIONS = {
 }
 
 
+_ADOPTED_QUESTIONS = {
+    "actual_request": _QUESTIONS["actual_request"],
+    "same_legal_change": (
+        "Does the identifiable submission request ask for the incremental legal effect "
+        "represented by surviving_amendment_span, including its inserted_word_offsets, "
+        "and is that same effect present in surviving_final_span when read within the full "
+        "final_provision_text? Read amendment_old and amendment_new in full. Match regulated "
+        "actor, action, scope, conditions and legal force in BOTH amendment and final contexts. "
+        "A request matching a rejected or unrelated section of amendment_new, or unchanged "
+        "background, is insufficient. A retained phrase is not automatically a retained legal "
+        "effect: surrounding negation, exceptions and qualifications in the final provision "
+        "control its meaning. Null amendment_old is unknown; never invent original wording "
+        "or automatically infer an insertion or deletion from it."
+    ),
+    "incompatible_legal_change": (
+        "Does the submission's requested legal effect impose incompatible requirements with "
+        "the incremental surviving effect identified by surviving_amendment_span and "
+        "surviving_final_span, considering amendment_old/new and the full final_provision_text? "
+        "Compare the same actor, action, scope, conditions and legal force. Permission does "
+        "not establish duty. Negation unrelated to this target is insufficient; lack of "
+        "entailment alone is not contradiction. Unknown originals remain unknown."
+    ),
+    "shared_background": (
+        "Does the supplied submission text or its context explicitly identify the requested "
+        "target wording or legal effect as existing law, background or an earlier third-party "
+        "definition instead of this submitter's own requested change? Read the surviving "
+        "target with amendment_old/new and final_provision_text. Unchanged old wording is "
+        "background. Inserting quoted background does not establish a new requested legal "
+        "effect. Lack of attribution does not prove originality; use only provided evidence."
+    ),
+}
+
+
 class _LegalState(BaseModel):
     """PR #63's `LegalState`, field for field and in order: the order fixes the request bytes."""
 
@@ -89,6 +119,96 @@ class _LegalState(BaseModel):
     amendment_new: str
     proposal_text: str | None
     proposal_context_status: str
+
+
+class _AdoptedOriginState(_LegalState):
+    prompt_revision: Literal["adopted-origin-v1"] = ADOPTED_PROMPT_REVISION
+    adoption_evidence_id: str
+    surviving_amendment_span: SourceSpan
+    surviving_final_span: SourceSpan
+    inserted_word_offsets: tuple[int, ...]
+    final_provision_text: str
+    final_provision: str
+
+
+type AdoptedRequest = JevRequest | AdoptedSkip
+
+
+def adopted_origin_request(
+    ask: Ask,
+    amendment: Amendment,
+    evidence: AdoptionEvidence,
+    source_text: str | None,
+    final: ArticleVersion | None,
+    proposal: Mapping[str, str],
+) -> AdoptedRequest:
+    """Preserve the full surviving target contexts; drop only optional proposal context.
+
+    Missing context is unassessed. A wrong identity or raw source slice is a corrupt
+    invariant and fails explicitly. Exact wire bytes enforce the provider's 24k bound.
+    """
+    if source_text is None:
+        return "missing_submission_source"
+    if final is None:
+        return "missing_final_source"
+    if (
+        ask.span.record_id != ask.document_id
+        or ask.span.field != "text"
+        or evidence.amendment_span.record_id != amendment.amendment_id
+        or evidence.amendment_span.field != "new_text"
+        or final.stage != "final_act"
+        or evidence.final_span.record_id != final.article_id
+        or evidence.final_span.field != "text"
+        or ask.procedure_id != amendment.procedure_id
+        or final.procedure_id != amendment.procedure_id
+        or not span_matches(ask.span, source_text)
+        or not span_matches(evidence.amendment_span, amendment.new_text)
+        or not span_matches(evidence.final_span, final.text)
+    ):
+        raise PipelineError("Adopted origin evidence must quote its exact owning sources")
+    target = _ARTICLE.search(amendment.target_provision or "")
+    article = proposal.get(f"article {target[1]}") if target is not None else None
+    state = _AdoptedOriginState(
+        submission_old=None,
+        submission_new=ask.span.text,
+        preceding_context=source_text[max(0, ask.span.start - _BEFORE) : ask.span.start],
+        following_context=source_text[ask.span.end : ask.span.end + _AFTER],
+        amendment_old=amendment.old_text,
+        amendment_new=amendment.new_text,
+        proposal_text=article,
+        proposal_context_status="unavailable_no_exact_provision"
+        if article is None
+        else "exact_target_provision",
+        adoption_evidence_id=evidence.evidence_id,
+        surviving_amendment_span=evidence.amendment_span,
+        surviving_final_span=evidence.final_span,
+        inserted_word_offsets=evidence.inserted_word_offsets,
+        final_provision_text=final.text,
+        final_provision=final.provision,
+    )
+
+    def build(current: _AdoptedOriginState) -> JevRequest:
+        payload: dict[str, JsonValue] = current.model_dump(mode="json")
+        return JevRequest(
+            state=payload,
+            questions={
+                key: NoulQuestion(instructions=text) for key, text in _ADOPTED_QUESTIONS.items()
+            },
+        )
+
+    request = build(state)
+    if article is not None and len(request_bytes(request)) > MAX_REQUEST_BYTES:
+        request = build(
+            state.model_copy(
+                update={
+                    "proposal_text": None,
+                    "proposal_context_status": "omitted_full_provision_exceeds_request_bound",
+                }
+            )
+        )
+    if len(request_bytes(request)) > MAX_REQUEST_BYTES:
+        return "request_too_large"
+    return request
 
 
 @dataclass(frozen=True)

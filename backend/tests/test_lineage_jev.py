@@ -41,7 +41,7 @@ def _passage(key: str, document_id: str, text: str, actor: str = ACME.actor_id) 
     )
 
 
-def _world(*extra: tuple[str, str, datetime | None, str]) -> Collected:
+def semantic_world(*extra: tuple[str, str, datetime | None, str]) -> Collected:
     """`test_lineage_assembly`'s law with one reworded paper, plus `extra` documents.
 
     Each extra is (key, text, published, actor id); its one passage quotes it whole.
@@ -64,7 +64,7 @@ def _world(*extra: tuple[str, str, datetime | None, str]) -> Collected:
     )
 
 
-def _judge(tmp_path: Path, fake: FakeJev, max_usd: float = 1.0) -> jev_judge.JevJudge:
+def offline_judge(tmp_path: Path, fake: FakeJev, max_usd: float = 1.0) -> jev_judge.JevJudge:
     client = jev.JevClient(SecretStr("offline"), ssl.create_default_context(), transport=fake)
     return jev_judge.JevJudge(client=client, cache=tmp_path / "jev", max_usd=max_usd, workers=2)
 
@@ -75,12 +75,12 @@ def _submitters(world: Collected) -> dict[str, Actor]:
 
 
 def test_a_reworded_request_jev_supports_becomes_a_dated_semantic_origin(tmp_path: Path) -> None:
-    world = _world()
+    world = semantic_world()
     adoption = adopt(world)
     fake = FakeJev()
 
     origins, note = reworded_origins(
-        world, adoption.adoptions, _judge(tmp_path, fake), submitters=_submitters(world)
+        world, adoption.adoptions, offline_judge(tmp_path, fake), submitters=_submitters(world)
     )
 
     (origin,) = [o for o in origins if o.document_id == "doc:hys_attachment:9"]
@@ -92,33 +92,40 @@ def test_a_reworded_request_jev_supports_becomes_a_dated_semantic_origin(tmp_pat
     assert origin.amendment_ids == ("am:2099-0001-COD:IMCO:1",)
     assert (origin.precedes, origin.eligibility) == (True, "ask_first")
     assert origin.counts_as_origin
-    assert "cleared 0.67 on all four answers" in note
+    assert "cleared 0.67 on all four directed support dimensions" in note
     assert any(state["submission_new"] == REWORDED for state in fake.states)
 
 
 def test_a_pair_below_the_cutoff_or_not_answered_is_no_origin(tmp_path: Path) -> None:
-    world = _world()
+    world = semantic_world()
     weak = FakeJev(answer=lambda _: {**SUPPORTING, "same_legal_change": 0.5})
     origins, note = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path / "a", weak), submitters=_submitters(world)
+        world,
+        adopt(world).adoptions,
+        offline_judge(tmp_path / "a", weak),
+        submitters=_submitters(world),
     )
     assert origins == ()
     assert "; 0 cleared" in note
 
     failing = FakeJev(fail=lambda _: True)
     origins, note = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path / "b", failing), submitters={}
+        world, adopt(world).adoptions, offline_judge(tmp_path / "b", failing), submitters={}
     )
     assert origins == ()
     assert "Jev judged 0 of" in note
 
 
 def test_pairs_verbatim_search_found_are_not_asked_again(tmp_path: Path) -> None:
-    world = _world()
+    world = semantic_world()
     fake = FakeJev()
-    known = frozenset((d.document_id, "am:2099-0001-COD:IMCO:1") for d in world.documents)
+    known = frozenset(
+        (d.document_id, evidence.evidence_id)
+        for d in world.documents
+        for evidence in adopt(world).adoptions[0].evidence
+    )
     origins, _ = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path, fake), submitters={}, known=known
+        world, adopt(world).adoptions, offline_judge(tmp_path, fake), submitters={}, known=known
     )
     assert origins == ()
     assert fake.states == []
@@ -127,12 +134,15 @@ def test_pairs_verbatim_search_found_are_not_asked_again(tmp_path: Path) -> None
 def test_one_origin_per_document_and_amendment_and_unknown_dates_stay_unknown(
     tmp_path: Path,
 ) -> None:
-    world = _world(("8", REWORDED + " Again.", None, CITIZEN.actor_id))
+    world = semantic_world(("8", REWORDED + " Again.", None, CITIZEN.actor_id))
     second = _passage("8b", "doc:hys_attachment:8", REWORDED, CITIZEN.actor_id)
     world = replace(world, passages=(*world.passages, second))
 
     origins, _ = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path, FakeJev()), submitters=_submitters(world)
+        world,
+        adopt(world).adoptions,
+        offline_judge(tmp_path, FakeJev()),
+        submitters=_submitters(world),
     )
 
     undated = [o for o in origins if o.document_id == "doc:hys_attachment:8"]
@@ -145,12 +155,12 @@ def test_one_origin_per_document_and_amendment_and_unknown_dates_stay_unknown(
 
 def test_a_passage_without_text_is_not_asked(tmp_path: Path) -> None:
     orphan = _passage("6", "doc:hys_attachment:missing", REWORDED)
-    world = _world()
+    world = semantic_world()
     world = replace(world, passages=(*world.passages, orphan))
     fake = FakeJev()
 
     origins, _ = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path, fake), submitters={}
+        world, adopt(world).adoptions, offline_judge(tmp_path, fake), submitters={}
     )
 
     assert {o.document_id for o in origins} == {"doc:hys_attachment:9"}
@@ -162,25 +172,25 @@ def test_a_pair_over_the_request_bound_is_counted_not_asked(
 ) -> None:
     # BM25 already refuses passages and amendments past 800 tokens, so no real pair reaches
     # the bound; the guard stays for a future caller with a larger context.
-    def too_large(*_: object) -> None:
-        return None
+    def too_large(*_: object) -> jev_judge.AdoptedRequest:
+        return "request_too_large"
 
-    monkeypatch.setattr(lineage_jev, "judge_request", too_large)
-    world = _world()
+    monkeypatch.setattr(lineage_jev, "adopted_origin_request", too_large)
+    world = semantic_world()
     fake = FakeJev()
 
     origins, note = reworded_origins(
-        world, adopt(world).adoptions, _judge(tmp_path, fake), submitters={}
+        world, adopt(world).adoptions, offline_judge(tmp_path, fake), submitters={}
     )
 
     assert origins == ()
     assert fake.states == []
-    assert "over the request bound" in note
+    assert "request_too_large" in note
 
 
 def test_the_lineage_view_adds_reworded_origins_and_says_how(tmp_path: Path) -> None:
     view = lineage_assembly.build_lineage(
-        _world(), generated_at=NOW, judge=_judge(tmp_path, FakeJev())
+        semantic_world(), generated_at=NOW, judge=offline_judge(tmp_path, FakeJev())
     )
     kinds = {(o.document_id, o.kind) for o in view.origins}
     assert ("doc:hys_attachment:9", "semantic") in kinds
@@ -188,9 +198,9 @@ def test_the_lineage_view_adds_reworded_origins_and_says_how(tmp_path: Path) -> 
     assert lineage_assembly.VERBATIM_ONLY not in view.limitations
     assert lineage_assembly.REWORDED in view.limitations
     assert any(
-        note.startswith("Reworded origins (jev-reworded-origins)") for note in view.limitations
+        note.startswith("Reworded origins (jev-reworded-origins,") for note in view.limitations
     )
-    plain = lineage_assembly.build_lineage(_world(), generated_at=NOW)
+    plain = lineage_assembly.build_lineage(semantic_world(), generated_at=NOW)
     assert all(o.kind == "verbatim" for o in plain.origins)
     assert lineage_assembly.VERBATIM_ONLY in plain.limitations
 

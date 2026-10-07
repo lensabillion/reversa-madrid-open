@@ -26,7 +26,7 @@ ADOPTED = f"Providers shall keep the logs {RARE}."
 # The frontend's tests read this view, so the TypeScript types are checked against real JSON.
 # Regenerate after a contract change: uv run --directory backend --locked python
 # tests/test_lineage_views.py
-FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-sources.json"
+FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-sources-v2.1.json"
 
 
 def adopted_world(tmp_path: Path) -> Collected:
