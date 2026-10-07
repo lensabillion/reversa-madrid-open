@@ -716,8 +716,6 @@ data/
   raw/
     registry/ meetings_ec/ meetings_mep/ ep_opendata/ probe/
     laws/<procedure-slug>/   # 2021/0106(COD) becomes 2021-0106-COD
-      manifest.json
-  parsed/                    # one file per table below
 ```
 
 **The cache is not an optimisation.** A second identical request never leaves the
@@ -727,41 +725,24 @@ mid-event. `fetching.py` is the only module that touches the network: two reques
 second, standard library only, and a non-2xx response raises instead of being cached, so
 a source that returns 503 at 10:00 and works at 11:00 is not remembered as broken.
 
-**The manifest is how a law enters the pipeline.** One procedure identifier resolves
-into `manifest.json`, which lists the derived CELEX numbers, the lead committee, the
-rapporteurs, the consultation identifier, the document URLs, and an `available` block.
-Nothing downstream carries a hardcoded identifier, and the `available` block is the
-fail-soft switch: a law with no public consultation still produces a graph from
-amendments alone, and the coverage report can say what was missing rather than leaving a
-silent hole.
+**The records a law produces** are the typed models of `schemas/atlas.py` (`LawRecord`,
+`SourceDocument`, `Passage`, `Amendment`, `ArticleVersion`, `Actor`, and so on), written as
+JSON Lines by the collect command (see "Collect Command" above) and read back by every later
+part. They replaced this layer's first row models and per-law manifest on 6 October 2026:
+the `RunManifest` that `collect` publishes last plays the manifest's role, and every record
+carries its source document, retrieval date and hash, because the jury picks edges at random
+and asks to see the original. JSON Lines rather than CSV, because legal text contains every
+delimiter, and rather than Parquet, because Parquet needs a new dependency (pyarrow) that the
+supply-chain policy has not cleared.
 
-**The six parsed tables** are defined in `tables.py` as typed row models: `actors`,
-`meetings`, `asks`, `amendments`, `articles` and `links`. Three choices in them matter.
-An `asks` row is one text chunk from one submission, not one submission, because a
-position paper carries thirty distinct asks and matching a whole PDF is worthless. Every
-row carries `source_url`, `fetched_at` and `extraction_method`, because the jury picks
-edges at random and asks to see the original. And rows reject undeclared fields, so a
-parser cannot quietly invent a column.
-
-Rows are stored as JSON Lines rather than CSV, because legal text contains every
-delimiter, and rather than Parquet, because Parquet needs a new dependency (pyarrow)
-that the supply-chain policy has not cleared. The row models are the contract, so
-changing the container later changes no parser.
-
-**Entity resolution** (`names.py`) is the join nothing else can do. Only the register and
-the Commission's meetings carry a registration identifier; MEP meetings and consultation
-submissions carry free text, and roughly half of MEP entries do not use the register's
-official name, so a join on name alone looks right and is wrong. `ActorIndex.resolve`
-tries four layers in order — registration identifier, normalised exact name, acronym,
-then fuzzy token-set similarity above 0.90 — and records which layer fired and with what
-score. Two outcomes are deliberately not matches: `ambiguous`, when several registered
-organisations fit equally (one parent with twelve national entries), and `unresolved`,
-below the threshold. A visible unresolved count is more defensible than a silently wrong
-join, and the jury can ask about it.
-
-Not in this layer yet: response parsers for any source, the proposal-to-final-act diff,
-amendment PDF parsing, candidate link scoring, and the per-law coverage report. They are
-the next work, and each needs a probed response shape first.
+**Entity resolution** is the join nothing else can do: only the register carries a
+registration identifier, consultation submissions carry free text, and roughly half of the
+free-text names do not use the register's official spelling, so a join on the raw name looks
+right and is wrong. `names.py` keeps the normalisers (`tokenise`, `normalise`,
+`token_set_ratio`, which strip case, punctuation, legal suffixes and filler words) and the
+0.90 fuzzy threshold; `services/actors.py` (part 2) is the resolver that applies them and
+records which layer fired, keeping an ambiguous or unresolved name visible rather than
+guessing.
 
 ## Verification
 
@@ -824,17 +805,17 @@ aggregations took 0.1062 seconds (0.1062 ms per run). This tiny in-memory benchm
 excludes ingestion, scoring, network and disk loading; it does not establish full-pipeline
 runtime or real-world accuracy. The script retains the inputs and measurement procedure.
 
-## Fitted Calculation and Local Model Evaluation
+## Fitted Signals and Local Model Evaluation
 
-`influence.services.calculation.calculate_links` composes the merged passage-change
-reader and assessment with fitted signals, law-local background/mutual ranks and explicit
-publication evidence. It returns the shared `LinkAssessment` contract consumed by the
-Atlas graph. It preserves all candidate alternatives and reports missing/experimental
-evidence. The default accepted-model set is empty: a fitted support score is neither a
-calibrated probability nor permission to publish.
-
-The [calculation design and plan-coverage handoff](../docs/design/calculation-handoff.md)
-explains formulas, evidence gates, known gaps and dependencies. The
+`services/signals.py` (rarity, alignment, direction and legal cues), `services/ranking_signals.py`
+(law-local background and mutual ranks) and `services/calibration.py` (a standardised,
+L2-regularised logistic combiner fitted on grouped folds, with a Wilson-bound threshold
+selection) are the development evaluation of part 4's fitted signals. They are measured by
+the benchmark below, not called by the live `influence atlas` path, whose assessor is the
+rule-based `services/assessment.py`. The `calculate_links` composition that once bound them
+into a publication policy was removed on 6 October 2026 as dead code (nothing but its own
+tests called it); the [calculation design and plan-coverage handoff](../docs/design/calculation-handoff.md)
+keeps its formulas and evidence gates as the record of that design. The
 [isolated model runtime](models/README.md) gives reproducible local Qwen/E5 embeddings,
 DeBERTa NLI inference, measured retrieval comparisons and failed legal diagnostics.
 No paid API or new application dependency is required.
