@@ -397,16 +397,21 @@ function provisions(view: LineageView, layer: "proposal" | "final_act"): number 
  * the final act's provisions and its new words, the new words traced to amendments (in how
  * many adopted phrases), the amendments that carry them, and the consultation documents that
  * said that wording first (from how many named organisations). Only counts already in the
- * view; nothing is estimated.
+ * view and its eligible adopted-origin records; nothing is estimated.
  */
 export function lineageFunnel(
   view: LineageView,
   ranking: OrganisationRanking,
 ): readonly FunnelStep[] {
   const { counts } = view;
+  const documentsKnown =
+    view.status !== "unknown" &&
+    counts.documents_read !== null &&
+    counts.documents_with_origin !== null;
+  const adopted = new Set(view.adopted_phrases.map((phrase) => phrase.phrase_id));
   const kinds = new Map<string, Set<OriginMatchRecord["kind"]>>();
   for (const origin of view.origins) {
-    if (countsAsOrigin(origin)) {
+    if (adopted.has(origin.phrase_id) && countsAsOrigin(origin)) {
       const seen = kinds.get(origin.document_id) ?? new Set();
       seen.add(origin.kind);
       kinds.set(origin.document_id, seen);
@@ -438,11 +443,10 @@ export function lineageFunnel(
     },
     {
       id: "documents",
-      part: counts.documents_with_origin,
+      part: documentsKnown ? kinds.size : null,
       whole: counts.documents_read,
-      detail: ranking.rows.filter((row) => row.adoptedFirst > 0).length,
-      split:
-        counts.documents_with_origin === null ? null : { lexical, semantic: kinds.size - lexical },
+      detail: documentsKnown ? ranking.rows.filter((row) => row.adoptedFirst > 0).length : null,
+      split: documentsKnown ? { lexical, semantic: kinds.size - lexical } : null,
     },
   ];
 }

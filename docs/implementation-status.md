@@ -27,6 +27,20 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Adopted-Origin Funnel Count — 7 October 2026
+
+rev-is6b fixes the website's consultation-document funnel numerator: it counts distinct
+eligible, non-citation documents attached to adopted phrases, excluding tabled-only origins.
+The lexical/semantic split uses that same adopted population, with a document counted as
+lexical when it has both kinds of adopted origin. Named organisations already use eligible
+adopted phrases. Unknown views or uncomputed document counts keep these figures unknown.
+No backend records, schemas, stored data or other interface labels change.
+
+Verified in the isolated worktree: make check-frontend passes with 66 tests in seven files,
+Biome, Next.js route types, strict TypeScript and the production build. Regression cases
+cover one adopted-origin document plus two tabled-only documents, duplicate/shared documents,
+method precedence, citation/later/undated exclusions, unnamed sources and unknown inputs.
+
 ### Cleanup Verification
 
 The cleanup removes the retired Atlas runtime modules and their exclusive tests, experiment

@@ -219,3 +219,84 @@ test("a funnel step reads unknown when its text was not fully collected", () => 
   const steps = lineageFunnel({ ...view, coverage }, rankOrganisations(view));
   expect(steps[1]?.part).toBeNull();
 });
+
+test("the funnel counts adopted-origin documents, not two tabled-only documents", () => {
+  const adoptedDocument = { ...origin, kind: "semantic" as const };
+  const tabled = {
+    ...origin,
+    phrase_id: "phrase:tabled-only",
+    actor_id: "actor:tabled-only",
+    organisation: "Tabled Only Association",
+  };
+  const lineage: LineageView = {
+    ...view,
+    counts: { ...view.counts, documents_read: 3, documents_with_origin: 3 },
+    tabled_phrases: [
+      {
+        phrase_id: tabled.phrase_id,
+        text: phrase.text,
+        words: phrase.words,
+        amendment_ids: origin.amendment_ids,
+      },
+    ],
+    origins: [
+      adoptedDocument,
+      adoptedDocument,
+      // This document has both populations: its tabled lexical match must not change the
+      // adopted semantic-only classification, nor count the document twice.
+      { ...tabled, document_id: adoptedDocument.document_id },
+      { ...tabled, document_id: "doc:tabled-one" },
+      { ...tabled, document_id: "doc:tabled-two", kind: "semantic" },
+    ],
+  };
+  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toEqual({
+    id: "documents",
+    part: 1,
+    whole: 3,
+    detail: 1,
+    split: { lexical: 0, semantic: 1 },
+  });
+});
+
+test("the funnel excludes citations, later and undated origins but includes unnamed sources", () => {
+  const lineage = withOrigins([
+    { ...origin, document_id: "doc:citation", is_citation: true },
+    {
+      ...origin,
+      document_id: "doc:later",
+      eligibility: "amendment_first",
+      precedes: false,
+    },
+    {
+      ...origin,
+      document_id: "doc:undated",
+      eligibility: "unknown_date",
+      precedes: null,
+      published_at: null,
+    },
+    { ...origin, document_id: "doc:unnamed", organisation: null, actor_id: null },
+  ]);
+  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toMatchObject({
+    part: 1,
+    detail: 0,
+    split: { lexical: 1, semantic: 0 },
+  });
+  const empty = withOrigins([]);
+  expect(lineageFunnel(empty, rankOrganisations(empty))[4]).toMatchObject({
+    part: 0,
+    detail: 0,
+    split: { lexical: 0, semantic: 0 },
+  });
+});
+
+test.each<LineageView>([
+  { ...view, status: "unknown", reason: "Final act missing" },
+  { ...view, counts: { ...view.counts, documents_read: null } },
+  { ...view, counts: { ...view.counts, documents_with_origin: null } },
+])("the funnel keeps uncomputed adopted-document figures unknown (%#)", (lineage) => {
+  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toMatchObject({
+    part: null,
+    detail: null,
+    split: null,
+  });
+});
