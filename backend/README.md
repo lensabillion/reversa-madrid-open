@@ -38,7 +38,9 @@ HTTP requests only read saved views; collection and analysis run through the CLI
 
 The Atlas producer and its offline forecast, report, audit, directions, channels,
 coordinated-amendment and batch commands are retired. So are the standalone extraction
-probe and model/practice experiment runners. Historical documents and recorded evaluation
+probe and model/practice experiment runners. Independent lineage review remains supported
+as quality tooling; it reads `lineage.json` and never changes the website's data.
+Historical documents and recorded evaluation
 JSON remain, with the former instructions in [the archived backend guide](README-history-2026-10-07.md).
 Existing ignored data is not deleted, but `atlas.json` is no longer read or produced.
 
@@ -284,6 +286,30 @@ document counts as an origin only when it is dated before every carrying amendme
 view is `status: "unknown"` with its reason, and every count that could not be computed is
 null, never zero. The website retains its existing sample display; no independent
 precision audit is established by this cleanup.
+
+## Independent Lineage Review
+
+This quality tool samples adopted-phrase claims from a saved lineage view, exports them
+for human readers, and summarises labels kept separately from model output. It does not
+depend on `atlas.json` and never writes a lineage view. From the repository root:
+
+```sh
+uv run --directory backend --locked python -m influence.practice.lineage_review \
+  export --view ../data/laws/2021-0106-COD/lineage.json --out ../data/review/ai-act --n 30 --seed 0
+uv run --directory backend --locked python -m influence.practice.lineage_review \
+  summarise --rows ../data/review/ai-act/rows.jsonl --labels ../data/review/ai-act/labels.jsonl --floor 0.9
+```
+
+The export writes JSONL, CSV and Markdown. Reviewers supply `labels.jsonl` separately;
+each label identifies the claim and reader with a `real`, `not_real` or `unclear` verdict.
+The summariser reports reader agreement and a Wilson confidence interval, and refuses
+to pass on too few resolved labels. Sampled claims and additionally selected strongest
+claims are reported separately.
+
+Limits: the sample covers adopted phrases rather than exactly the displayed graph's
+population; reported precision covers resolved agreements and excludes disagreements
+and unclear labels. Restoring this tool does not establish independent accuracy or fix
+those pre-existing limitations. No review labels were supplied during this cleanup.
 
 ## Verification
 

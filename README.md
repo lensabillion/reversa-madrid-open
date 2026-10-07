@@ -48,6 +48,12 @@ application reads that view and turns its records into a graph, counts and evide
 | Wording and consultation matches | [lexical adoption](backend/src/influence/services/lineage.py), [origins](backend/src/influence/services/origin.py), [optional Jev origins](backend/src/influence/services/lineage_jev.py) |
 | Saved view and API | [assembly](backend/src/influence/services/lineage_assembly.py), [schema](backend/src/influence/schemas/lineage.py), [view reader](backend/src/influence/services/lineage_views.py), [routes](backend/src/influence/routers/lineage.py) |
 | Website | [API proxy](frontend/next.config.ts), [lineage page](frontend/app/lineage/page.tsx), [graph](frontend/lib/lineage-graph.ts), [aggregates](frontend/lib/lineage.ts) |
+| Independent quality review | [lineage review tool](backend/src/influence/practice/lineage_review.py): sample adopted-phrase claims, export them for readers, and summarise separately stored labels |
+
+The review tool and automated tests are retained quality tools. Review labels never alter
+`lineage.json` or feed the website. The review tool samples adopted phrases, which differs
+from the graph's displayed population; its precision covers resolved reader agreements.
+Its existence is not evidence that a review has been completed or an accuracy gate passed.
 
 Shared wording and model judgments do not prove authorship or causal influence. The
 [repository review](docs/reviews/repository-consistency-2026-10-07.md) records remaining

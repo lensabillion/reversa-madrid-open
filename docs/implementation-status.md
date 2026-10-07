@@ -17,7 +17,7 @@ acceptance tests for the same eight parts. The [consolidated execution plan](pla
 The owner chose to retire the entire `atlas.json` branch after inspecting its temporary
 Saved analysis preview (`rev-w1ao`). Only the lineage website and its data-generation
 path remain supported: `setup`, `collect`, `lineage` (optional `--jev`), health and lineage
-GET endpoints, and the existing frontend/build/test tooling. The uncommitted analysis
+GET endpoints, and the existing frontend/build/test and independent lineage-review tooling. The uncommitted analysis
 page/API were removed. The offline Atlas producer/consumers, standalone experiments and
 unused model dependency group are retired. Documents, recorded evaluation JSON, committed
 lineage snapshots and ignored user data are preserved. Existing Atlas files are not read.
@@ -29,7 +29,7 @@ remaining lineage findings in the [repository review](reviews/repository-consist
 
 ### Cleanup Verification
 
-The cleanup removes 51 retired runtime modules and their exclusive tests, experiment
+The cleanup removes the retired Atlas runtime modules and their exclusive tests, experiment
 runners and optional model dependency group. Shared collection loading and BM25 candidate
 helpers now live in `services/collected.py` and `services/lineage_candidates.py`. All
 Markdown/PDF documents, recorded evaluation JSON and committed lineage snapshots remain;
@@ -37,7 +37,8 @@ the former backend instructions are archived in
 [the historical backend guide](../backend/README-history-2026-10-07.md). The root README
 now includes a diagram and code-linked description of the retained architecture.
 
-Verified locally on 7 October 2026: `make check` exits 0; 640 backend tests, 100% line and
+Before the self-review correction, verified locally on 7 October 2026: `make check` exits 0;
+640 backend tests, 100% line and
 branch coverage (3,838 statements, 1,028 branches); 59 frontend tests; Ruff, Biome, strict
 Python/TypeScript checks, the production build, all six research catalogs and both
 dependency audits pass. A fixed-input complete lineage view with mocked Jev is byte-for-byte
@@ -51,6 +52,29 @@ confirmed the law list, AI Act summary and graph (131 nodes, 306 connections), a
 evidence cards. No fresh public collection, paid Jev calls or accuracy evaluation was run.
 Container verification is left to the PR's CI gate; PR and CI state are recorded on
 `rev-w1ao`.
+
+Self-review caught an overbroad deletion: `practice/lineage_review.py` evaluates the
+retained lineage product and is quality tooling, not an Atlas consumer. It and its tests
+are restored, using the existing atomic writer and keeping only its statistical and
+coalition helpers locally. The old `benchmarks/lineage_jev.py` and `lineage_view.py` remain
+retired: they use an older experimental request/cache format and produce `atlas.json`.
+Production `services/lineage_jev.py` and its tests remain supported. Additional retained
+span tests preserve non-BMP, mixed-script and numeric cases formerly embedded in the
+deleted scorer suite. After correction, `make check-backend` passes: 665 tests, strict
+types and Ruff, 100% line and branch coverage (4,054 statements, 1,082 branches).
+
+Additional preservation checks: all 22 retained schema JSON contracts have identical
+fields/defaults/validators/patterns (only two description strings differ). With a fixed
+clock and no judge, complete lineage generation from the real collected AI Act (5,660
+amendments, 631 phrases) and Data Act (2,437 amendments, 196 phrases) is byte-identical
+between `015bdac` and the corrected runtime. The 224 input files keep identical contents,
+sizes and modification times during that comparison. Outputs went only to temporary
+directories; collection and paid model calls were not run. Both committed lineage
+snapshots and all 11 evaluation JSON artifacts also retain their original Git contents.
+
+Operational limit: the next collection run detects the changed package source hash and
+can rebuild cached stages. This cleanup does not delete saved data; it does not promise
+that a future regeneration leaves existing bundles or Jev request caches unchanged.
 
 ## Objective and Deliverables (Historical Challenge)
 

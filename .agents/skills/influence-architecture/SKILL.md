@@ -30,11 +30,15 @@ setup → collect → lineage → lineage.json → GET /api/v1/lineage → /line
 | Persisted view | `lineage.json`, schema `lineage-1`; preserve compatibility with committed snapshots |
 | Read-only API | Health and lineage list/detail; caching, validation and explicit missing/error states |
 | Website | Existing lineage summary, holders, graph, evidence, sample and method; backend supplies records, frontend derives its existing organisation aggregates and layout |
-| Quality tooling | Locked installs, Ruff/Biome, strict types, behavioral tests, gate probes, dependency audits and container checks |
+| Quality tooling | Independent lineage review with separate human labels; locked installs, Ruff/Biome, strict types, behavioral tests, gate probes, dependency audits and container checks |
 
 The `atlas.json` producer, ask-first graph/outcome/forecast/report/audit branch, standalone
 channels/directions/coordinated/batch commands, extraction probe CLI and practice/model
-experiment runners are retired. Do not restore a retired feature merely because a dated
+experiment runners are retired. Keep `influence.practice.lineage_review` and its tests:
+it reviews current lineage claims and is quality tooling even though HTTP never calls it.
+Its phrase sample differs from the graph population, and its precision uses resolved
+agreements; do not treat it as a completed independent accuracy audit.
+Do not restore a retired feature merely because a dated
 plan describes it. Existing documents, evaluation JSON and ignored user data are preserved.
 The shared collection schema's `atlas-1` identifier is a persisted contract, not an active
 Atlas pipeline; keep compatible records rather than renaming stored fields gratuitously.

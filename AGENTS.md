@@ -45,7 +45,9 @@ Owner decision, 7 October 2026 (`rev-w1ao`): maintain only the lineage website a
 data-generation path. Supported product commands are `setup`, `collect`, and `lineage`
 (including optional `--jev`); HTTP serves health and lineage views. The Atlas producer,
 forecast/report/audit/directions/channels/coordinated/batch commands and standalone
-practice/model experiments are retired. Preserve documents, recorded evaluation evidence
+practice/model experiments are retired. Keep independent lineage review
+(`influence.practice.lineage_review`) and its tests as quality tooling, even though HTTP
+does not call them. Preserve documents, recorded evaluation evidence
 and ignored user data. Shared record schemas keep their persisted format for compatibility.
 The historical challenge descriptions below are context, not authorization to restore
 retired features. The [backend guide](backend/README.md) is the current command contract.
@@ -191,7 +193,7 @@ Each behavior is checked from the angles that can catch its failures:
 | Property-based | Does an invariant hold on many generated inputs (for example, a score stays within 0–1, matching is symmetric where it should be)? | Hypothesis, fast-check |
 | Contract | Do the API, CLI and data outputs keep their exact shape? | pytest with the FastAPI test client; golden files |
 | Gate probes | Do the linters still reject a known violation? | committed probe files run by the gates |
-| Evaluation | Does a scoring change raise the precision of the links we publish without losing recall? | the practice harness on LobbyPlag's labelled pairs (organization-grouped folds), plus a blind audit of a random sample of our own published links, reported with a confidence interval |
+| Evaluation | Does a scoring change raise precision without losing recall? | retained lineage review with separately stored human labels and confidence intervals; account for its phrase-vs-graph sampling limits. Historical LobbyPlag results remain evidence, but their retired runners do not validate new changes |
 | Performance | Does one law, named live, finish within minutes? | timed runs on fixed laws, from download and from cache |
 | End to end | Does one command turn a procedure number into a graph, rankings and report figures? | a rehearsal on laws not used during development |
 
