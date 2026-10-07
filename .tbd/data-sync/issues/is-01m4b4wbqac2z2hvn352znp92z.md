@@ -3,9 +3,9 @@ type: is
 id: is-01m4b4wbqac2z2hvn352znp92z
 title: Audit repository documentation, architecture and runtime contradictions
 kind: task
-status: in_progress
+status: closed
 priority: 1
-version: 17
+version: 18
 delegate: unknown@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -26,8 +26,12 @@ child_order_hints:
 hold: null
 hold_until: null
 created_at: 2026-10-07T12:19:45.001Z
-updated_at: 2026-10-07T12:50:17.875Z
+updated_at: 2026-10-07T14:08:52.362Z
 started_at: 2026-10-07T12:20:15.502Z
+closed_at: 2026-10-07T14:08:52.361Z
+close_reason: PR101 and PR102 are merged into the parent branding branch (PR100), verified on GitHub 7 October2026. Their audit/cleanup deliverables and final CI passed; release to main remains under PR100/rev-3n26. New analytical fixes are separate beads.
+resolution: null
+duplicate_of: null
 ---
 Review every tracked documentation surface against current architecture, code, tests and commands at efea068. Parts 1-8 and practice loop. Produce an evidence-backed severity-ordered remediation plan; review only, no product changes. Coordinate independent backend, frontend/gates and documentation reviews.
 
