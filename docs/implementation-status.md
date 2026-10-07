@@ -250,6 +250,16 @@ words traced; 195 of 788 documents said wording first; 153 named organisations. 
 `--jev` (semantic origins), and any audit of the shown links. Observed, not explained: all
 530 dated non-citation matches have the submission first (0 amendment-first).
 
+Three more snapshots are committed under `mock-data/laws/` (`measured`, 3 October, macOS
+26.6.2 arm64 laptop, `make lineage LAW=<procedure> ARGS='--jev --refresh'`, backend source
+`src-e6c32911fa16`, identical to `main` at `d7de70d`, Have Your Say index built): the
+Digital Services Act (275 adopted phrases from 503 of 6,476 amendments; 300 lexical and 61
+semantic origins; Jev 0.13 USD; 5 m 0 s), the Digital Markets Act (113 phrases from 265 of
+3,261; 158 and 37; 0.07 USD; 1 m 38 s) and the Data Act (196 phrases from 244 of 2,437; 97
+and 34; 0.07 USD; 4 m 1 s). A clone can open all five lineage views without the pipeline or
+a TypeSafe key; `data/` stays uncommitted. Not verified: whether those runs' downloads came
+from the local HTTP cache, so the times are not cold-start times.
+
 ## Coordinated Amendments (Atlas Part 3, Plan Gate 2) — 3 October 2026
 
 `influence coordinated <law>` (`make coordinated LAW=...`, bead `rev-637f`) lists the
