@@ -456,7 +456,9 @@ def test_lexical_evidence_suppression_does_not_hide_a_sibling_target(tmp_path: P
     assert "already_lexical=1" in note
 
 
-SEMANTIC_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-semantic-sources-v2.1.json"
+SEMANTIC_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "lineage" / "view-semantic-sources-v2.1.json"
+)
 
 
 def render_semantic_fixture() -> str:
