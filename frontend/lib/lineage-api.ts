@@ -143,6 +143,33 @@ export interface LineageCounts {
   linked_units: number | null;
 }
 
+/** Compact source-document metadata; no complete extracted text is embedded. */
+export interface LineageDocumentRecord {
+  document_id: string;
+  url: string;
+  title: string | null;
+  source_kind:
+    | "parltrack"
+    | "cellar"
+    | "ep_api"
+    | "hys_feedback"
+    | "hys_attachment"
+    | "register"
+    | "meetings"
+    | "votes"
+    | "public_statement";
+  published_at: string | null;
+  retrieved_at: string;
+  sha256: string;
+}
+export interface LineageSourceRecord {
+  record_id: string;
+  document_id: string;
+  record_type: "document_text" | "amendment" | "article";
+  label: string | null;
+  unavailable_reason: string | null;
+}
+
 /** Everything the explorer shows for one law's lineage, from one run. */
 export interface LineageView {
   schema_version: "lineage-1" | "lineage-2";
@@ -165,6 +192,9 @@ export interface LineageView {
   /** In the backend's `credit_rank` order (basis, kind, then rate); the view keeps that order. */
   credits: readonly CreditRecord[];
   limitations: readonly string[];
+  /** Absent on legacy snapshots, which have explicit unavailable source links. */
+  documents?: readonly LineageDocumentRecord[];
+  source_records?: readonly LineageSourceRecord[];
 }
 
 export const lineageLawsUrl = "/api/v1/lineage";

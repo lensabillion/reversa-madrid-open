@@ -58,8 +58,7 @@ pipeline wrote.
 `/lineage` is the explorer: the header's **Lineage explorer** link opens the maintained website. It shows, for each law `make lineage` has built, which wording of the
 final act came from which amendments, who tabled them, and which submissions said the same
 words, and when. It reads two backend endpoints through the `/api/v1/…` proxy:
-`GET /api/v1/lineage` (the law list) and `GET /api/v1/lineage/{slug}` (one `lineage-1`
-view; 404 when the law has none).
+`GET /api/v1/lineage` (the law list) and `GET /api/v1/lineage/{slug}` (one `lineage-2` view; legacy `lineage-1` remains readable; 404 when the law has none).
 
 The selected law lives in the URL (`/lineage?law=2021-0106-COD`). `lib/lineage.ts`
 (`prepareLineage`) joins the view into rows: every adopted phrase with its final-act
@@ -144,3 +143,26 @@ or causal influence. Organisation counts and graph headings describe experimenta
 associations. The owner chose to keep these exploratory records visible (`rev-u2rn`).
 Collection completeness is distinct from association accuracy; random inspection is not an
 audit. This presentation policy does not change stored records, eligibility or matching.
+
+### Quotation sources
+
+`components/lineage-source-quote.tsx` displays the saved quotation and compact provenance from
+`source_records` → `documents`. Exact graph association cards show three linked quotations;
+existing Evidence-tab quotations use the same component. Links preserve the saved URL and
+permit only HTTP/HTTPS. Parltrack amendments link to the recorded dataset source, rather than
+an inferred amendment page. Publication/retrieval dates, source kind, document identity and
+SHA-256 accompany each mapped source. A missing legacy mapping or unsafe URL stays explicitly
+unavailable while its quotation remains visible.
+
+Offsets are Unicode code points in the named extracted record field, with an inclusive start
+and exclusive end; they are not byte offsets into the linked file. Recorded pages are shown
+without inventing page-specific URL fragments. No complete document text or extra source fetch
+is added. `tests/lineage-sources.test.tsx` reads the generated backend `view-sources.json`
+contract and checks exact mappings, dates/hashes, unsafe and absent URLs, field identity and
+Unicode offsets.
+
+Evidence cards are saved phrase context, without arrows implying that each submission matched
+every carrier. The first six carrier rows can be expanded to all carriers. Each adopted carrier
+shows only its own phrase-filtered exact amendment evidence and mapped source; legacy carrier
+quotes remain explicitly unavailable. Complete submission → amendment → final associations
+are shown separately through saved support IDs.

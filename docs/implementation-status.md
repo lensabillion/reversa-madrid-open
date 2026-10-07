@@ -27,6 +27,25 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Quotation Source Provenance — 7 October 2026
+
+R6 (`rev-j07w`) attaches compact collected source metadata and explicit record-to-document
+mappings to lineage quotations. It preserves source URLs, publication/retrieval dates,
+source kind and downloaded-byte hashes without inferring links from IDs. Missing metadata
+has a reason; consultation text cannot point to another document. Browser quotations expose
+safe original links and distinguish extracted-field Unicode offsets from source-file bytes.
+Legacy views remain readable with explicit missing-provenance text.
+
+Backend verification passed 697 tests with full line/branch coverage (4,307 statements,
+1,214 branches), including remapping and unavailable-metadata regressions. Frontend checks
+passed 100 tests in eight files, Biome, strict types and production build. Independent Astra review approved source identity, safe links, phrase-specific
+carrier quotations and expansion beyond six carriers. Saved phrase context is explicitly
+separate from exact support-ID associations. A four-law offline rehearsal checked
+2,858 quoted records against 395 copied source-document records; all mappings and metadata
+matched collection, with no missing metadata or non-web URLs in these bundles. All 328
+input files retained hashes and timestamps. The generated measurement record is
+`backend/evaluation/lineage-source-provenance.json`; source bundles were not rewritten.
+
 ### Sampling the Displayed Associations — 7 October 2026
 
 R5 (`rev-ha8p`) shares graph method/tabler/focus settings and node clipping with the
@@ -63,7 +82,8 @@ adopted-origin population as its document count. The adopted-only ranking does n
 a misleading tabled-only zero. Independent Astra review approved these joins and guards.
 The frontend gate passes 83 tests, strict types, Biome and a production build; a live DMA
 preview verified the notice, saved counts, graph focus and three exact quotations. Sampling
-is explicitly unavailable until R5 binds it to the displayed complete paths.
+was explicitly unavailable at this R2 checkpoint; R5 now binds inspection to the displayed
+complete paths, as recorded above.
 
 ### Experimental Presentation Policy — 7 October 2026
 
@@ -476,6 +496,7 @@ Open decisions are not settled until the project owner agrees.
 | Compete in Challenge 03 | Decided 2026-10-02 for the first brief; the owner asked on 2026-10-03 to re-plan for the Atlas brief | [Research](research/research-2026-10-02-reversa-challenges.md); [Atlas explainer §1](explainer/influence-atlas-primer.md#1-what-changed-this-morning) |
 | The Influence Atlas brief replaces the first Challenge 03 brief | Reported by the owner 2026-10-03 | The new brief's rules ("We hand out nothing"), schedule (demos 19:30, no 19:00 inputs) and scoring leave no hidden test |
 | Architecture: eight parts plus a practice loop (Atlas) | Decided 2026-10-03: the owner merged PR [#21](https://github.com/lensabillion/reversa-madrid-open/pull/21) at 11:33 | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |
+| Show unaudited lineage associations as clearly labelled experimental exploration | Owner decision 2026-10-07 (`rev-u2rn`) | Supersedes the 3 October publication-only display policy for the maintained lineage website. Show no authorship/causal or measured-precision claim; require exact structural supports for graph associations and keep missing evidence explicit. Independent audit remains required for accuracy claims. |
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
 | Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
 | Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |

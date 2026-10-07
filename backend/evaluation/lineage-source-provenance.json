@@ -1,0 +1,43 @@
+{
+  "status": "offline_source_identity_rehearsal",
+  "provider_calls": 0,
+  "metadata_only": true,
+  "rows": [
+    {
+      "slug": "2020-0361-COD",
+      "quoted_records": 780,
+      "source_documents": 113,
+      "missing_metadata": 0,
+      "non_web_urls": 0,
+      "input_files_unchanged": 52,
+      "output_bytes": 1331134
+    },
+    {
+      "slug": "2020-0374-COD",
+      "quoted_records": 380,
+      "source_documents": 34,
+      "missing_metadata": 0,
+      "non_web_urls": 0,
+      "input_files_unchanged": 52,
+      "output_bytes": 680657
+    },
+    {
+      "slug": "2021-0106-COD",
+      "quoted_records": 1310,
+      "source_documents": 199,
+      "missing_metadata": 0,
+      "non_web_urls": 0,
+      "input_files_unchanged": 162,
+      "output_bytes": 2478120
+    },
+    {
+      "slug": "2022-0047-COD",
+      "quoted_records": 388,
+      "source_documents": 49,
+      "missing_metadata": 0,
+      "non_web_urls": 0,
+      "input_files_unchanged": 62,
+      "output_bytes": 637920
+    }
+  ]
+}

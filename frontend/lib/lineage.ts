@@ -8,6 +8,7 @@ import type {
   OriginMatchRecord,
   OriginSupportRecord,
 } from "./lineage-api";
+import { indexLineageSources, type LineageSourceIndex } from "./lineage-sources";
 import type { SourceSpan } from "./source-span";
 
 /** An amendment that carries a phrase; adoption details exist only for adopted wording. */
@@ -83,6 +84,7 @@ export interface PreparedLineage {
   tabled: readonly LineagePhraseRow[];
   credits: readonly LineageCreditTable[];
   supportedClaims: SupportedLineageClaims;
+  sources: LineageSourceIndex;
 }
 
 function originRow(origin: OriginMatchRecord): LineageOriginRow {
@@ -100,7 +102,7 @@ function originRow(origin: OriginMatchRecord): LineageOriginRow {
   };
 }
 
-function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
+function adoptionRow(adoption: AmendmentAdoptionRecord, phraseId: string): LineageAmendmentRow {
   return {
     amendmentId: adoption.amendment_id,
     stage: adoption.stage,
@@ -110,7 +112,7 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
     newWords: adoption.new_words,
-    evidence: adoption.evidence ?? [],
+    evidence: (adoption.evidence ?? []).filter((evidence) => evidence.phrase_id === phraseId),
   };
 }
 
@@ -199,7 +201,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
       if (!adoptedIds.has(phraseId)) {
         throw new Error(`${adoption.amendment_id} names ${phraseId}, which the view does not list`);
       }
-      carry(phraseId, adoptionRow(adoption));
+      carry(phraseId, adoptionRow(adoption, phraseId));
     }
   }
   for (const phrase of view.tabled_phrases) {
@@ -292,6 +294,7 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     tabled: [...tabled].sort(byEvidence),
     credits,
     supportedClaims: collectSupportedClaims(view),
+    sources: indexLineageSources(view),
   };
 }
 

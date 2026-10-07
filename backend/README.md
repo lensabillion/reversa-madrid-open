@@ -308,6 +308,23 @@ view is `status: "unknown"` with its reason, and every count that could not be c
 null, never zero. The website retains its existing sample display; no independent
 precision audit is established by this cleanup.
 
+## Quotation Source Metadata
+
+Generated views embed compact `documents` metadata and `source_records` mappings for every
+exposed quotation. The mappings use the actual collected `document_id` of amendment and
+article records; consultation text is already keyed by its document identifier. URLs are
+copied from collected `SourceDocument` records, never reconstructed from an ID. Shared
+source files appear once. Metadata includes title, source kind, publication and retrieval
+timestamps and the SHA-256 of retrieved bytes. Missing document metadata retains its known
+identity and an explicit unavailable reason; a missing underlying quoted record is an error.
+
+The explorer resolves quotations through those mappings and renders only HTTP/HTTPS links.
+Parltrack URLs are labelled source datasets because the recorded source may be a bulk dump.
+Offsets identify Unicode code points in the extracted record field, with an exclusive end;
+they are not PDF byte offsets or offsets in the downloaded dump. No page URL is invented.
+Legacy snapshots remain readable and explicitly say when original-source metadata is
+unavailable. This provenance makes quotations inspectable; it does not validate causality.
+
 ## Independent Lineage Review
 
 This quality tool samples adopted-phrase claims from a saved lineage view, exports them

@@ -14,7 +14,6 @@ import {
 } from "../lib/lineage";
 import {
   type LineageLawSummary,
-  type LineageMatchKind,
   type LineageView,
   lineageLawsUrl,
   lineageViewUrl,
@@ -41,7 +40,7 @@ import {
   phraseFacets,
   rankOrganisations,
 } from "../lib/lineage-insights";
-import type { SourceSpan } from "../lib/source-span";
+import type { LineageSourceIndex } from "../lib/lineage-sources";
 import { useResource } from "../lib/use-resource";
 import { GRAPH_NODES_PER_COLUMN, LineageGraphExplorer } from "./lineage-graph";
 import {
@@ -54,6 +53,7 @@ import {
 } from "./lineage-insights";
 import { KindBadge, KindLegend, kindStyle } from "./lineage-kind";
 import { LineageMethod } from "./lineage-method";
+import { SourceQuote } from "./lineage-source-quote";
 import { coverageNote, retryStyle, StateMessage, sentence } from "./view-state";
 
 const buildCommand = "make lineage LAW='2021/0106(COD)'";
@@ -90,18 +90,6 @@ function day(value: string | null): string {
   return value === null ? "date unknown" : value.slice(0, 10);
 }
 
-/** The quote's left rule takes its method's color: teal lexical, violet semantic. */
-function Quote({ span, label, kind }: { span: SourceSpan; label: string; kind: LineageMatchKind }) {
-  return (
-    <blockquote
-      className={`border-l-4 ${kindStyle[kind].border} bg-white px-3 py-2 font-serif text-[15px] leading-6 text-stone-900`}
-    >
-      <span className="sr-only">{label}: </span>
-      {span.text}
-    </blockquote>
-  );
-}
-
 function Timing({ origin }: { origin: LineageOriginRow }) {
   if (origin.countsAsOrigin) {
     return (
@@ -129,25 +117,28 @@ function Timing({ origin }: { origin: LineageOriginRow }) {
   );
 }
 
-function Arrow() {
-  return (
-    <span
-      aria-hidden="true"
-      className="hidden text-lg text-stone-400 lg:absolute lg:top-4 lg:-right-3 lg:z-10 lg:block lg:rounded-full lg:bg-white lg:px-1"
-    >
-      →
-    </span>
-  );
-}
-
 /**
- * One link in the brief's order, left to right: what the submission asked, the amendment
- * that carried it, and the wording of the final act (or, for tabled wording, its absence).
+ * Saved phrase context: submissions and carriers remain separate records. Only explicit
+ * support IDs establish the complete associations shown by ClaimCard.
  */
-export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
+export function PhraseCard({
+  phrase,
+  sources,
+}: {
+  phrase: LineagePhraseRow;
+  sources: LineageSourceIndex;
+}) {
+  const [allCarriers, setAllCarriers] = useState(false);
+  const carriers = allCarriers
+    ? phrase.amendments
+    : phrase.amendments.slice(0, AMENDMENTS_PER_CARD);
   return (
     <li className="rounded-sm border border-stone-200 bg-white">
       <article aria-label={`Phrase ${phrase.phraseId}`} className="grid gap-0 lg:grid-cols-3">
+        <p className="border-b border-stone-200 px-4 py-3 text-xs leading-5 text-stone-600 lg:col-span-3">
+          Saved wording context. Listing submissions and carriers here does not assert that every
+          submission matches every carrier. Exact associations require saved support IDs.
+        </p>
         <section className="relative space-y-3 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
           <h4 className={eyebrow}>
             {phrase.origins.length === 0
@@ -170,18 +161,22 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
                   <Timing origin={origin} />
                   <KindBadge kind={origin.kind} />
                 </p>
-                <Quote span={origin.quote} label="Submission wording" kind={origin.kind} />
+                <SourceQuote
+                  sources={sources}
+                  span={origin.quote}
+                  label="Submission wording"
+                  kind={origin.kind}
+                />
               </li>
             ))}
           </ul>
-          <Arrow />
         </section>
         <section className="relative space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
           <h4 className={eyebrow}>
             {plural(phrase.amendments.length, "amendment carries it", "amendments carry it")}
           </h4>
           <ul className="space-y-2 text-sm text-stone-700">
-            {phrase.amendments.slice(0, AMENDMENTS_PER_CARD).map((amendment) => (
+            {carriers.map((amendment) => (
               <li key={amendment.amendmentId}>
                 <span className="block font-mono text-xs text-stone-800">
                   {amendment.amendmentId}
@@ -196,6 +191,29 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
                       : ""}
                   </span>
                 )}
+                {amendment.evidence.length === 0 ? (
+                  <p className="mt-2 text-xs text-amber-900">
+                    {phrase.adopted
+                      ? "Exact carrier quotation unavailable in this snapshot."
+                      : "No adoption evidence: this wording was only tabled."}
+                  </p>
+                ) : (
+                  amendment.evidence.map((evidence) => (
+                    <div key={evidence.evidence_id} className="mt-2 space-y-1">
+                      <SourceQuote
+                        sources={sources}
+                        span={evidence.amendment_span}
+                        label="Amendment wording"
+                        kind="verbatim"
+                      />
+                      <p className="break-all text-xs text-stone-500">
+                        Saved adoption evidence {evidence.evidence_id}; paired final record{" "}
+                        {evidence.final_span.record_id}, field {evidence.final_span.field}, offsets
+                        [{evidence.final_span.start}, {evidence.final_span.end}).
+                      </p>
+                    </div>
+                  ))
+                )}
                 {amendment.authors.length > 0 && (
                   <span className="block text-xs text-stone-600">
                     {amendment.authors.join(", ")}
@@ -205,18 +223,24 @@ export function PhraseCard({ phrase }: { phrase: LineagePhraseRow }) {
             ))}
           </ul>
           {phrase.amendments.length > AMENDMENTS_PER_CARD && (
-            <p className="text-xs text-stone-500">
-              and {count.format(phrase.amendments.length - AMENDMENTS_PER_CARD)} more amendments
-              with the same wording
-            </p>
+            <button
+              type="button"
+              aria-expanded={allCarriers}
+              onClick={() => setAllCarriers((value) => !value)}
+              className={retryStyle}
+            >
+              {allCarriers
+                ? "Show fewer carriers"
+                : `Show all ${count.format(phrase.amendments.length)} carriers`}
+            </button>
           )}
-          <Arrow />
         </section>
         <section className="space-y-2 p-4">
           <h4 className={eyebrow}>{phrase.adopted ? "In the final act" : "Tabled, not adopted"}</h4>
           {phrase.finalQuotes.length > 0 ? (
             phrase.finalQuotes.map((span) => (
-              <Quote
+              <SourceQuote
+                sources={sources}
                 key={`${span.record_id}:${span.start}`}
                 span={span}
                 label="Final act wording"
@@ -251,7 +275,13 @@ const fieldStyle =
   "rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-teal-700";
 
 /** The three exact source projections of one saved association support. */
-export function ClaimCard({ claim }: { claim: SupportedLineageClaim }) {
+export function ClaimCard({
+  claim,
+  sources,
+}: {
+  claim: SupportedLineageClaim;
+  sources: LineageSourceIndex;
+}) {
   const { origin, adoption, support } = claim;
   const amendment = (
     adoption.author_names.length > 0 ? adoption.author_names : adoption.author_ids
@@ -265,7 +295,12 @@ export function ClaimCard({ claim }: { claim: SupportedLineageClaim }) {
           <p className="text-xs text-stone-500">
             {day(origin.published_at)} · {origin.document_id}
           </p>
-          <Quote span={support.submission_span} label="Submission wording" kind={origin.kind} />
+          <SourceQuote
+            sources={sources}
+            span={support.submission_span}
+            label="Submission wording"
+            kind={origin.kind}
+          />
         </section>
         <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
           <h4 className={eyebrow}>Exact carrying amendment</h4>
@@ -274,11 +309,21 @@ export function ClaimCard({ claim }: { claim: SupportedLineageClaim }) {
             {adoption.stage} · tabled {day(adoption.tabled_on)}
           </p>
           <p className="text-xs text-stone-600">{amendment}</p>
-          <Quote span={support.amendment_span} label="Amendment wording" kind="verbatim" />
+          <SourceQuote
+            sources={sources}
+            span={support.amendment_span}
+            label="Amendment wording"
+            kind="verbatim"
+          />
         </section>
         <section className="space-y-2 p-4">
           <h4 className={eyebrow}>Exact final-act occurrence</h4>
-          <Quote span={support.final_span} label="Final act wording" kind="verbatim" />
+          <SourceQuote
+            sources={sources}
+            span={support.final_span}
+            label="Final act wording"
+            kind="verbatim"
+          />
           <p className="break-all font-mono text-xs text-stone-500">{claim.claimId}</p>
         </section>
       </article>
@@ -415,7 +460,7 @@ function Phrases({ lineage }: { lineage: PreparedLineage }) {
       ) : (
         <ol className="space-y-3">
           {phrases.slice(0, shown).map((phrase) => (
-            <PhraseCard key={phrase.phraseId} phrase={phrase} />
+            <PhraseCard key={phrase.phraseId} phrase={phrase} sources={lineage.sources} />
           ))}
         </ol>
       )}
@@ -662,7 +707,9 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
             slice={slice}
             scope={scope}
             onScopeChange={changeScope}
-            renderClaim={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+            renderClaim={(claim) => (
+              <ClaimCard key={claim.claimId} claim={claim} sources={lineage.sources} />
+            )}
           />
         )}
         {tab === "evidence" && <Phrases lineage={lineage} />}
@@ -677,7 +724,9 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
               onSeed={setInspectionSeed}
               pool={pool}
               scopeLabel={describeGraphScope(scope, graph)}
-              renderLink={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+              renderLink={(claim) => (
+                <ClaimCard key={claim.claimId} claim={claim} sources={lineage.sources} />
+              )}
             />
           ))}
         {tab === "method" && <LineageMethod view={view} />}

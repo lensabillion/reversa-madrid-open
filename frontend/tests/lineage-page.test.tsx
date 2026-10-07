@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import LineagePage from "../app/lineage/page";
 import { PHRASES_PER_PAGE } from "../components/lineage-law-browser";
 import type { LineageLawList, LineageView } from "../lib/lineage-api";
-import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
+import { fixtureSourcesView, fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 // Next.js re-renders `useSearchParams` readers after `history.pushState`; outside its router,
 // this stand-in reads jsdom's URL and is notified by the pushState spy installed below.
@@ -122,7 +122,7 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(within(card).getByText("am:2021-0106-COD:ENVI:PE7-7")).toBeDefined();
   expect(within(card).getByText("Acme Unknown Lobby")).toBeDefined();
   expect(within(card).getByText("Said before the amendments")).toBeDefined();
-  expect(within(card).getAllByRole("blockquote")).toHaveLength(2);
+  expect(within(card).getAllByRole("blockquote")).toHaveLength(3);
   await openTab("Associations");
   expect(
     screen.getByRole("heading", {
@@ -530,4 +530,19 @@ test("legacy carrier evidence is unavailable but saved quotations remain inspect
     screen.getAllByText(/This legacy snapshot lacks carrier-specific evidence/).length,
   ).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: "Draw 3 links" })).toBeNull();
+});
+
+test("loaded compact source metadata reaches exact graph cards without source fetches", async () => {
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  const fetchMock = serve(fixtureSourcesView());
+  render(<LineagePage />);
+  await openTab("Graph");
+  fireEvent.click(screen.getByRole("button", { name: /Acme Unknown Lobby: 1 phrases/ }));
+  const card = screen.getByRole("article", { name: /Association origin-support:/ });
+  expect(within(card).getAllByRole("link")).toHaveLength(3);
+  expect(within(card).getByRole("link", { name: "Open Parltrack dataset source" })).toBeDefined();
+  expect(fetchMock.mock.calls.map(([input]) => String(input)).sort()).toEqual([
+    "/api/v1/lineage",
+    `/api/v1/lineage/${slug}`,
+  ]);
 });
