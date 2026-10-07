@@ -599,6 +599,13 @@ A slug without a written view answers 404 with the command that builds it; an un
 view answers 500 with the reason. Invalid parameters return FastAPI's 422 validation
 response. OpenAPI defines each successful response schema.
 
+A response body of 1,024 bytes or more (`GZIP_MINIMUM_BYTES` in `api.py`) is
+gzip-compressed when the request's `Accept-Encoding` names gzip: the answer carries
+`Content-Encoding: gzip` and `Vary: Accept-Encoding`, and decompresses to exactly the plain
+body. Without gzip in `Accept-Encoding` the body is sent as is. Shorter bodies, such as
+`/health`, the law list and a 404, and bodiless answers such as a 304, are never compressed. The AI Act's lineage view
+in `mock-data/` goes from 1,262,923 bytes to 158,677 (measured 6 October 2026).
+
 ### PDF and Text Extraction
 
 `services/documents.py` (`extract_document`) turns a PDF or UTF-8 text into numbered pages
