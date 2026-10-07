@@ -36,7 +36,7 @@ setting.
 - `app/lineage/page.tsx`: the route; `app/page.tsx` redirects to it
 - `components/lineage-*.tsx`, `lib/lineage*.ts`: the explorer (below)
 - `components/view-state.tsx`: the loading, empty and error messages and the retry link style
-- `lib/api-client.ts`: `readJson` and `ApiError`, the backend's own explanation of a non-2xx answer
+- `lib/api-client.ts`: `readJson` and `ApiError`, the backend's own explanation of a non-2xx answer; every read revalidates against the API's ETag (`cache: "no-cache"`), so a rewritten view shows at once and an unchanged one is a 304
 - `lib/coverage.ts`, `lib/source-span.ts`: the coverage rows and quoted spans the view carries
 - `lib/use-resource.ts`: loading, errors, retries and cancellation shared by API consumers
 - `next.config.ts`: the same-origin API proxy and the standalone build output
