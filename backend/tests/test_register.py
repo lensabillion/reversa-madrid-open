@@ -1,6 +1,5 @@
 """The Transparency Register connector, on small files shaped like the real export."""
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,6 @@ from influence.repositories.register import (
     RegisterError,
     country_iso3,
     iter_register,
-    register_export_date,
     to_actor,
 )
 
@@ -194,33 +192,6 @@ def test_truncated_file_is_a_register_error(tmp_path: Path) -> None:
 def test_a_file_without_entries_is_a_register_error(tmp_path: Path) -> None:
     with pytest.raises(RegisterError, match="No interestRepresentative"):
         list(iter_register(write(tmp_path, export())))
-
-
-def test_export_date_is_read_from_the_metadata(tmp_path: Path) -> None:
-    path = write(tmp_path, export(FULL))
-
-    assert register_export_date(path) == datetime(2026, 10, 2, 20, 0, 0, 70000, tzinfo=UTC)
-
-
-@pytest.mark.parametrize("entries", [(FULL,), ()])
-def test_export_date_is_none_when_the_file_does_not_say(
-    tmp_path: Path, entries: tuple[str, ...]
-) -> None:
-    path = write(tmp_path, export(*entries, metadata=""))
-
-    assert register_export_date(path) is None
-
-
-def test_unreadable_export_date_is_a_register_error(tmp_path: Path) -> None:
-    metadata = '<metaData xmlns=""><exportDate>yesterday</exportDate></metaData>'
-
-    with pytest.raises(RegisterError, match="Unreadable export date 'yesterday'"):
-        register_export_date(write(tmp_path, export(FULL, metadata=metadata)))
-
-
-def test_export_date_of_a_missing_file_is_a_register_error(tmp_path: Path) -> None:
-    with pytest.raises(RegisterError, match="Cannot read"):
-        register_export_date(tmp_path / "absent.xml")
 
 
 @pytest.mark.parametrize(

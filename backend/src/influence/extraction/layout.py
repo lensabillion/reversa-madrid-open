@@ -7,8 +7,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from influence.extraction.tables import TABLE_NAMES
-
 # The catalog's source ids for global sources, plus the probe report's own directory.
 GLOBAL_SOURCES = frozenset({"registry", "meetings_ec", "meetings_mep", "ep_opendata", "probe"})
 
@@ -40,10 +38,6 @@ class DataLayout:
         return self.root / "raw"
 
     @property
-    def parsed(self) -> Path:
-        return self.root / "parsed"
-
-    @property
     def cache(self) -> Path:
         return self.root / "cache"
 
@@ -55,15 +49,7 @@ class DataLayout:
     def law(self, procedure_id: str) -> Path:
         return self.raw / "laws" / procedure_slug(procedure_id)
 
-    def manifest(self, procedure_id: str) -> Path:
-        return self.law(procedure_id) / "manifest.json"
-
     def law_source(self, procedure_id: str, name: str) -> Path:
         if not name or "/" in name or "\\" in name:
             raise LayoutError(f"Unusable per-law source name {name!r}")
         return self.law(procedure_id) / name
-
-    def table(self, name: str) -> Path:
-        if name not in TABLE_NAMES:
-            raise LayoutError(f"Unknown table {name!r}")
-        return self.parsed / f"{name}.jsonl"

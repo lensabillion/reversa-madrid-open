@@ -588,10 +588,3 @@ def mep_members(
             )
         except ValidationError:
             _count(skipped, SKIP_INVALID)
-
-
-def mep_actors(
-    meps_path: Path, mep_ids: Collection[int], skipped: Counter[str] | None = None
-) -> Iterator[Actor]:
-    """Actors for the given Members only, stopping once every one has been found."""
-    return (member.actor for member in mep_members(meps_path, mep_ids, skipped))

@@ -1,9 +1,9 @@
 """The Atlas view of one law: what `influence atlas` writes to `atlas.json`.
 
-It carries the shared `atlas-1` records the frontend adapter validates again (the bundle's
-keys are the camelCase names of `AtlasBundle` in `frontend/lib/atlas.ts`), the graph
-snapshot built from them, and outcome counts the backend has already ordered: the page
-renders them and never ranks or scores anything itself.
+It carries the shared `atlas-1` records (the bundle's keys are camelCase, the names the
+explorer used when it read this view), the graph snapshot built from them, and outcome
+counts the backend has already ordered. The forecast, the report, the actor directions and
+the blind audit read it; nothing downstream ranks or scores anything itself.
 """
 
 from typing import Annotated, Literal
@@ -91,25 +91,3 @@ class AtlasView(FrozenModel):
     snapshot: GraphSnapshot
     rankings: tuple[RankingRow, ...]
     limitations: tuple[str, ...]
-
-
-class AtlasLawSummary(FrozenModel):
-    slug: Slug
-    procedure_id: ProcedureId
-    title: NonEmpty
-    run_id: NonEmpty
-    published_links: int = Field(ge=0)
-    # None: the law has no `coordinated.json`, which is not the same as zero clusters.
-    cross_group_clusters: int | None = Field(default=None, ge=0)
-
-
-class InvalidAtlasView(FrozenModel):
-    """A law directory whose view cannot be read, listed so one broken law hides no other."""
-
-    slug: NonEmpty
-    reason: NonEmpty
-
-
-class AtlasLawList(FrozenModel):
-    laws: tuple[AtlasLawSummary, ...]
-    invalid: tuple[InvalidAtlasView, ...] = ()

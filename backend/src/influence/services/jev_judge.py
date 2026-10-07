@@ -39,10 +39,7 @@ from influence.services.jev import (
     NoulQuestion,
 )
 
-PROMPT_REVISION = "legal-change-v1"
 CUTOFF = 0.67
-# The share of the matched ask wording that must lie outside proposal quotations.
-OWN_WORDING = 0.5
 # TypeSafe's input price as PR #63 recorded it; the cap is accounting, not a billing promise.
 PRICE_PER_TOKEN = 0.042 / 1_000_000
 RESERVE_USD = REQUEST_TOKEN_RESERVE * PRICE_PER_TOKEN
