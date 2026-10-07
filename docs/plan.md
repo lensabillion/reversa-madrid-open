@@ -1,5 +1,12 @@
 # influence: Consolidated Execution Plan
 
+> Current scope, 7 October 2026 (`rev-w1ao`): the maintained product is the lineage
+> website and its setup/collect/lineage path, including optional Jev. The Atlas producer
+> and offline consumers are retired. This document preserves the broader challenge
+> design and research; its old commands and planned features are historical unless
+> retained in the [current backend guide](../backend/README.md) and
+> [implementation status](implementation-status.md).
+
 Project name: **influence**, decided 7 October 2026. “The Influence Atlas” below refers
 to the organizers' challenge title; existing `atlas` commands and record names describe
 the ask-first pipeline.

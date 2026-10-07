@@ -12,15 +12,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi import Path as PathParameter
 
 from influence.routers.view_cache import NO_STORE, max_age_from, not_modified, validators
-from influence.schemas.atlas_view import SLUG_PATTERN
+from influence.schemas.atlas import SLUG_PATTERN
 from influence.schemas.lineage import LineageLawList, LineageView
+from influence.services.collected import PipelineError
 from influence.services.lineage_views import (
     list_lineage_views,
     read_lineage_view,
     view_stat,
     view_stats,
 )
-from influence.services.pipeline import PipelineError
 
 router = APIRouter(prefix="/api/v1")
 # Read at import, which is app start: an invalid value stops the API before it serves.

@@ -20,6 +20,7 @@ from pathlib import Path
 from influence.extraction.files import write_bytes_atomic
 from influence.extraction.layout import procedure_slug
 from influence.schemas.lineage import LineageView, OriginMatch, TabledPhrase
+from influence.services.collected import Collected
 from influence.services.jev_judge import JevJudge
 from influence.services.lineage import Rarity, adopt
 from influence.services.lineage_jev import reworded_origins
@@ -29,7 +30,6 @@ from influence.services.origin import (
     find_tabled_origins,
     submitters_from,
 )
-from influence.services.pipeline import Collected
 
 VIEW_FILE = "lineage.json"
 METHOD = "verbatim-adopted-phrases"

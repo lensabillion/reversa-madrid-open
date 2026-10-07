@@ -1,24 +1,14 @@
 """The passage reader: quoted instructions become changes, everything else stays unclassified."""
 
-import json
 from itertools import pairwise
-from pathlib import Path
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from influence.schemas.scoring import ScoreRequest, TextChange
-from influence.services.passage_change import opposed_sentence, read_changes
-from influence.services.scoring import score_pair
+from influence.services.passage_change import read_changes
 
-FIXTURES = Path(__file__).parent / "fixtures" / "atlas"
 CITY = "City Network.\n\nIn Article 9(2), replace 'shall' with 'may': the authority may publish."
-
-
-def _row(name: str, key: str, value: str) -> dict[str, str]:
-    lines = (FIXTURES / name).read_text(encoding="utf-8").splitlines()
-    return next(row for row in map(json.loads, lines) if row[key] == value)
 
 
 def test_replace_instruction_gives_old_and_new_with_exact_offsets() -> None:
@@ -93,27 +83,6 @@ def test_changes_are_exact_ordered_and_never_overlap(text: str) -> None:
         previous_end = change.end
 
 
-def test_bridge_lets_the_scorer_see_the_shall_may_change() -> None:
-    """Before: the whole City Network paragraph as one insertion scored 0.03.
-
-    That 0.03 is the pre-bridge baseline measured in the Atlas fixture on 3 October. The
-    fixture is invented, so this shows the failure mode is fixed, not real-world accuracy.
-    """
-    amendment = _row("amendments.jsonl", "amendment_id", "am:2099-0001-COD:IMCO:102")
-    passage = _row("document_texts.jsonl", "document_id", "doc:hys_attachment:fixture0003")
-    request = TextChange(old=amendment["old_text"], new=amendment["new_text"])
-    before = score_pair(
-        ScoreRequest(amendment=request, submission=TextChange(old="", new=passage["text"]))
-    )
-    (change,) = read_changes(passage["text"])
-    assert change.old is not None
-    after = score_pair(
-        ScoreRequest(amendment=request, submission=TextChange(old=change.old, new=change.new))
-    )
-    assert round(before.score, 2) == 0.03
-    assert after.score == 1.0
-
-
 @pytest.mark.parametrize(
     "passage",
     [
@@ -133,53 +102,3 @@ def test_an_apostrophe_is_not_read_as_the_closing_quote(passage: str) -> None:
 def test_a_closing_quote_before_punctuation_or_a_digit_still_closes(after: str) -> None:
     (change,) = read_changes(f"insert 'keep logs'{after}")
     assert (change.kind, change.new) == ("insert", "keep logs")
-
-
-@pytest.mark.parametrize(
-    ("passage", "sentence"),
-    [
-        (
-            "Intro. We strongly oppose any proposal to insert 'keep logs'. Thanks.",
-            "We strongly oppose any proposal to insert 'keep logs'.",
-        ),
-        ("Please do not delete 'keep logs'", "Please do not delete 'keep logs'"),
-        ("We don't want to delete 'keep logs'; fine.", "We don't want to delete 'keep logs';"),
-        (
-            "Members shouldn\N{RIGHT SINGLE QUOTATION MARK}t remove 'keep logs'.",
-            "Members shouldn\N{RIGHT SINGLE QUOTATION MARK}t remove 'keep logs'.",
-        ),
-        ("Ok.\n  We reject the move to add 'keep logs'", "We reject the move to add 'keep logs'"),
-        (
-            "We object to the plan to change 'a' to 'b' here.",
-            "We object to the plan to change 'a' to 'b' here.",
-        ),
-    ],
-)
-def test_an_opposition_cue_before_the_instruction_gives_the_whole_sentence(
-    passage: str, sentence: str
-) -> None:
-    (change,) = read_changes(passage)
-    bounds = opposed_sentence(passage, change)
-    assert bounds is not None
-    assert passage[bounds[0] : bounds[1]] == sentence
-
-
-@pytest.mark.parametrize(
-    "passage",
-    [
-        "Insert 'keep logs'.",
-        "We oppose the ban. Insert 'keep logs'.",
-        "Insert 'keep logs', not the ban.",
-        "We oppose the ban; insert 'keep logs'.",
-        "Note the annotation. Insert 'keep logs'.",
-    ],
-)
-def test_no_opposition_cue_before_the_instruction_in_its_sentence(passage: str) -> None:
-    (change,) = read_changes(passage)
-    assert change.kind == "insert"
-    assert opposed_sentence(passage, change) is None
-
-
-def test_a_statement_has_no_opposed_instruction() -> None:
-    (change,) = read_changes("We do not support logging.")
-    assert opposed_sentence("We do not support logging.", change) is None

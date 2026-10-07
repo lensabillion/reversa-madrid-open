@@ -12,7 +12,47 @@ acceptance tests for the same eight parts. The [consolidated execution plan](pla
 [technical plan](brief/PLAN.md) disagree, and orders the work as acceptance gates.
 `attic/` is not an implementation source.
 
-## Objective and Deliverables
+## Current Product Scope — 7 October 2026
+
+The owner chose to retire the entire `atlas.json` branch after inspecting its temporary
+Saved analysis preview (`rev-w1ao`). Only the lineage website and its data-generation
+path remain supported: `setup`, `collect`, `lineage` (optional `--jev`), health and lineage
+GET endpoints, and the existing frontend/build/test tooling. The uncommitted analysis
+page/API were removed. The offline Atlas producer/consumers, standalone experiments and
+unused model dependency group are retired. Documents, recorded evaluation JSON, committed
+lineage snapshots and ignored user data are preserved. Existing Atlas files are not read.
+
+The historical sections below record earlier implementations and measurements; they are
+not the current command list. Use [the backend guide](../backend/README.md). Shared
+collection and lineage formats stay compatible. This scope reduction does not fix the
+remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
+
+### Cleanup Verification
+
+The cleanup removes 51 retired runtime modules and their exclusive tests, experiment
+runners and optional model dependency group. Shared collection loading and BM25 candidate
+helpers now live in `services/collected.py` and `services/lineage_candidates.py`. All
+Markdown/PDF documents, recorded evaluation JSON and committed lineage snapshots remain;
+the former backend instructions are archived in
+[the historical backend guide](../backend/README-history-2026-10-07.md). The root README
+now includes a diagram and code-linked description of the retained architecture.
+
+Verified locally on 7 October 2026: `make check` exits 0; 640 backend tests, 100% line and
+branch coverage (3,838 statements, 1,028 branches); 59 frontend tests; Ruff, Biome, strict
+Python/TypeScript checks, the production build, all six research catalogs and both
+dependency audits pass. A fixed-input complete lineage view with mocked Jev is byte-for-byte
+identical to the pre-cleanup revision `015bdac` (SHA-256
+`8b0c8217d1977a947b3753bc55c35c8c3b02813c0110ebb720b5937d9ae0c77a`). The
+existing frontend fixture contract also passes. An independent AST comparison found the
+extracted helpers unchanged apart from docstrings, and retained snapshot schemas unchanged.
+
+The running local website reads the existing four-law data directory. Browser checks
+confirmed the law list, AI Act summary and graph (131 nodes, 306 connections), and Data Act
+evidence cards. No fresh public collection, paid Jev calls or accuracy evaluation was run.
+Container verification is left to the PR's CI gate; PR and CI state are recorded on
+`rev-w1ao`.
+
+## Objective and Deliverables (Historical Challenge)
 
 The organizers replaced the Challenge 03 brief at kickoff on 3 October 2026. The first
 brief (60 supplied amendment–submission pairs and 20 proposals, scored as CSVs against a
@@ -354,7 +394,7 @@ Open decisions are not settled until the project owner agrees.
 | Show only links above a precision threshold; keep the rest as unconfirmed, in a separate audit view | Decided 2026-10-03, with the architecture (PR #21) | The jury reads 3 random edges: with precision p, all three pass with probability p³ (0.95 → 0.86, 0.90 → 0.73) |
 | Nobody edits links, scores or rankings; people may audit a random sample to measure precision | Decided 2026-10-03, with the architecture (PR #21) | The first brief's hand-labelling ban no longer exists; AGENTS.md "Data and Challenge Rules" |
 | Consolidated execution plan: one answer where the uploaded plan, the explainer and the design differ; acceptance gates in order | Decided 2026-10-03: the plan is on `main` and bead `rev-f090` is closed | [docs/plan.md](plan.md), §3 for each choice and its reason |
-| The explorer reads the lineage view (`/lineage`), not the Atlas view | Decided 2026-10-03 (bead `rev-658l`); the `/atlas` page and the `/api/v1/atlas` routes were removed 2026-10-06 (bead `rev-x7bn`) | Lineage starts from the final law, so every shown claim is wording that reached the law. `make atlas` and `atlas.json` stay because the forecast, the report, the actor directions and the blind audit read them; whether that pipeline stays is a separate, open decision |
+| Maintain the lineage website and its data-generation path only | Owner decision 2026-10-07 (`rev-w1ao`), after inspecting the temporary Saved analysis preview | Remove the `atlas.json` producer and its offline consumers, plus `/analysis`. Preserve setup/collect/lineage with optional Jev, shared data contracts, the lineage API/frontend, quality tooling, all documents and existing user data. |
 | Backend: Python 3.14, FastAPI, uv; Ruff, strict basedpyright, 100% branch coverage | Decided 2026-10-02 | PR [#3](https://github.com/lensabillion/reversa-madrid-open/pull/3) |
 | Frontend: Next.js 16.3.6, Tailwind CSS v4, Biome, Vitest | Decided 2026-10-02 | PR [#5](https://github.com/lensabillion/reversa-madrid-open/pull/5); D2 in the first explainer |
 | TypeScript 7 rather than 6 | Decided 2026-10-02, by merging #5 and #8 | PR #5: Next.js 16.3.6 type-checks with the project's own `tsc` |

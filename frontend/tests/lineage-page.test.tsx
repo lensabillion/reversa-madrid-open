@@ -104,7 +104,9 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(questions.closest("section")?.textContent).toContain(
     "Acme Unknown Lobby leads, with 1 adopted phrase said first.",
   );
-  expect(questions.closest("section")?.textContent).toContain("No forecast yet");
+  expect(questions.closest("section")?.textContent).toContain(
+    "Forecasting is not part of this lineage view.",
+  );
   const summary = screen.getByRole("region", { name: "From proposal to law" });
   expect(within(summary).getByText("18 of 103 words")).toBeDefined();
   expect(within(summary).getByText("1 of 3 amendments")).toBeDefined();
