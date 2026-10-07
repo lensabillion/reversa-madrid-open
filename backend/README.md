@@ -291,6 +291,25 @@ root as the command (`INFLUENCE_DATA_ROOT`, default the repository's `data/`):
 | `GET /api/v1/lineage` | `{"laws": [{slug, procedure_id, title, run_id, status, adopted_phrases, amendments_adopting, documents_with_origin}]}` for every law with a `lineage.json`; a count is null when the view could not compute it |
 | `GET /api/v1/lineage/{slug}` | The `LineageView`. 404 when the law has no view; 422 for a malformed slug; 500 when the file on disk is invalid |
 
+Both routes are cacheable, because a view changes only when `make lineage` rewrites its
+file, and it does so atomically (a rename), so the file's size and modification time
+identify its content without reading it (`routers/view_cache.py`):
+
+- `Cache-Control: public, max-age=<seconds>`: a browser or shared cache may reuse its copy
+  for that long. The seconds come from `INFLUENCE_VIEW_MAX_AGE` (default 3600), read when
+  the API starts; anything but a whole number of seconds, 0 or more, stops the API with an
+  error naming the variable. `0` makes every reuse a revalidation.
+- `ETag`: a strong tag hashed from the installed package version and each view file's
+  slug, size and modification time in nanoseconds. For the list it covers every view, so
+  it changes when any view is added, rewritten or removed.
+- `Last-Modified`: the view file's modification time; for the list, the newest view's
+  (absent when there is none).
+- A request whose `If-None-Match` matches the current tag (RFC 9110, section 13.1.2: weak
+  comparison, a comma-separated list or repeated fields, or `*`) answers `304 Not Modified`
+  with the same three headers and no body, after one `stat` per view file and no read.
+  `If-Modified-Since` is not evaluated, so a client sending only that gets a 200.
+- 404 and 500 answers keep their messages and carry `Cache-Control: no-store`.
+
 `tests/fixtures/lineage/view.json` is the offline test world's view, regenerated with
 `uv run --directory backend --locked python tests/test_lineage_views.py`; the frontend
 tests read it, so its TypeScript types are checked against real backend JSON
@@ -596,7 +615,8 @@ when run through `make`. Tested offline (`tests/test_report.py`); not yet run on
 | `GET /api/v1/lineage`, `GET /api/v1/lineage/{slug}` | The lineage views: see "Lineage View API" |
 
 A slug without a written view answers 404 with the command that builds it; an unreadable
-view answers 500 with the reason. Invalid parameters return FastAPI's 422 validation
+view answers 500 with the reason. The view routes send `Cache-Control`, `ETag` and `Last-Modified`
+and answer 304 to a matching `If-None-Match` (see "Lineage View API"). Invalid parameters return FastAPI's 422 validation
 response. OpenAPI defines each successful response schema.
 
 A response body of 1,024 bytes or more (`GZIP_MINIMUM_BYTES` in `api.py`) is

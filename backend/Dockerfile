@@ -40,9 +40,11 @@ COPY --from=builder /opt/influence /opt/influence
 # INFLUENCE_LOG_LEVEL (debug, info, warning, error or critical, any case) sets the level
 # of the API's own loggers and of uvicorn's; the app applies it when uvicorn imports it,
 # before uvicorn logs its first line, and a wrong value stops the container at startup.
+# INFLUENCE_VIEW_MAX_AGE is the seconds a browser or cache may reuse a lineage view.
 ENV PATH=/opt/influence/bin:$PATH \
     INFLUENCE_DATA_ROOT=/data \
     INFLUENCE_LOG_LEVEL=info \
+    INFLUENCE_VIEW_MAX_AGE=3600 \
     PYTHONUNBUFFERED=1
 
 USER influence
