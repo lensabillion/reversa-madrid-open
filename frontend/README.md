@@ -4,14 +4,14 @@ The Next.js web app that shows what the pipeline wrote. It reads the
 [backend API](../backend/README.md) through a same-origin proxy (`/api/v1/…`, in
 `next.config.ts`) and renders one explorer, `/lineage` (the home page redirects there),
 which starts from the final law and traces each adopted phrase to the amendments that
-carried it and the submissions that said it first. The app scores and ranks nothing of
-its own: every link, count and ranking is read from the view the backend wrote.
+carried it and the submissions that said it first. The backend supplies the lineage records and Member/group credit ordering. The frontend
+derives organisation aggregates and display filters from that view in `lib/lineage-insights.ts`.
 
 ## Run
 
 Install the pinned toolchains described in [AGENTS.md](../AGENTS.md), build at least one
 law with `make lineage LAW='AI Act'` (or point the backend at the committed snapshots with
-`INFLUENCE_DATA_ROOT=mock-data`), then run these in separate terminals from the repository
+`INFLUENCE_DATA_ROOT="$PWD/mock-data" make dev-backend`), then run these in separate terminals from the repository
 root:
 
 ```sh
@@ -43,8 +43,8 @@ setting.
 
 React renders source text as text, never HTML. The first brief's evidence workspace
 (`/workspace`) was removed on 6 October 2026 with the routes it called, and the ask-first
-`/atlas` page with its `/api/v1/atlas` routes the same day; `make atlas` still writes
-`atlas.json` for the forecast and the report.
+`/atlas` page with its `/api/v1/atlas` routes the same day. The Atlas producer and its
+offline consumers were retired on 7 October; neither `/atlas` nor `/analysis` is served.
 
 ## Verify
 
@@ -55,8 +55,7 @@ pipeline wrote.
 
 ## Lineage Explorer Page
 
-`/lineage` is the explorer: the header's **Lineage explorer** link opens it from the
-evidence workspace. It shows, for each law `make lineage` has built, which wording of the
+`/lineage` is the explorer: the header's **Lineage explorer** link opens the maintained website. It shows, for each law `make lineage` has built, which wording of the
 final act came from which amendments, who tabled them, and which submissions said the same
 words, and when. It reads two backend endpoints through the `/api/v1/…` proxy:
 `GET /api/v1/lineage` (the law list) and `GET /api/v1/lineage/{slug}` (one `lineage-1`
@@ -66,8 +65,7 @@ The selected law lives in the URL (`/lineage?law=2021-0106-COD`). `lib/lineage.t
 (`prepareLineage`) joins the view into rows: every adopted phrase with its final-act
 quotation, the amendments that carry it and the submissions that say it; every tabled
 phrase the same way; credits split into groups and holders in the backend's order. A
-record that names a phrase or amendment the view lacks rejects the whole view, as in the
-Atlas page. Phrases are ordered by evidence (an earlier, non-citation submission first,
+record that names a phrase or amendment the view lacks rejects the whole view. Phrases are ordered by evidence (an earlier, non-citation submission first,
 then any submission, then length) and paged 20 at a time. Each card reads in the brief's
 order, left to right: what the submission said, the amendment that carried it, the final
 wording. A search box (every word must appear, ignoring case and accents, across the
@@ -99,7 +97,7 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   Register) with what this run took from it, read from `coverage` (a partial layer shows its
   reason); then what the evidence does not prove. It restates the backend's rules and computes nothing.
 - **The five questions**: WHO and HOW are answered from the view; WHAT and TOWARDS are
-  marked "partly" (one law; direction labels come from `make directions`); NEXT is marked
+  marked "partly" (one law; no policy-direction analysis is available); NEXT is marked
   "not in this view", because no forecast is computed. Nothing is filled in to look complete.
 - **Who gets their way: organisations** (`rankOrganisations`): every named organisation whose
   submission says inserted wording, ranked by adopted phrases it said before any amendment

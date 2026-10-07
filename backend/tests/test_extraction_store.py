@@ -12,7 +12,7 @@ from influence.extraction.cache import (
     request_key,
 )
 from influence.extraction.files import write_bytes_atomic
-from influence.extraction.layout import DataLayout, LayoutError, procedure_slug
+from influence.extraction.layout import LayoutError, procedure_slug
 
 
 def metadata(key: str, body: bytes, *, byte_count: int | None = None) -> ResponseMetadata:
@@ -48,28 +48,6 @@ def test_procedure_slug_keeps_only_path_safe_characters(procedure_id: str, expec
 def test_procedure_slug_rejects_an_id_with_nothing_to_keep() -> None:
     with pytest.raises(LayoutError, match="no usable characters"):
         procedure_slug("///")
-
-
-def test_layout_separates_global_sources_from_per_law_directories(tmp_path: Path) -> None:
-    layout = DataLayout(tmp_path)
-    assert layout.raw == tmp_path / "raw"
-    assert layout.cache == tmp_path / "cache"
-    assert layout.global_source("registry") == tmp_path / "raw" / "registry"
-    assert layout.law("2021/0106(COD)") == tmp_path / "raw" / "laws" / "2021-0106-COD"
-    assert layout.law_source("2021/0106(COD)", "hys").name == "hys"
-
-
-def test_layout_rejects_a_global_source_outside_the_known_set(tmp_path: Path) -> None:
-    with pytest.raises(LayoutError, match="Unknown global source"):
-        DataLayout(tmp_path).global_source("lobbyfacts")
-
-
-@pytest.mark.parametrize("name", ["", "a/b", "a\\b"])
-def test_layout_rejects_per_law_source_names_that_escape_the_law_directory(
-    tmp_path: Path, name: str
-) -> None:
-    with pytest.raises(LayoutError, match="Unusable per-law source name"):
-        DataLayout(tmp_path).law_source("2021/0106(COD)", name)
 
 
 def test_request_key_separates_its_parts_so_different_requests_cannot_collide() -> None:
@@ -109,3 +87,15 @@ def test_cache_refuses_an_entry_whose_metadata_or_size_cannot_be_trusted(tmp_pat
         cache.load(key)
     with pytest.raises(CacheError, match="does not match the body"):
         cache.store(metadata(key, b"body", byte_count=99), b"body")
+
+
+def test_default_data_root_uses_the_environment_or_repository_data(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from influence.extraction import layout
+
+    monkeypatch.setenv("INFLUENCE_DATA_ROOT", str(tmp_path))
+    assert layout.default_data_root() == tmp_path
+    monkeypatch.delenv("INFLUENCE_DATA_ROOT")
+    assert layout.default_data_root() == Path(layout.__file__).resolve().parents[4] / "data"

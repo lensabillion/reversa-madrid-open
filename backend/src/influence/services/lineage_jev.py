@@ -5,7 +5,7 @@ document. Organisations mostly ask in their own words: on the AI Act verbatim se
 a few dozen documents among 788. This covers the reworded case for the amendments whose
 wording reached the final act:
 
-1. For each adopting amendment, part 3's BM25 (`pipeline.find_candidates`) shortlists the
+1. For each adopting amendment, BM25 (`lineage_candidates.find_candidates`) shortlists the
    consultation passages that share its rare changed words.
 2. Each (passage, amendment) pair goes to Jev with PR #63's frozen prompt
    (`jev_judge.judge_request`); answers are cached by request and the spend is capped.
@@ -26,6 +26,7 @@ from collections.abc import Mapping, Sequence
 
 from influence.schemas.atlas import Actor, Amendment, Ask
 from influence.schemas.lineage import AmendmentAdoption, OriginMatch, TimeEligibility
+from influence.services.collected import Collected
 from influence.services.jev import JevRequest
 from influence.services.jev_judge import (
     CUTOFF,
@@ -34,7 +35,7 @@ from influence.services.jev_judge import (
     proposal_articles,
     request_bytes,
 )
-from influence.services.pipeline import Collected, asks_from_passages, find_candidates
+from influence.services.lineage_candidates import asks_from_passages, find_candidates
 from influence.services.prose_match import words_of
 
 METHOD = "jev-reworded-origins"

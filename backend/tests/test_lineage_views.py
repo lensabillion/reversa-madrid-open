@@ -1,6 +1,6 @@
 """Lineage views read back for the API, the routes, and the fixture the frontend tests read.
 
-The world is `test_pipeline`'s matching world: an amendment inserts a rare phrase that a
+The world is `test_collected`'s matching world: an amendment inserts a rare phrase that a
 consultation submission, dated before it, also asks for. As collected, the final act does
 not hold the phrase, so it is tabled wording; `adopted_world` adds a final-act provision that
 says it, so it becomes adopted wording with an origin.
@@ -13,14 +13,14 @@ from tempfile import TemporaryDirectory
 
 import pytest
 from fastapi.testclient import TestClient
-from test_pipeline import LATER, RARE, SLUG, collected, matching_world
+from test_collected import LATER, RARE, SLUG, collected, matching_world
 
 from influence.api import create_app
 from influence.schemas.atlas import ArticleVersion
 from influence.schemas.lineage import LineageView
 from influence.services import lineage_views
+from influence.services.collected import Collected, PipelineError
 from influence.services.lineage_assembly import VIEW_FILE, build_lineage, write_lineage
-from influence.services.pipeline import Collected, PipelineError
 
 ADOPTED = f"Providers shall keep the logs {RARE}."
 # The frontend's tests read this view, so the TypeScript types are checked against real JSON.

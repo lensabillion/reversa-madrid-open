@@ -3,7 +3,7 @@
 # the browser talks to one origin and the API port stays on the loopback interface.
 #
 # INFLUENCE_DATA names the host directory mounted at /data: the repository's data/ by
-# default (what `make atlas` and `make lineage` write), or mock-data/ for the committed
+# default (what `make lineage` writes), or mock-data/ for the committed
 # snapshots: INFLUENCE_DATA=./mock-data make up
 #
 # INFLUENCE_LOG_LEVEL (debug, info, warning, error, critical; default info) sets how much

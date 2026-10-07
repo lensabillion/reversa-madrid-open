@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from atlas_fixture import build_fixture
-from test_coordinated import AI_ACT, SLUG, coordinated_world
+from collection_fixture import build_fixture
+from lineage_fixture import AI_ACT, SLUG, lineage_world
 from test_lineage import FINAL, NEW, PROPOSAL, amendment, mep
 from test_origin import document
 
@@ -13,8 +13,8 @@ from influence import cli
 from influence.schemas.atlas import Actor, ArticleVersion, Passage, SourceSpan
 from influence.schemas.lineage import LineageCounts, LineageView
 from influence.services import lineage_assembly
+from influence.services.collected import Collected, PipelineError
 from influence.services.lineage_assembly import build_lineage, write_lineage
-from influence.services.pipeline import Collected, PipelineError
 
 NOW = datetime(2099, 12, 1, tzinfo=UTC)
 ACME = Actor(
@@ -109,7 +109,7 @@ def test_the_view_is_written_atomically_and_reads_back(tmp_path: Path) -> None:
 def test_the_command_collects_traces_and_writes_the_lineage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    coordinated_world(tmp_path, monkeypatch)
+    lineage_world(tmp_path, monkeypatch)
 
     status = cli.main(["lineage", AI_ACT, "--data-root", str(tmp_path)])
 
@@ -159,7 +159,7 @@ def test_the_command_prints_what_is_known_and_says_what_is_not(
     view: LineageView,
     expected: str,
 ) -> None:
-    coordinated_world(tmp_path, monkeypatch)
+    lineage_world(tmp_path, monkeypatch)
 
     def fixed(
         _collected: Collected, *, generated_at: datetime, judge: object = None
@@ -177,7 +177,7 @@ def test_the_command_prints_what_is_known_and_says_what_is_not(
 def test_the_command_keeps_the_bundle_when_the_lineage_cannot_be_written(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    coordinated_world(tmp_path, monkeypatch)
+    lineage_world(tmp_path, monkeypatch)
 
     def broken(_view: LineageView, bundle: Path) -> Path:
         raise PipelineError(f"cannot write in {bundle.name}")

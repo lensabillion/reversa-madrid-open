@@ -6,6 +6,12 @@ fixes have been applied. The owner subsequently named the project **influence**;
 branding changes are tracked separately in `rev-3n26`. Numbered findings are ordered by risk to the truth of the published
 results, then reproducibility, onboarding, architecture maintenance and tooling.
 
+Historical scope: reproductions and file links below refer to the reviewed revision
+`efea0683bb7ff4b812079046c9fb1753adf3947e`. The later lineage-only cleanup retires Atlas
+commands and some referenced files; replay those findings at this revision. See
+[implementation status](../implementation-status.md#current-product-scope--7-october-2026)
+for the maintained product. Remaining lineage findings are not fixed by that cleanup.
+
 The repository's engineering checks pass, but the displayed results are not yet
 defensible as validated influence findings. Three reproduced backend defects can create
 unsupported attribution or authorize forecasts using future information. The current

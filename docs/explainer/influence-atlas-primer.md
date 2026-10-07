@@ -1,5 +1,12 @@
 # Who Writes Europe's Laws?
 
+> Current scope, 7 October 2026 (`rev-w1ao`): the maintained product is the lineage
+> website and its setup/collect/lineage path, including optional Jev. The Atlas producer
+> and offline consumers are retired. This document preserves the broader challenge
+> design and research; its old commands and planned features are historical unless
+> retained in the [current backend guide](../../backend/README.md) and
+> [implementation status](../implementation-status.md).
+
 **influence Primer** · Reversa × Madrid Open · Challenge 03 · Saturday 3 October 2026
 
 The owner named the project **influence** on 7 October 2026. “The Influence Atlas” is
@@ -422,6 +429,13 @@ interest, and 30 amendment votes in HowTheyVote. The DSA is second.
 - Individual citizens' submissions (`EU_CITIZEN`) are counted, never named.
 
 ## 6. The Architecture
+
+The current implementation follows one maintained path (owner decision, 7 October 2026):
+`setup → collect → lineage → lineage.json → lineage API → /lineage`. Collection resolves
+actors and preserves source provenance. Lineage traces adopted and tabled wording, with
+optional BM25/Jev origins; the website reads only its output. Shared helpers formerly
+inside Atlas modules are retained under lineage/collection homes. The eight-part design
+below is the historical challenge architecture, not a second supported runtime.
 
 Eight parts plus a practice loop (`proposed`). Each part has one job and hands a defined
 output to the next, so three or four people can build in parallel. The

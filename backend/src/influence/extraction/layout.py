@@ -1,17 +1,9 @@
-"""Where extracted data lives, so adding a law never touches another law's files.
+"""Public data root and path-safe law identifiers."""
 
-Global sources are fetched once; per-law sources live under the procedure's slug.
-"""
-
+import os
 import re
-from dataclasses import dataclass
 from pathlib import Path
 
-# The catalog's source ids for global sources, plus the probe report's own directory.
-GLOBAL_SOURCES = frozenset({"registry", "meetings_ec", "meetings_mep", "ep_opendata", "probe"})
-
-# A procedure id such as 2021/0106(COD) contains characters that are path separators on
-# POSIX and forbidden on Windows, so the directory name is a slug, never the raw id.
 _NON_ALPHANUMERIC = re.compile(r"[^A-Za-z0-9]+")
 
 
@@ -27,29 +19,9 @@ def procedure_slug(procedure_id: str) -> str:
     return slug
 
 
-@dataclass(frozen=True)
-class DataLayout:
-    """Paths under one data root. Creating a directory is explicit, never a side effect."""
-
-    root: Path
-
-    @property
-    def raw(self) -> Path:
-        return self.root / "raw"
-
-    @property
-    def cache(self) -> Path:
-        return self.root / "cache"
-
-    def global_source(self, name: str) -> Path:
-        if name not in GLOBAL_SOURCES:
-            raise LayoutError(f"Unknown global source {name!r}")
-        return self.raw / name
-
-    def law(self, procedure_id: str) -> Path:
-        return self.raw / "laws" / procedure_slug(procedure_id)
-
-    def law_source(self, procedure_id: str, name: str) -> Path:
-        if not name or "/" in name or "\\" in name:
-            raise LayoutError(f"Unusable per-law source name {name!r}")
-        return self.law(procedure_id) / name
+def default_data_root() -> Path:
+    """`INFLUENCE_DATA_ROOT`, or the repository's `data/` beside the installed source."""
+    override = os.environ.get("INFLUENCE_DATA_ROOT")
+    if override is not None:
+        return Path(override)
+    return Path(__file__).resolve().parents[4] / "data"
