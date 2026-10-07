@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { ClaimCard, PhraseCard } from "../components/lineage-law-browser";
 import { SourceQuote } from "../components/lineage-source-quote";
-import { collectSupportedClaims, prepareLineage } from "../lib/lineage";
+import { collectSupportedClaims, originRowKey, prepareLineage } from "../lib/lineage";
+import type { OriginMatchRecord } from "../lib/lineage-api";
+import { anyPhrase, filterPhrases } from "../lib/lineage-insights";
 import { indexLineageSources, safeSourceUrl } from "../lib/lineage-sources";
 import { fixtureSourcesView, fixtureView } from "./lineage-fixture";
 
@@ -332,4 +334,243 @@ test("legacy carrier rows explicitly lack exact quotation evidence", () => {
   expect(screen.getByText("Exact carrier quotation unavailable in this snapshot.")).toBeDefined();
   expect(screen.getAllByRole("blockquote")).toHaveLength(2);
   expect(screen.queryByText("→")).toBeNull();
+});
+
+test("same-start different-end origins have stable unique render identities", () => {
+  const origin = view.origins[0];
+  const saved = origin?.supports?.[0];
+  if (origin === undefined || saved === undefined) {
+    throw new Error("Missing supported origin");
+  }
+  const text = origin.span.text.slice(0, origin.span.text.lastIndexOf(" market"));
+  const shorten = (span: typeof origin.span) => ({
+    ...span,
+    text,
+    end: span.start + [...text].length,
+  });
+  const shorter = {
+    ...origin,
+    span: shorten(origin.span),
+    supports: [
+      {
+        ...saved,
+        support_id: "support:shorter",
+        submission_span: shorten(saved.submission_span),
+        amendment_span: shorten(saved.amendment_span),
+        final_span: shorten(saved.final_span),
+      },
+    ],
+  };
+  const amended = { ...view, origins: [origin, shorter] };
+  const row = prepareLineage(amended).adopted[0];
+  if (row === undefined) {
+    throw new Error("Missing phrase row");
+  }
+  expect(row.origins).toHaveLength(2);
+  expect(new Set(row.origins.map(originRowKey)).size).toBe(2);
+  const reversed = prepareLineage({ ...amended, origins: [shorter, origin] }).adopted[0];
+  expect(reversed?.origins.map(originRowKey).sort()).toEqual(row.origins.map(originRowKey).sort());
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    render(
+      <ol>
+        <PhraseCard phrase={row} sources={prepareLineage(amended).sources} />
+      </ol>,
+    );
+    expect(errors.mock.calls).toEqual([]);
+  } finally {
+    errors.mockRestore();
+  }
+});
+
+test("identical quotations merge distinct carrier supports without losing stable identity", () => {
+  const origin = view.origins[0];
+  const saved = origin?.supports?.[0];
+  const adoption = view.adoptions[0];
+  const evidence = adoption?.evidence?.[0];
+  if (
+    origin === undefined ||
+    saved === undefined ||
+    adoption === undefined ||
+    evidence === undefined
+  ) {
+    throw new Error("Missing supports");
+  }
+  const phrase = view.adopted_phrases[0];
+  const final = phrase?.final_spans[0];
+  if (phrase === undefined || final === undefined) {
+    throw new Error("Missing final occurrence");
+  }
+  const otherFinal = { ...final, record_id: "art:32024R1689:article-13" };
+  const otherEvidence = {
+    ...evidence,
+    evidence_id: "evidence:second-carrier",
+    final_span: { ...evidence.final_span, record_id: otherFinal.record_id },
+  };
+  // Same document, quotation and amendment; only the saved final occurrence differs.
+  const other = {
+    ...origin,
+    supports: [
+      {
+        ...saved,
+        support_id: "support:second-carrier",
+        adoption_evidence_id: otherEvidence.evidence_id,
+        final_span: { ...saved.final_span, record_id: otherFinal.record_id },
+      },
+    ],
+  };
+  const amended = {
+    ...view,
+    adopted_phrases: [{ ...phrase, final_spans: [final, otherFinal] }],
+    adoptions: [{ ...adoption, evidence: [evidence, otherEvidence] }],
+    origins: [origin, other],
+  };
+  const prepared = prepareLineage(amended);
+  const row = prepared.adopted[0];
+  if (row === undefined) {
+    throw new Error("Missing phrase row");
+  }
+  expect(row.origins).toHaveLength(1);
+  expect(row.origins[0]?.supports.map((item) => item.support_id).sort()).toEqual(
+    [saved.support_id, "support:second-carrier"].sort(),
+  );
+  const reverse = prepareLineage({ ...amended, origins: [other, origin] }).adopted[0]?.origins[0];
+  if (reverse === undefined || row.origins[0] === undefined) {
+    throw new Error("Missing origin row");
+  }
+  expect(originRowKey(reverse)).toBe(originRowKey(row.origins[0]));
+  expect(originRowKey(row.origins[0])).toContain("support:second-carrier");
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    render(
+      <ol>
+        <PhraseCard phrase={row} sources={prepared.sources} />
+      </ol>,
+    );
+    expect(errors.mock.calls).toEqual([]);
+  } finally {
+    errors.mockRestore();
+  }
+});
+
+test("legacy identity uses saved amendment IDs and exact duplicates coalesce", () => {
+  const legacy = fixtureView();
+  const origin = legacy.origins[0];
+  if (origin === undefined) {
+    throw new Error("Missing legacy origin");
+  }
+  const row = prepareLineage({ ...legacy, origins: [origin, origin] }).adopted[0]?.origins[0];
+  if (row === undefined) {
+    throw new Error("Missing legacy row");
+  }
+  expect(originRowKey(row)).toContain(origin.amendment_ids[0]);
+  expect(row.supports).toEqual([]);
+  expect(prepareLineage({ ...legacy, origins: [origin, origin] }).adopted[0]?.origins).toHaveLength(
+    1,
+  );
+});
+
+test("same quotation before, after and undated carriers preserves chronology in either order", () => {
+  const legacy = fixtureView();
+  const origin = legacy.origins[0];
+  if (origin === undefined) {
+    throw new Error("Missing origin");
+  }
+  const later = { ...origin, eligibility: "amendment_first" as const, precedes: false };
+  const undated = {
+    ...origin,
+    eligibility: "unknown_date" as const,
+    precedes: null,
+    earliest_amendment_on: null,
+  };
+  let identities: string[] | null = null;
+  for (const origins of [
+    [origin, later, undated],
+    [undated, later, origin],
+  ]) {
+    const prepared = prepareLineage({ ...legacy, origins });
+    const row = prepared.adopted[0];
+    if (row === undefined) {
+      throw new Error("Missing phrase");
+    }
+    expect(row.origins).toHaveLength(3);
+    expect(row.origins.map((item) => item.eligibility).sort()).toEqual([
+      "amendment_first",
+      "ask_first",
+      "unknown_date",
+    ]);
+    expect(new Set(row.origins.map(originRowKey)).size).toBe(3);
+    expect(row.hasEarlierRequest).toBe(true);
+    expect(filterPhrases(prepared.adopted, { ...anyPhrase, evidence: "first" })).toHaveLength(1);
+    const keys = row.origins.map(originRowKey).sort();
+    if (identities !== null) {
+      expect(keys).toEqual(identities);
+    }
+    identities = keys;
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = render(
+        <ol>
+          <PhraseCard phrase={row} sources={prepared.sources} />
+        </ol>,
+      );
+      expect(screen.getByRole("heading", { name: "1 submission says it" })).toBeDefined();
+      expect(screen.getByText("Said before the amendments")).toBeDefined();
+      expect(screen.getByText("Said after the first amendment")).toBeDefined();
+      expect(screen.getByText("Order unknown")).toBeDefined();
+      expect(errors.mock.calls).toEqual([]);
+      result.unmount();
+    } finally {
+      errors.mockRestore();
+    }
+  }
+});
+
+test.each<Partial<OriginMatchRecord>>([
+  { organisation: "A different named organisation" },
+  { published_at: "2020-01-01T00:00:00Z" },
+  { words: 99 },
+  { is_citation: true },
+  { earliest_amendment_on: "2020-01-01T00:00:00Z" },
+  { similarity: 0.5 },
+])("distinct saved presentation or target metadata remains separate (%#)", (changes) => {
+  const legacy = fixtureView();
+  const origin = legacy.origins[0];
+  if (origin === undefined) {
+    throw new Error("Missing origin");
+  }
+  const row = prepareLineage({ ...legacy, origins: [origin, { ...origin, ...changes }] })
+    .adopted[0];
+  expect(row?.origins).toHaveLength(2);
+  expect(new Set(row?.origins.map(originRowKey)).size).toBe(2);
+});
+
+test("the submission heading counts distinct documents, not quotation rows", () => {
+  const legacy = fixtureView();
+  const origin = legacy.origins[0];
+  if (origin === undefined) {
+    throw new Error("Missing origin");
+  }
+  const other = {
+    ...origin,
+    document_id: "doc:second-submission",
+    span: { ...origin.span, record_id: "doc:second-submission" },
+  };
+  const shorter = {
+    ...origin,
+    span: { ...origin.span, text: origin.span.text.slice(0, -1), end: origin.span.end - 1 },
+  };
+  const prepared = prepareLineage({ ...legacy, origins: [origin, shorter, other] });
+  const row = prepared.adopted[0];
+  if (row === undefined) {
+    throw new Error("Missing phrase");
+  }
+  expect(row.origins).toHaveLength(3);
+  render(
+    <ol>
+      <PhraseCard phrase={row} sources={prepared.sources} />
+    </ol>,
+  );
+  expect(screen.getByRole("heading", { name: "2 submissions say it" })).toBeDefined();
+  expect(screen.getAllByText("Said before the amendments")).toHaveLength(3);
 });

@@ -46,6 +46,13 @@ matched collection, with no missing metadata or non-web URLs in these bundles. A
 input files retained hashes and timestamps. The generated measurement record is
 `backend/evaluation/lineage-source-provenance.json`; source bundles were not rewritten.
 
+Browser review found duplicate render keys for distinct quotation spans and a saved-context
+deduplication issue: identical text could inherit the first carrier's timing state. Origin
+rows now coalesce only when full quotation and presentation metadata agree; keys preserve
+that identity and support IDs. Distinct timing states stay inspectable, and submission
+headings count distinct documents. These are display corrections; graph support eligibility
+and stored snapshots remain unchanged. Validation results are recorded on `rev-j07w`.
+
 ### Sampling the Displayed Associations — 7 October 2026
 
 R5 (`rev-ha8p`) shares graph method/tabler/focus settings and node clipping with the

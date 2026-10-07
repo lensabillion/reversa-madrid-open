@@ -8,6 +8,7 @@ import {
   type LineageCreditTable,
   type LineageOriginRow,
   type LineagePhraseRow,
+  originRowKey,
   type PreparedLineage,
   prepareLineage,
   type SupportedLineageClaim,
@@ -129,6 +130,7 @@ export function PhraseCard({
   sources: LineageSourceIndex;
 }) {
   const [allCarriers, setAllCarriers] = useState(false);
+  const submissionCount = new Set(phrase.origins.map((origin) => origin.documentId)).size;
   const carriers = allCarriers
     ? phrase.amendments
     : phrase.amendments.slice(0, AMENDMENTS_PER_CARD);
@@ -141,16 +143,13 @@ export function PhraseCard({
         </p>
         <section className="relative space-y-3 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
           <h4 className={eyebrow}>
-            {phrase.origins.length === 0
+            {submissionCount === 0
               ? "No submission says it"
-              : plural(phrase.origins.length, "submission says it", "submissions say it")}
+              : plural(submissionCount, "submission says it", "submissions say it")}
           </h4>
           <ul className="space-y-3">
             {phrase.origins.map((origin) => (
-              <li
-                key={`${origin.documentId}:${origin.kind}:${origin.quote.start}`}
-                className="space-y-1.5 text-sm"
-              >
+              <li key={originRowKey(origin)} className="space-y-1.5 text-sm">
                 <p className="font-medium text-stone-900">
                   {origin.organisation ?? "Unnamed submitter"}
                 </p>
