@@ -191,8 +191,8 @@ export function buildLineageGraph(view: LineageView, options: GraphOptions): Lin
           }),
         ),
       ].sort(),
-      lexical: true,
-      semantic: false,
+      lexical: [...value.claims].some((id) => claims.get(id)?.origin.kind === "verbatim"),
+      semantic: [...value.claims].some((id) => claims.get(id)?.origin.kind === "semantic"),
     })),
     claims,
     unavailableReason: supported.unavailableReason,
@@ -249,6 +249,8 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
                   }),
                 ),
               ].sort(),
+              lexical: shared.some((id) => graph.claims.get(id)?.origin.kind === "verbatim"),
+              semantic: shared.some((id) => graph.claims.get(id)?.origin.kind === "semantic"),
             },
           ];
     });

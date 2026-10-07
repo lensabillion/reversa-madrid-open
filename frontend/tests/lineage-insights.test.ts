@@ -10,7 +10,7 @@ import {
   phraseFacets,
   rankOrganisations,
 } from "../lib/lineage-insights";
-import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
+import { fixtureSemanticView, fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 const view = fixtureSupportedView();
 const [origin] = view.origins;
@@ -82,7 +82,12 @@ test("only wording said first ranks; later, citing and unnamed matches stay apar
 });
 
 test("unsupported semantic origins do not enter current organisation associations", () => {
-  const semantic: OriginMatchRecord = { ...origin, kind: "semantic", similarity: 0.8 };
+  const semantic: OriginMatchRecord = {
+    ...origin,
+    kind: "semantic",
+    similarity: 0.8,
+    supports: [],
+  };
   const alone = rankOrganisations(withOrigins([semantic])).rows[0];
   expect(alone).toBeUndefined();
   expect(rankOrganisations(withOrigins([semantic, origin])).rows[0]?.reworded).toBe(0);
@@ -339,4 +344,15 @@ test("legacy and mixed-support summaries count organisations from the same saved
     detail: 2,
     split: { lexical: 1, semantic: 1 },
   });
+});
+
+test("server semantic target supports enter organisation counts without double counting lexical phrases", () => {
+  const rows = rankOrganisations(fixtureSemanticView()).rows;
+  expect(rows.some((row) => row.adoptedFirstSemantic === 1 && row.adoptedFirstLexical === 0)).toBe(
+    true,
+  );
+  const lexical = rows.find((row) => row.name === "Acme Unknown Lobby");
+  expect(lexical?.adoptedFirst).toBe(1);
+  expect(lexical?.adoptedFirstLexical).toBe(1);
+  expect(lexical?.adoptedFirstSemantic).toBe(0);
 });

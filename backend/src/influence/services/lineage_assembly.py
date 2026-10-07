@@ -34,7 +34,7 @@ from influence.services.origin import (
 
 VIEW_FILE = "lineage.json"
 METHOD = "verbatim-adopted-phrases"
-METHOD_REVISION = "lineage-2.0"
+METHOD_REVISION = "lineage-2.1"
 VERBATIM_ONLY = "Verbatim wording only: a request the final act says in other words is not traced."
 LIMITATIONS = (
     VERBATIM_ONLY,
@@ -47,9 +47,11 @@ LIMITATIONS = (
 
 
 REWORDED = (
-    "Reworded origins are Jev's judgement on BM25's shortlist of passages per adopting "
-    "amendment: a request that shares none of the amendment's rare words is not judged, and "
-    "adoption itself (amendment to final act) is still traced word for word."
+    "Experimental reworded associations: Jev judges each shortlisted passage against an "
+    "exact accepted occurrence with the full supplied amendment and final-provision texts. "
+    "The 0.67 cutoff "
+    "is an uncalibrated policy; legacy prompt accuracy does not validate these judgments. "
+    "BM25 can miss requests with none of the amendment's rare words."
 )
 
 
@@ -95,9 +97,10 @@ def build_lineage(
         origins = (*adopted, *others.origins)
         if judge is not None:
             known = frozenset(
-                (origin.document_id, amendment_id)
+                (origin.document_id, support.adoption_evidence_id)
                 for origin in adopted
-                for amendment_id in origin.amendment_ids
+                if origin.counts_as_origin
+                for support in origin.supports
             )
             reworded, note = reworded_origins(
                 collected, adoption.adoptions, judge, submitters=submitters, known=known

@@ -18,6 +18,7 @@ from influence.schemas.atlas import (
     LayerCoverage,
     NonEmpty,
     ProcedureId,
+    Sha256,
     SourceSpan,
     TimeEligibility,
 )
@@ -174,10 +175,36 @@ class AdoptionEvidence(FrozenModel):
         return self
 
 
+class OriginJudgment(FrozenModel):
+    """The retained model answers for one exact adopted-origin request, not validation."""
+
+    request_sha256: Sha256
+    prompt_revision: Literal["adopted-origin-v1"] = "adopted-origin-v1"
+    model: Literal["jev-1.13.0"] = "jev-1.13.0"
+    actual_request: float = Field(ge=0, le=1, allow_inf_nan=False)
+    same_legal_change: float = Field(ge=0, le=1, allow_inf_nan=False)
+    incompatible_legal_change: float = Field(ge=0, le=1, allow_inf_nan=False)
+    shared_background: float = Field(ge=0, le=1, allow_inf_nan=False)
+    score: float = Field(ge=0, le=1, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def score_is_the_weakest_directed_answer(self) -> Self:
+        if self.score != min(
+            self.actual_request,
+            self.same_legal_change,
+            1 - self.incompatible_legal_change,
+            1 - self.shared_background,
+        ):
+            raise ValueError("Judgment score must equal its weakest directed answer")
+        return self
+
+
 class OriginSupport(FrozenModel):
     """One exact consultation/amendment/final projection of accepted carrier evidence."""
 
     support_id: NonEmpty
+    kind: MatchKind = "verbatim"
+    judgment: OriginJudgment | None = None
     adoption_evidence_id: NonEmpty
     amendment_id: AmendmentId
     submission_span: SourceSpan
@@ -195,6 +222,12 @@ class OriginSupport(FrozenModel):
             raise ValueError(
                 "Origin support quotes submission text, amendment new_text and final text"
             )
+        if self.kind == "semantic":
+            if self.judgment is None:
+                raise ValueError("Semantic origin support requires its adopted-origin judgment")
+            return self
+        if self.judgment is not None:
+            raise ValueError("Verbatim origin support carries no model judgment")
         if (
             len(submission) < MIN_ADOPTED_RUN_WORDS
             or submission != _folded_words(self.amendment_span.text)
@@ -478,13 +511,17 @@ class LineageView(FrozenModel):
                 raise ValueError("A lineage-2 adopted verbatim origin needs exact carrier supports")
             if not origin.supports:
                 continue
-            if not exact_adopted:
-                raise ValueError("Carrier supports belong only to adopted verbatim origins")
+            if origin.phrase_id not in adopted:
+                raise ValueError("Carrier supports belong only to adopted origins")
+            if origin.kind == "semantic" and len(origin.supports) != 1:
+                raise ValueError("A semantic origin retains exactly one judged carrier support")
             dates: dict[str, date | None] = {}
             for support in origin.supports:
                 if support.support_id in support_ids:
                     raise ValueError("Duplicate origin support identifiers")
                 support_ids.add(support.support_id)
+                if support.kind != origin.kind:
+                    raise ValueError("Origin and carrier support kinds must agree")
                 carrier = evidence_by_id.get(support.adoption_evidence_id)
                 if carrier is None:
                     raise ValueError("An origin support names missing adoption evidence")
@@ -498,15 +535,29 @@ class LineageView(FrozenModel):
                     raise ValueError(
                         "An origin support must reference its exact origin and carrier"
                     )
-                interval = _span_word_interval(evidence.amendment_span, support.amendment_span)
-                if interval != _span_word_interval(evidence.final_span, support.final_span):
-                    raise ValueError(
-                        "Amendment and final projections must align inside the carrier run"
-                    )
-                if not any(
-                    interval[0] <= offset < interval[1] for offset in evidence.inserted_word_offsets
-                ):
-                    raise ValueError("An origin support must intersect an inserted word")
+                if support.kind == "semantic":
+                    if (support.amendment_span, support.final_span) != (
+                        evidence.amendment_span,
+                        evidence.final_span,
+                    ):
+                        raise ValueError(
+                            "Semantic supports quote the exact accepted amendment/final pair"
+                        )
+                    if support.judgment is None or origin.similarity != support.judgment.score:
+                        raise ValueError(
+                            "Semantic origin similarity must equal its retained judgment score"
+                        )
+                else:
+                    interval = _span_word_interval(evidence.amendment_span, support.amendment_span)
+                    if interval != _span_word_interval(evidence.final_span, support.final_span):
+                        raise ValueError(
+                            "Amendment and final projections must align inside the carrier run"
+                        )
+                    if not any(
+                        interval[0] <= offset < interval[1]
+                        for offset in evidence.inserted_word_offsets
+                    ):
+                        raise ValueError("An origin support must intersect an inserted word")
                 dates[adoption.amendment_id] = adoption.tabled_on
             if origin.amendment_ids != tuple(sorted(dates)):
                 raise ValueError("An origin names exactly the amendments its supports carry")
@@ -586,6 +637,7 @@ __all__ = [
     "LineageLawList",
     "LineageLawSummary",
     "LineageView",
+    "OriginJudgment",
     "OriginMatch",
     "OriginSupport",
     "TabledPhrase",

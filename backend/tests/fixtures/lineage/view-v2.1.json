@@ -1,0 +1,284 @@
+{
+  "schema_version": "lineage-2",
+  "procedure_id": "2021/0106(COD)",
+  "slug": "2021-0106-COD",
+  "title": "Artificial Intelligence Act",
+  "run_id": "20261003T120000Z",
+  "generated_at": "2026-10-03T12:30:00Z",
+  "method": "verbatim-adopted-phrases",
+  "method_revision": "lineage-2.1",
+  "coverage": [
+    {
+      "layer": "metadata",
+      "status": "complete",
+      "count": 1,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "proposal",
+      "status": "complete",
+      "count": 8,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "parliament_position",
+      "status": "not_collected",
+      "count": null,
+      "reason": "CELLAR files only Parliament's legislative resolution, not its consolidated position text, and the EP API adopted-texts connector is not built",
+      "source_updated_on": null
+    },
+    {
+      "layer": "final_act",
+      "status": "complete",
+      "count": 6,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "committee_amendments",
+      "status": "complete",
+      "count": 2,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "plenary_amendments",
+      "status": "complete",
+      "count": 1,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "asks",
+      "status": "complete",
+      "count": 4,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "actors",
+      "status": "complete",
+      "count": 5,
+      "reason": null,
+      "source_updated_on": null
+    },
+    {
+      "layer": "meetings",
+      "status": "not_collected",
+      "count": null,
+      "reason": "No connector for this layer is built yet",
+      "source_updated_on": null
+    },
+    {
+      "layer": "votes",
+      "status": "not_collected",
+      "count": null,
+      "reason": "No connector for this layer is built yet",
+      "source_updated_on": null
+    }
+  ],
+  "status": "computed",
+  "reason": null,
+  "counts": {
+    "amendments": 3,
+    "amendments_adopting": 1,
+    "adopted_phrases": 1,
+    "phrases_without_group": 0,
+    "documents_read": 5,
+    "documents_with_origin": 1,
+    "changed_units": 103,
+    "linked_units": 18
+  },
+  "adopted_phrases": [
+    {
+      "phrase_id": "phrase:97d079c4c308f874",
+      "kind": "verbatim",
+      "text": "providers shall keep the logs for at least six months after the system is placed on the market",
+      "words": 18,
+      "final_spans": [
+        {
+          "record_id": "art:32024R1689:article-12",
+          "field": "text",
+          "page": null,
+          "start": 0,
+          "end": 94,
+          "text": "Providers shall keep the logs for at least six months after the system is placed on the market"
+        }
+      ],
+      "similarity": null,
+      "judge_probability": null,
+      "holders": [
+        "actor:mep:125042",
+        "actor:mep:197721"
+      ]
+    }
+  ],
+  "tabled_phrases": [],
+  "adoptions": [
+    {
+      "amendment_id": "am:2021-0106-COD:ENVI:PE7-7",
+      "kind": "verbatim",
+      "stage": "committee",
+      "committee": "ENVI",
+      "author_ids": [
+        "actor:mep:197721",
+        "actor:mep:125042"
+      ],
+      "author_names": [
+        "César Luena",
+        "Javi López",
+        "Margrete Auken on behalf of the Verts/ALE Group"
+      ],
+      "author_groups": [
+        "S&D",
+        "S&D"
+      ],
+      "tabled_on": "2022-01-25",
+      "phrase_ids": [
+        "phrase:97d079c4c308f874"
+      ],
+      "adopted_words": 18,
+      "inserted_words": 13,
+      "new_words": 18,
+      "longest_run": 18,
+      "evidence": [
+        {
+          "evidence_id": "adoption-evidence:ef8ca3dbab4433205e73f60263922a88",
+          "phrase_id": "phrase:97d079c4c308f874",
+          "amendment_span": {
+            "record_id": "am:2021-0106-COD:ENVI:PE7-7",
+            "field": "new_text",
+            "page": null,
+            "start": 0,
+            "end": 94,
+            "text": "Providers shall keep the logs for at least six months after the system is placed on the market"
+          },
+          "final_span": {
+            "record_id": "art:32024R1689:article-12",
+            "field": "text",
+            "page": null,
+            "start": 0,
+            "end": 94,
+            "text": "Providers shall keep the logs for at least six months after the system is placed on the market"
+          },
+          "inserted_word_offsets": [
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ]
+        }
+      ]
+    }
+  ],
+  "origins": [
+    {
+      "phrase_id": "phrase:97d079c4c308f874",
+      "document_id": "doc:hys_feedback:4",
+      "actor_id": "actor:name:hys_feedback.acme-unknown-lobby",
+      "organisation": "Acme Unknown Lobby",
+      "published_at": "2021-08-06T23:57:37+02:00",
+      "span": {
+        "record_id": "doc:hys_feedback:4",
+        "field": "text",
+        "page": null,
+        "start": 26,
+        "end": 104,
+        "text": "keep the logs for at least six months after the system is placed on the market"
+      },
+      "kind": "verbatim",
+      "similarity": null,
+      "words": 16,
+      "amendment_ids": [
+        "am:2021-0106-COD:ENVI:PE7-7"
+      ],
+      "earliest_amendment_on": "2022-01-25",
+      "precedes": true,
+      "eligibility": "ask_first",
+      "is_citation": false,
+      "supports": [
+        {
+          "support_id": "origin-support:f273a1b7ae793310134b22daa32ca527",
+          "kind": "verbatim",
+          "judgment": null,
+          "adoption_evidence_id": "adoption-evidence:ef8ca3dbab4433205e73f60263922a88",
+          "amendment_id": "am:2021-0106-COD:ENVI:PE7-7",
+          "submission_span": {
+            "record_id": "doc:hys_feedback:4",
+            "field": "text",
+            "page": null,
+            "start": 26,
+            "end": 104,
+            "text": "keep the logs for at least six months after the system is placed on the market"
+          },
+          "amendment_span": {
+            "record_id": "am:2021-0106-COD:ENVI:PE7-7",
+            "field": "new_text",
+            "page": null,
+            "start": 16,
+            "end": 94,
+            "text": "keep the logs for at least six months after the system is placed on the market"
+          },
+          "final_span": {
+            "record_id": "art:32024R1689:article-12",
+            "field": "text",
+            "page": null,
+            "start": 16,
+            "end": 94,
+            "text": "keep the logs for at least six months after the system is placed on the market"
+          }
+        }
+      ]
+    }
+  ],
+  "credits": [
+    {
+      "holder_id": "actor:mep:125042",
+      "basis": "verbatim",
+      "holder_kind": "mep",
+      "name": "Margrete AUKEN",
+      "phrases": 1,
+      "joint_phrases": 1,
+      "amendments": 1,
+      "amendments_tabled": 2
+    },
+    {
+      "holder_id": "actor:mep:197721",
+      "basis": "verbatim",
+      "holder_kind": "mep",
+      "name": "Brando BENIFEI",
+      "phrases": 1,
+      "joint_phrases": 1,
+      "amendments": 1,
+      "amendments_tabled": 2
+    },
+    {
+      "holder_id": "S&D",
+      "basis": "verbatim",
+      "holder_kind": "group",
+      "name": "S&D",
+      "phrases": 1,
+      "joint_phrases": 0,
+      "amendments": 1,
+      "amendments_tabled": 2
+    }
+  ],
+  "limitations": [
+    "Verbatim wording only: a request the final act says in other words is not traced.",
+    "Shared wording is evidence, not proof of authorship: the Council, the trilogues, a common draft or a coalition can explain the same words.",
+    "Every holder of a phrase is credited with the whole phrase (no fractional credit); a phrase with several holders is joint. Members are ranked by their rate per amendment tabled.",
+    "A Member's political group is their group on the day the amendment was tabled, from Parltrack's dated group spells; a Member with no spell covering that day counts as group unknown, never under a later group.",
+    "1 amendment(s) have no original wording; their whole text was treated as inserted."
+  ]
+}

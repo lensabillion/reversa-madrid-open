@@ -67,6 +67,20 @@ The frontend gate passed 84 tests in seven files, Biome, strict types and a prod
 build. Independent Astra review checked complete paths, clipping, focus, deduplication and
 refresh lifecycle. Semantic support integration remains the separately tested R3 layer.
 
+### Exact Semantic Targets — 7 October 2026
+
+R3 (`rev-h5zb`) replaces broad-amendment Jev questions with one `adopted-origin-v1`
+request per exact surviving carrier. It retains full supplied amendment old/new and final
+provision context, validates raw source slices, isolates the cache revision and persists
+exact semantic supports with judgment metadata. Adoption remains lexical. The 0.67 policy
+is explicitly uncalibrated and experimental. Backend verification passed 694 tests with
+full line/branch coverage; independent Astra review approved the structural contract.
+Frontend integration passed 102 tests, Biome, strict types and a production build;
+independent review verified semantic claim metadata, exact pairs and focused-edge method
+flags. Four-law request planning made no provider calls. A frozen 28-case synthetic comparison
+(47 distinct requests, four structural skips) is prepared; paid evaluation awaits human
+spending approval. See the [diagnostic plan](reviews/lineage-semantic-diagnostics-2026-10-07.md).
+
 ### Exact Lexical Carrier Evidence — 7 October 2026
 
 The R2 backend repair (`rev-0q9m`) emits `lineage-2`: accepted amendment/final runs and

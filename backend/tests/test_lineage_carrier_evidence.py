@@ -260,7 +260,7 @@ def test_v2_rejects_broken_carrier_and_origin_references(tmp_path: Path) -> None
         view.model_copy(
             update={"origins": (origin.model_copy(update={"kind": "semantic", "similarity": 0.9}),)}
         ),
-        "only to adopted verbatim",
+        "kinds must agree",
     )
     invalid(
         view.model_copy(
