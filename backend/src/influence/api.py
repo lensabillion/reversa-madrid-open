@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from influence.extraction.cli import default_data_root
 from influence.routers import health, lineage
@@ -14,6 +15,11 @@ VERSION = version("influence")
 # The dev explorer's origins. Through Next.js's proxy the browser never calls the API
 # directly, so this only matters for a page served elsewhere than the proxy.
 LOCAL_ORIGINS = ("http://localhost:3000", "http://127.0.0.1:3000")
+# Bodies shorter than this go out as they are. Below about 1 KB a response already fits in
+# one TCP packet beside its headers, so gzip (18 bytes of framing, plus CPU on both ends)
+# saves no round trip: /health (about 40 bytes) and the law list stay plain, while the
+# lineage views (hundreds of KB of repetitive JSON) shrink to about a seventh.
+GZIP_MINIMUM_BYTES = 1024
 
 
 def create_app(atlas_data_root: Path | None = None) -> FastAPI:
@@ -25,6 +31,8 @@ def create_app(atlas_data_root: Path | None = None) -> FastAPI:
     """
     app = FastAPI(title="Influence Atlas API", version=VERSION)
     app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_methods=("GET",))
+    # Added last, so outermost: it wraps every other layer and compresses the body as it leaves.
+    app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES)
     app.state.atlas_data_root = atlas_data_root or default_data_root()
     app.include_router(health.router)
     app.include_router(lineage.router)
