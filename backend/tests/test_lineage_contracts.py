@@ -68,6 +68,7 @@ def credit(amendments: int, tabled: int = 4, holder: str = "actor:mep:1") -> Cre
 
 def view(**changes: object) -> LineageView:
     data: dict[str, object] = {
+        "schema_version": "lineage-1",
         "procedure_id": "2099/0001(COD)",
         "slug": "2099-0001-COD",
         "title": "Widget Act",

@@ -18,10 +18,10 @@ law's own texts never match themselves. A document counts as an origin only when
 before every carrying amendment, so an undated document, or one undated carrier, leaves the
 order unknown (`eligibility` "unknown_date").
 
-Complexity: the index holds one entry per 8-word window of every phrase; each document is
-scanned once, and a window is built only where its first word starts some indexed window, so
-the cost is linear in the documents' words plus the matched windows. The 259 AI Act
-attachments (about 2 million words) scan in a few seconds. `find_tabled_origins` indexes
+Complexity: the index holds one entry per 8-word window of every accepted carrier run.
+Each document is scanned once, and a window is built only where its first word starts an
+indexed window. The cost is linear in document words plus matched windows.
+`find_tabled_origins` indexes
 every amendment's inserted words instead of the adopted phrases, about one entry per inserted
 word (the AI Act's 5,660 amendments insert well under a million), so it scans the same way;
 a window that many amendments share costs one lookup per carrier.
@@ -46,11 +46,13 @@ from influence.schemas.lineage import (
     MIN_ADOPTED_RUN_WORDS,
     NGRAM_WORDS,
     AdoptedPhrase,
+    AdoptionEvidence,
     AmendmentAdoption,
     OriginMatch,
+    OriginSupport,
     TabledPhrase,
 )
-from influence.services.lineage import Rarity, inserted_words, phrase_id_of
+from influence.services.lineage import Rarity, evidence_id_of, inserted_words, phrase_id_of
 from influence.services.prose_match import Word, words_of
 
 # The first words of a run that quotes another act: "the European Parliament and of the
@@ -134,16 +136,22 @@ def _runs(
     index: Mapping[tuple[str, ...], Sequence[tuple[int, int]]],
     first_words: frozenset[str],
     rarity: Rarity,
-) -> dict[int, tuple[int, int]]:
-    """For each phrase found in the document, its longest significant run as (first, end)."""
+    insertions: Sequence[tuple[int, ...]] | None = None,
+) -> dict[int, tuple[int, int, int]]:
+    """Longest qualifying (document first, end, carrier first) for each indexed run.
+
+    Qualification precedes selection: an earlier or longer overlap without the carrier's
+    insertion cannot suppress an actual supported overlap. Window hits are linear in the
+    indexed and document words plus matched windows, as in the module's cost description.
+    """
     hits: defaultdict[tuple[int, int], list[int]] = defaultdict(list)
     for start in range(len(folded) - NGRAM_WORDS + 1):
         if folded[start] not in first_words:
             continue
         for phrase_index, phrase_start in index.get(tuple(folded[start : start + NGRAM_WORDS]), ()):
             hits[phrase_index, start - phrase_start].append(start)
-    best: dict[int, tuple[int, int]] = {}
-    for (phrase_index, _), starts in hits.items():
+    best: dict[int, tuple[int, int, int]] = {}
+    for (phrase_index, shift), starts in hits.items():
         first = previous = starts[0]
         for start in (*starts[1:], None):
             if start is not None and start == previous + 1:
@@ -151,9 +159,19 @@ def _runs(
                 continue
             end = previous + NGRAM_WORDS
             if end - first >= MIN_ADOPTED_RUN_WORDS and rarity.significant(folded[first:end]):
-                current = best.get(phrase_index)
-                if current is None or end - first > current[1] - current[0]:
-                    best[phrase_index] = (first, end)
+                carrier_first = first - shift
+                if insertions is None or any(
+                    carrier_first <= offset < carrier_first + end - first
+                    for offset in insertions[phrase_index]
+                ):
+                    current = best.get(phrase_index)
+                    rank = (-(end - first), first, carrier_first)
+                    if current is None or rank < (
+                        -(current[1] - current[0]),
+                        current[0],
+                        current[2],
+                    ):
+                        best[phrase_index] = (first, end, carrier_first)
             if start is not None:
                 first = previous = start
     return best
@@ -175,11 +193,12 @@ def find_origins(
     amendments: Mapping[str, Amendment] | None = None,
     submitters: Mapping[str, Actor] | None = None,
 ) -> tuple[OriginMatch, ...]:
-    """Every document that says an adopted phrase, with an exact quotation and the dates.
+    """Exact submission/carrier/final associations, with supported carrier dates.
 
-    For each (phrase, document) pair the longest shared run of at least
-    `MIN_ADOPTED_RUN_WORDS` words that `rarity` finds significant (the law's own rarity, as in
-    adoption) is reported once. Documents that are not consultation documents are skipped.
+    For each document and accepted carrier occurrence, choose the longest qualifying run
+    of at least `MIN_ADOPTED_RUN_WORDS` words with three rare words and an insertion.
+    Group only identical phrase/document/submission occurrences, retaining each support.
+    Documents that are not consultation documents are skipped.
     `precedes` is True when the document is dated before the earliest amendment carrying the
     phrase, False when not, and None when the document or any carrying amendment is undated;
     `eligibility` records the corresponding date status. `is_citation` marks a run that is a
@@ -188,14 +207,40 @@ def find_origins(
     supplies a tabling date for an adoption that has none. `submitters` (see
     `submitters_from`) names the organisation behind a document; without it a comment is
     named by its title and an attachment is left unnamed. Output is ordered longest first,
-    then by document and phrase, so it is reproducible.
+    then by document, phrase and submission offsets, so it is reproducible.
     """
     verbatim = [phrase for phrase in phrases if phrase.kind == "verbatim"]
     carriers = _carriers(verbatim, adoptions)
+    listed = {phrase.phrase_id for phrase in verbatim}
+    accepted: list[tuple[AmendmentAdoption, AdoptionEvidence]] = []
+    for phrase_id in sorted(listed):
+        for adoption in carriers[phrase_id]:
+            evidence = [item for item in adoption.evidence if item.phrase_id == phrase_id]
+            if not evidence:
+                raise OriginError(
+                    f"{adoption.amendment_id} lacks exact carrier evidence for {phrase_id}"
+                )
+            for item in evidence:
+                if item.amendment_span.record_id != adoption.amendment_id:
+                    raise OriginError("Carrier evidence quotes a different amendment")
+                source = None if amendments is None else amendments.get(adoption.amendment_id)
+                if (
+                    source is not None
+                    and source.new_text[item.amendment_span.start : item.amendment_span.end]
+                    != item.amendment_span.text
+                ):
+                    raise OriginError(
+                        "Carrier evidence does not quote the amendment's exact source"
+                    )
+                accepted.append((adoption, item))
+    accepted.sort(key=lambda pair: pair[1].evidence_id)
     index: defaultdict[tuple[str, ...], list[tuple[int, int]]] = defaultdict(list)
-    for phrase_index, phrase in enumerate(verbatim):
-        for start, window in _windows(phrase.text.split()):
-            index[window].append((phrase_index, start))
+    for target, (_, evidence) in enumerate(accepted):
+        for start, window in _windows(
+            [word.text for word in words_of(evidence.amendment_span.text)]
+        ):
+            index[window].append((target, start))
+    insertions = [evidence.inserted_word_offsets for _, evidence in accepted]
     first_words = frozenset(window[0] for window in index)
 
     found: list[OriginMatch] = []
@@ -203,29 +248,82 @@ def find_origins(
         words = words_of(text.text)
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
-        for phrase_index, (first, end) in _runs(folded, index, first_words, rarity).items():
-            phrase = verbatim[phrase_index]
-            carrying = carriers[phrase.phrase_id]
-            earliest, precedes = _order(
-                [_tabled(a, amendments) for a in carrying], document.published_at
+        grouped: defaultdict[tuple[str, SourceSpan], dict[str, OriginSupport]] = defaultdict(dict)
+        supporting: dict[str, AmendmentAdoption] = {}
+        for target, (first, end, carrier_first) in _runs(
+            folded, index, first_words, rarity, insertions
+        ).items():
+            adoption, evidence = accepted[target]
+            submission_span = _span(document, text.text, words, first, end)
+            amendment_span = _project(
+                evidence.amendment_span, carrier_first, carrier_first + end - first
             )
+            final_span = _project(evidence.final_span, carrier_first, carrier_first + end - first)
+            support_id = evidence_id_of(
+                "origin-support",
+                evidence.evidence_id,
+                (submission_span, amendment_span, final_span),
+            )
+            support = OriginSupport(
+                support_id=support_id,
+                adoption_evidence_id=evidence.evidence_id,
+                amendment_id=adoption.amendment_id,
+                submission_span=submission_span,
+                amendment_span=amendment_span,
+                final_span=final_span,
+            )
+            grouped[evidence.phrase_id, submission_span][support_id] = support
+            supporting[adoption.amendment_id] = adoption
+        for (phrase_id, span), supports in grouped.items():
+            ids = tuple(sorted({support.amendment_id for support in supports.values()}))
+            earliest, precedes = _order(
+                [_tabled(supporting[amendment_id], amendments) for amendment_id in ids],
+                document.published_at,
+            )
+            run_words = [word.text for word in words_of(span.text)]
             found.append(
                 OriginMatch(
-                    phrase_id=phrase.phrase_id,
+                    phrase_id=phrase_id,
                     document_id=document.document_id,
                     actor_id=None if submitter is None else submitter.actor_id,
                     organisation=_organisation(document, submitter),
                     published_at=document.published_at,
-                    span=_span(document, text.text, words, first, end),
-                    words=end - first,
-                    amendment_ids=tuple(sorted({a.amendment_id for a in carrying})),
+                    span=span,
+                    words=len(run_words),
+                    amendment_ids=ids,
                     earliest_amendment_on=earliest,
                     precedes=precedes,
                     eligibility=_eligibility(precedes),
-                    is_citation=is_citation(folded[first:end]),
+                    is_citation=is_citation(run_words),
+                    supports=tuple(supports[key] for key in sorted(supports)),
                 )
             )
-    return tuple(sorted(found, key=lambda m: (-m.words, m.document_id, m.phrase_id)))
+    return tuple(
+        sorted(
+            found,
+            key=lambda match: (
+                -match.words,
+                match.document_id,
+                match.phrase_id,
+                match.span.start,
+                match.span.end,
+            ),
+        )
+    )
+
+
+def _project(span: SourceSpan, first: int, end: int) -> SourceSpan:
+    """Project a matched word interval inside its accepted occurrence, without text search."""
+    words = words_of(span.text)
+    start, stop = words[first].start, words[end - 1].end
+    return SourceSpan(
+        record_id=span.record_id,
+        field=span.field,
+        start=span.start + start,
+        end=span.start + stop,
+        text=span.text[start:stop],
+        page=span.page,
+    )
 
 
 def _consultation(
@@ -328,7 +426,7 @@ def find_tabled_origins(
         folded = [word.text for word in words]
         submitter = (submitters or {}).get(document.document_id)
         shared: dict[str, tuple[set[str], int, int]] = {}
-        for target, (first, end) in _runs(folded, index, first_words, rarity).items():
+        for target, (first, end, _) in _runs(folded, index, first_words, rarity).items():
             run = tuple(folded[first:end])
             if all(window in adopted_windows for _, window in _windows(run)):
                 continue

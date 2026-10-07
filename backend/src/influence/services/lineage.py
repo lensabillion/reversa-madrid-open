@@ -46,6 +46,7 @@ seconds.
 """
 
 import hashlib
+import json
 import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
@@ -58,6 +59,7 @@ from influence.schemas.lineage import (
     MIN_ADOPTED_RUN_WORDS,
     NGRAM_WORDS,
     AdoptedPhrase,
+    AdoptionEvidence,
     AdoptionStatus,
     AmendmentAdoption,
     Credit,
@@ -159,6 +161,14 @@ class _Run:
 
 
 @dataclass(frozen=True, slots=True)
+class _AcceptedRun:
+    place: Place
+    amendment_span: SourceSpan
+    final_span: SourceSpan
+    inserted_word_offsets: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class _Holder:
     key: str
     kind: HolderKind
@@ -248,6 +258,19 @@ def phrase_id_of(words: Sequence[str]) -> str:
     return "phrase:" + hashlib.sha256(" ".join(words).encode("utf-8")).hexdigest()[:16]
 
 
+def evidence_id_of(
+    prefix: str, anchor: str, spans: Sequence[SourceSpan], offsets: tuple[int, ...] = ()
+) -> str:
+    """Content identity includes exact record addresses, so repeated wording stays distinct."""
+    payload = json.dumps(
+        [anchor, [span.model_dump(mode="json") for span in spans], offsets],
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return prefix + ":" + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
+
+
 def _place_id(article_id: str, first: int, end: int) -> str:
     """Identity of adopted wording by its place, so one stretch of the law is one phrase."""
     key = f"place:{article_id}:{first}:{end}"
@@ -305,7 +328,10 @@ def adopt_records(
     actors: Sequence[Actor],
 ) -> Adoption:
     """Find the adopted wording, the amendments that carry it and the credit for each holder."""
-    final_articles = [article for article in articles if article.stage == "final_act"]
+    final_articles = sorted(
+        (article for article in articles if article.stage == "final_act"),
+        key=lambda article: article.article_id,
+    )
     if not final_articles:
         return _unknown(
             len(amendments), "The final act's text was not collected; nothing can be traced."
@@ -331,14 +357,43 @@ def adopt_records(
 
     rarity = Rarity.of(article.text for article in articles)
     dropped = [0]
-    found: list[tuple[Amendment, set[Place], int, int, int, int]] = []
+    found: list[tuple[Amendment, set[Place], int, int, int, int, tuple[_AcceptedRun, ...]]] = []
     bases: defaultdict[str, int] = defaultdict(int)
-    for amendment in amendments:
+    for amendment in sorted(amendments, key=lambda item: item.amendment_id):
         new, mask, basis = inserted_words(amendment)
         bases[basis] += 1
         kept = _runs(new, mask, final_index, proposal, rarity, dropped)
         if not kept:
             continue
+        # Preserve the accepted occurrences before the final-word union erases their
+        # carrier boundaries. Word offsets are local to each accepted run.
+        source_words = words_of(amendment.new_text)
+        raw_runs: list[_AcceptedRun] = []
+        for run in kept:
+            start = source_words[run.start].start
+            end = source_words[run.start + len(run.words) - 1].end
+            amendment_span = SourceSpan(
+                record_id=amendment.amendment_id,
+                field="new_text",
+                start=start,
+                end=end,
+                text=amendment.new_text[start:end],
+            )
+            offsets = tuple(offset for offset in range(len(run.words)) if mask[run.start + offset])
+            for article, first in run.places:
+                raw_runs.append(
+                    _AcceptedRun(
+                        (article, first),
+                        amendment_span,
+                        _span(
+                            final_articles[article],
+                            final_words[article],
+                            first,
+                            first + len(run.words),
+                        ),
+                        offsets,
+                    )
+                )
         places = {
             (article, first + offset)
             for run in kept
@@ -351,7 +406,9 @@ def adopt_records(
             position for run in kept for position in range(run.start, run.start + len(run.words))
         }
         longest = max(len(run.words) for run in kept)
-        found.append((amendment, places, len(covered), sum(mask), len(new), longest))
+        found.append(
+            (amendment, places, len(covered), sum(mask), len(new), longest, tuple(raw_runs))
+        )
 
     intervals = _intervals(place for _, places, *_ in found for place in places)
     phrase_of: dict[Place, int] = {}
@@ -365,10 +422,26 @@ def adopt_records(
     carriers: list[list[Amendment]] = [[] for _ in intervals]
     latest = latest_groups(actors)
     adoptions: list[AmendmentAdoption] = []
-    for amendment, places, adopted, inserted, new_words, longest in found:
+    for amendment, places, adopted, inserted, new_words, longest, accepted in found:
         numbers = sorted({phrase_of[place] for place in places})
         for number in numbers:
             carriers[number].append(amendment)
+        evidence: dict[str, AdoptionEvidence] = {}
+        for run in accepted:
+            phrase_id = phrase_ids[phrase_of[run.place]]
+            evidence_id = evidence_id_of(
+                "adoption-evidence",
+                phrase_id,
+                (run.amendment_span, run.final_span),
+                run.inserted_word_offsets,
+            )
+            evidence[evidence_id] = AdoptionEvidence(
+                evidence_id=evidence_id,
+                phrase_id=phrase_id,
+                amendment_span=run.amendment_span,
+                final_span=run.final_span,
+                inserted_word_offsets=run.inserted_word_offsets,
+            )
         adoptions.append(
             AmendmentAdoption(
                 amendment_id=amendment.amendment_id,
@@ -385,6 +458,7 @@ def adopt_records(
                 inserted_words=inserted,
                 new_words=new_words,
                 longest_run=longest,
+                evidence=tuple(evidence[key] for key in sorted(evidence)),
             )
         )
 

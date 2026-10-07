@@ -26,7 +26,7 @@ ADOPTED = f"Providers shall keep the logs {RARE}."
 # The frontend's tests read this view, so the TypeScript types are checked against real JSON.
 # Regenerate after a contract change: uv run --directory backend --locked python
 # tests/test_lineage_views.py
-FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view.json"
+FRONTEND_FIXTURE = Path(__file__).parent / "fixtures" / "lineage" / "view-v2.json"
 
 
 def adopted_world(tmp_path: Path) -> Collected:
@@ -54,6 +54,14 @@ def render_fixture() -> str:
     with TemporaryDirectory() as directory:
         view = build_lineage(adopted_world(Path(directory)), generated_at=LATER)
     return json.dumps(view.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n"
+
+
+def test_the_legacy_fixture_remains_readable_without_fabricating_support() -> None:
+    legacy_path = Path(__file__).parent / "fixtures" / "lineage" / "view.json"
+    legacy = LineageView.model_validate_json(legacy_path.read_bytes())
+    assert legacy.schema_version == "lineage-1"
+    assert all(not adoption.evidence for adoption in legacy.adoptions)
+    assert all(not origin.supports for origin in legacy.origins)
 
 
 def test_the_committed_frontend_fixture_is_the_adopted_worlds_view() -> None:
