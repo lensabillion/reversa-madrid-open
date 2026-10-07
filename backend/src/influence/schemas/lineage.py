@@ -1,33 +1,9 @@
-"""Contracts of the lineage pipeline: which wording of the final law came from where.
+"""Contracts of lineage: which wording of the final law came from where.
 
-The Atlas pipeline goes from a submission to an amendment to the law. Lineage starts from the
-law: it finds the stretches of the final act that were not in the Commission's proposal, finds
-the amendments whose new text holds them, and then who tabled those amendments and which
-consultation documents say the same thing earlier. It is a separate pipeline with its own
-view (`lineage-1`) and leaves the `atlas-1` records untouched. The explorer reads this view
-(`GET /api/v1/lineage/{slug}`, page `/lineage`); its claims stay labelled as unreviewed until
-they pass the gates in `docs/design/`.
-
-Pieces and who produces what:
-
-* adoption (`services/lineage.py`, `adopt_records`): verbatim `AdoptedPhrase`,
-  `AmendmentAdoption`, `Credit`. A phrase is a place in the final act (an article and a word
-  interval), so one stretch of the law is never counted twice;
-* origin (`services/origin.py`): `OriginMatch` for adopted phrases (`find_origins`) and for
-  inserted wording whether or not it was adopted (`find_tabled_origins`, `TabledPhrase`).
-  Origin and adoption are two independent facts: a document can be the origin of an
-  amendment that was never adopted, and an adopted phrase can have no known origin;
-* assembly (`services/lineage_assembly.py`, `build_lineage`, run by `influence lineage`):
-  `LineageView`, written to `data/laws/<procedure>/lineage.json`;
-* review (`practice/lineage_review.py`): reads a `LineageView`, never writes one.
-
-The "semantic" kind (reworded wording found by embeddings and a judge) is part of the contract
-but no piece produces it yet. A verbatim match is a run of identical words: cheap and nearly
-unambiguous, and still only evidence of shared wording, not of who wrote it first or why.
-
-Counting follows `docs/plan.md` section 7: no fractional credit (every holder of a phrase is
-credited with the whole phrase, and a phrase with several holders is flagged joint), Members
-are ranked by their rate per amendment tabled, and an unknown count is None, never zero.
+Lineage starts from new wording in the final act, finds amendments that carry it, and
+traces their wording to earlier consultation documents. Exact matches retain Unicode
+source offsets and whole credit. The optional Jev path adds judged reworded origins on
+BM25's bounded shortlist; unknown inputs and limits remain explicit in the view.
 """
 
 from datetime import date
@@ -55,8 +31,7 @@ LINEAGE_SCHEMA_VERSION = "lineage-1"
 NGRAM_WORDS = 8
 MIN_ADOPTED_RUN_WORDS = 8
 # A phrase carried by amendments of at least this many different political groups is
-# coalition wording rather than one group's request: the same rule as part 3's cross-group
-# clusters (`services/coordinated.py`).
+# coalition wording rather than one group's request.
 COALITION_GROUPS = 2
 
 PhraseId = Annotated[str, StringConstraints(pattern=r"^phrase:[0-9a-f]{16}$")]
@@ -240,7 +215,7 @@ class OriginMatch(FrozenModel):
     earliest_amendment_on: date | None = None
     # None when a date is unknown: an undated document, or carrier, cannot settle the order.
     precedes: bool | None = None
-    # Part 4's name for the same fact: did the document (the ask) come first?
+    # Explicit date status for the same fact: did the consultation document come first?
     eligibility: TimeEligibility = "unknown_date"
     # A run that is a citation of another act ("... of the European Parliament and of the
     # Council of 20 May 2021 ...") is shared wording but not a request.

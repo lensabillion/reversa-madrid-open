@@ -22,7 +22,7 @@ def test_health_returns_ok_and_installed_version() -> None:
 def test_openapi_documents_health_response_schema() -> None:
     document = TestClient(create_app()).get("/openapi.json").json()
 
-    assert document["info"] == {"title": "Influence Atlas API", "version": version("influence")}
+    assert document["info"] == {"title": "influence API", "version": version("influence")}
     ok_response = document["paths"]["/health"]["get"]["responses"]["200"]
     assert ok_response["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/Health"

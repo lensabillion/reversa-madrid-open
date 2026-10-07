@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from influence.extraction.cli import default_data_root
+from influence.extraction.layout import default_data_root
 from influence.logging_setup import configure_logging
 from influence.routers import health, lineage
 
@@ -26,13 +26,13 @@ GZIP_MINIMUM_BYTES = 1024
 def create_app(atlas_data_root: Path | None = None) -> FastAPI:
     """Build an app that serves the law bundles under `atlas_data_root`.
 
-    The root holds what `influence atlas` and `influence lineage` write; it defaults to
+    The root holds what `influence collect` and `influence lineage` write; it defaults to
     `INFLUENCE_DATA_ROOT` or the repository's `data/`, as the commands do. Every route
     reads; nothing is written through HTTP.
     """
     # First, so a wrong INFLUENCE_LOG_LEVEL stops startup before anything is served.
     configure_logging()
-    app = FastAPI(title="Influence Atlas API", version=VERSION)
+    app = FastAPI(title="influence API", version=VERSION)
     app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_methods=("GET",))
     # Added last, so outermost: it wraps every other layer and compresses the body as it leaves.
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES)

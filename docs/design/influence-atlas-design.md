@@ -1,4 +1,14 @@
-# Influence Atlas Architecture and Delivery Design
+# influence Architecture and Delivery Design
+
+> Current scope, 7 October 2026 (`rev-w1ao`): the maintained product is the lineage
+> website and its setup/collect/lineage path, including optional Jev. The Atlas producer
+> and offline consumers are retired. This document preserves the broader challenge
+> design and research; its old commands and planned features are historical unless
+> retained in the [current backend guide](../../backend/README.md) and
+> [implementation status](../implementation-status.md).
+
+The project is **influence**, named by the owner on 7 October 2026. “The Influence Atlas”
+is the title of the organizers' brief; existing `atlas` identifiers remain technical names.
 
 3 October 2026. Proposed design requested by the project owner; implementation is planned unless
 explicitly marked delivered. Tracked by `rev-f090`. The [consolidated plan](../plan.md)

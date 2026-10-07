@@ -1,5 +1,5 @@
 {
-  "name": "reversa-influence-graph-web",
+  "name": "influence-web",
   "private": true,
   "engines": {
     "node": ">=24 <25"

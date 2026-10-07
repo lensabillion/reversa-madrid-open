@@ -5,7 +5,7 @@ pipeline (about 20 minutes of downloads for one law). The layout mirrors `data/`
 backend serves it unchanged:
 
 ```sh
-INFLUENCE_DATA_ROOT=mock-data make dev-backend   # API at http://127.0.0.1:8000
+INFLUENCE_DATA_ROOT="$PWD/mock-data" make dev-backend   # API at http://127.0.0.1:8000
 make dev-frontend                                # http://localhost:3000/lineage?law=2021-0106-COD
 ```
 

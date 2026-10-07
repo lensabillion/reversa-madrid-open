@@ -13,7 +13,7 @@ from typing import override
 import pytest
 from extraction_fixtures import FETCHED_AT, FakeUrlResponse, RecordingFetcher
 
-from influence.extraction import catalog, fetching, probe, pull
+from influence.extraction import fetching
 from influence.extraction.cache import HttpCache, request_key
 from influence.extraction.fetching import (
     USER_AGENT,
@@ -24,11 +24,7 @@ from influence.extraction.fetching import (
     ResponseHead,
     UrllibFetcher,
 )
-from influence.extraction.layout import DataLayout, LayoutError
 
-REGISTRY = catalog.source("A")
-AMENDMENTS = catalog.source("H")
-OEIL = catalog.source("E")
 DUMP_URL = "https://parltrack.org/dumps/ep_meps.json.zst"
 
 
@@ -38,7 +34,7 @@ def fetcher_for(
     recording = RecordingFetcher(responses, [])
     return (
         CachedFetcher(
-            cache=HttpCache(DataLayout(tmp_path).cache),
+            cache=HttpCache(tmp_path / "cache"),
             fetcher=recording,
             limiter=RateLimiter(monotonic=lambda: 0.0, sleep=lambda _: None),
             clock=lambda: FETCHED_AT,
@@ -311,106 +307,3 @@ def test_cached_fetcher_defaults_to_the_standard_library_and_a_real_clock(
     assert isinstance(fetcher.fetcher, UrllibFetcher)
     assert fetcher.clock().tzinfo == UTC
     assert fetcher.clock() > datetime(2026, 1, 1, tzinfo=UTC)
-
-
-def test_probe_records_what_a_source_returned_including_a_truncated_sniff(
-    tmp_path: Path,
-) -> None:
-    assert REGISTRY.probe_url is not None
-    body = b"<register>" + b"x" * 1000
-    fetcher, _ = fetcher_for(tmp_path, {REGISTRY.probe_url: RawResponse(200, "text/xml", body)})
-    result = probe.probe_source(fetcher, REGISTRY)
-    assert result.reachable
-    assert (result.status, result.content_type, result.byte_count) == (200, "text/xml", len(body))
-    assert result.sniff is not None
-    assert len(result.sniff) == probe.SNIFF_CHARACTERS
-    assert result.error is None
-
-
-def test_probe_turns_a_refusal_into_a_recorded_result_so_the_run_continues(
-    tmp_path: Path,
-) -> None:
-    assert OEIL.probe_url is not None
-    fetcher, _ = fetcher_for(tmp_path, {OEIL.probe_url: RawResponse(500, None, b"")})
-    result = probe.probe_source(fetcher, OEIL)
-    assert (result.reachable, result.status, result.sniff) == (False, 500, None)
-    assert result.error == "HTTP 500"
-
-
-def test_probing_a_source_without_a_base_url_is_a_programming_error(tmp_path: Path) -> None:
-    fetcher, _ = fetcher_for(tmp_path, {})
-    with pytest.raises(ValueError, match="no probe URL"):
-        probe.probe_source(fetcher, AMENDMENTS)
-
-
-def test_probe_sources_skips_sources_with_no_base_url_and_names_the_unreachable(
-    tmp_path: Path,
-) -> None:
-    specs = (REGISTRY, AMENDMENTS, OEIL)
-    assert REGISTRY.probe_url is not None
-    assert OEIL.probe_url is not None
-    fetcher, _ = fetcher_for(
-        tmp_path,
-        {
-            REGISTRY.probe_url: RawResponse(200, "text/html", b"page"),
-            OEIL.probe_url: RawResponse(404, None, b""),
-        },
-    )
-    report = probe.probe_sources(fetcher, specs)
-    assert [result.letter for result in report.results] == ["A", "E"]
-    assert [result.letter for result in report.unreachable()] == ["E"]
-    path = tmp_path / "probe-report.json"
-    probe.write_report(path, report)
-    assert probe.ProbeReport.model_validate_json(path.read_bytes()) == report
-    formatted = probe.format_report(report)
-    assert "A registry [confirmed] 200 text/html, 4 bytes" in formatted
-    assert "E oeil [unverified] unreachable: HTTP 404" in formatted
-
-
-def test_format_report_names_a_missing_content_type_rather_than_printing_none(
-    tmp_path: Path,
-) -> None:
-    assert REGISTRY.probe_url is not None
-    fetcher, _ = fetcher_for(tmp_path, {REGISTRY.probe_url: RawResponse(200, None, b"x")})
-    report = probe.probe_sources(fetcher, (REGISTRY,))
-    assert "no content type" in probe.format_report(report)
-
-
-def test_raw_storage_puts_the_bytes_and_their_provenance_under_the_source(
-    tmp_path: Path,
-) -> None:
-    layout = DataLayout(tmp_path)
-    url = "https://transparency-register.europa.eu/full.xml"
-    fetcher, _ = fetcher_for(tmp_path, {url: RawResponse(200, "text/xml", b"<register/>")})
-    stored = pull.store_raw(layout, REGISTRY, fetcher, url, name="full.xml")
-    assert stored.body_path == layout.global_source("registry") / "full.xml"
-    assert stored.body_path.read_bytes() == b"<register/>"
-    assert stored.byte_count == 11
-    assert '"url"' in stored.provenance_path.read_text(encoding="utf-8")
-
-
-def test_a_per_law_source_is_stored_under_its_procedure_and_needs_one(tmp_path: Path) -> None:
-    layout = DataLayout(tmp_path)
-    url = "https://oeil.secure.europarl.europa.eu/procedure"
-    fetcher, _ = fetcher_for(tmp_path, {url: RawResponse(200, "text/html", b"<html/>")})
-    stored = pull.store_raw(layout, OEIL, fetcher, url, name="oeil", procedure_id="2021/0106(COD)")
-    assert stored.body_path.parent == layout.law_source("2021/0106(COD)", "oeil")
-    with pytest.raises(LayoutError, match="needs a procedure id"):
-        pull.target_directory(layout, OEIL, None)
-
-
-def test_raw_storage_refuses_a_name_that_would_escape_the_directory(tmp_path: Path) -> None:
-    fetcher, recording = fetcher_for(tmp_path, {})
-    with pytest.raises(LayoutError, match="Unusable raw file name"):
-        pull.store_raw(DataLayout(tmp_path), REGISTRY, fetcher, "https://a.eu", name="../out")
-    assert recording.calls == []
-
-
-def test_the_catalog_letters_ids_and_target_tables_are_unique_and_known() -> None:
-    assert len({spec.letter for spec in catalog.SOURCES}) == len(catalog.SOURCES)
-    assert len({spec.source_id for spec in catalog.SOURCES}) == len(catalog.SOURCES)
-    assert catalog.source("registry") is catalog.source("a")
-    assert {spec.letter for spec in catalog.by_scope("global")} == {"A", "B", "C", "D"}
-    assert AMENDMENTS not in catalog.probeable(catalog.SOURCES)
-    with pytest.raises(catalog.UnknownSourceError):
-        catalog.source("Z")

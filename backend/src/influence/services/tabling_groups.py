@@ -43,11 +43,6 @@ def tabling_groups(amendment: Amendment, latest: Mapping[str, str]) -> dict[str,
     return {author: latest.get(author) for author in amendment.author_ids}
 
 
-def known_groups(amendment: Amendment, latest: Mapping[str, str]) -> set[str]:
-    """The distinct known groups among the amendment's authors on its tabling day."""
-    return {group for group in tabling_groups(amendment, latest).values() if group is not None}
-
-
 def uses_latest_groups(amendments: Iterable[Amendment]) -> bool:
     """Whether any authored amendment lacks tabling-day groups, so the fallback applied."""
     return any(amendment.author_ids and not amendment.author_groups for amendment in amendments)

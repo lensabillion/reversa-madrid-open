@@ -1,11 +1,10 @@
-"""Part 3, find candidates: a per-law BM25 index over submission passages.
+"""A per-law BM25 index over submission passages for optional lineage origin matching.
 
 Retrieval only narrows the search. A high score means shared rare words, not influence.
 """
 
 import re
 from collections import Counter, defaultdict
-from collections.abc import Sequence
 from math import log
 
 import numpy as np
@@ -111,9 +110,6 @@ class PassageIndex:
         norm = 1 - _B + _B * np.array(lengths, dtype=np.float64)[self._indices] / average
         self._weights = np.array(idfs) * count_array * (_K1 + 1) / (count_array + _K1 * norm)
 
-    def __len__(self) -> int:
-        return len(self._passages)
-
     def _context(self, index: int) -> tuple[int, int]:
         document = self._passages[index].document_id
         first = index - 1 if index and self._passages[index - 1].document_id == document else index
@@ -171,18 +167,3 @@ class PassageIndex:
             candidates=candidates,
             limitations=_DELTA_LIMITATIONS if kind == "delta" else _WHOLE_TEXT_LIMITATIONS,
         )
-
-
-def fuse_rankings(rankings: Sequence[Sequence[str]], constant: int = 60) -> list[str]:
-    """Reciprocal-rank fusion: merge ranked lists of IDs without comparing their raw scores.
-
-    Each list gives an item 1 / (constant + rank), and the items are ordered by the sum, so
-    an item both lists rank well beats one only a single list likes. BM25 scores from
-    different queries are not comparable, ranks are. Ties keep first-seen order. Linear in
-    the total length of the lists plus a sort of the distinct items.
-    """
-    scores: dict[str, float] = {}
-    for ranking in rankings:
-        for rank, item in enumerate(ranking, start=1):
-            scores[item] = scores.get(item, 0.0) + 1 / (constant + rank)
-    return sorted(scores, key=lambda item: -scores[item])

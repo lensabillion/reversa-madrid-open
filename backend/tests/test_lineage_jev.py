@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from lineage_fixture import AI_ACT, lineage_world
 from pydantic import SecretStr
-from test_coordinated import AI_ACT, coordinated_world
 from test_jev_judge import SUPPORTING, FakeJev
 from test_lineage_assembly import ACME, NOW, collected
 from test_origin import document
@@ -18,9 +18,9 @@ from test_origin import document
 from influence import cli
 from influence.schemas.atlas import Actor, Passage, SourceSpan
 from influence.services import jev, jev_judge, lineage_assembly, lineage_jev
+from influence.services.collected import Collected
 from influence.services.lineage import adopt
 from influence.services.lineage_jev import reworded_origins
-from influence.services.pipeline import Collected
 
 # Shares three of the adopted amendment's rare words but no run of eight: only a meaning
 # judge can tie it to the amendment.
@@ -211,7 +211,7 @@ def test_the_lineage_command_needs_a_key_and_a_positive_budget_for_jev(
 def test_the_lineage_command_hands_the_view_a_cached_jev_judge(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    coordinated_world(tmp_path, monkeypatch)
+    lineage_world(tmp_path, monkeypatch)
     monkeypatch.setenv(cli.JEV_KEY_VARIABLE, "offline")
     seen: list[jev_judge.JevJudge | None] = []
     real = lineage_assembly.build_lineage

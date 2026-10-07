@@ -34,7 +34,7 @@ RUN useradd --create-home --uid 1000 influence
 
 COPY --from=builder /opt/influence /opt/influence
 
-# /data is where `influence atlas` and `influence lineage` write; compose mounts the
+# /data is where `influence lineage` writes; compose mounts the
 # repository's data/ (or mock-data/) there. The default is explicit because the
 # installed package's "beside the source" fallback has no meaning inside an image.
 # INFLUENCE_LOG_LEVEL (debug, info, warning, error or critical, any case) sets the level

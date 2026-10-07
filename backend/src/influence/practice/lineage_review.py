@@ -2,8 +2,8 @@
 
 The lineage pipeline traces the final law's new wording back to amendments, the MEPs who
 tabled them and the documents that said it earlier. Its scores say how strong a claim looks,
-not whether it is true, so the pipeline is promoted only when people read a selection of its
-claims and call them real. This module is that step, and it only reads: it never writes a
+not whether it is true. This tool supports independent review of selected claims; its gate
+does not control website publication. It only reads: it never writes a
 `LineageView`, and labels live in their own file, apart from model output, so they can never
 feed back into what the explorer shows (AGENTS.md, "Data and Challenge Rules").
 
@@ -13,30 +13,28 @@ per (amendment, phrase) pair, keeps a phrase that twenty amendments share from f
 review twenty times.
 
 * `review_rows` draws `n` claims uniformly at random with a seed (a simple random sample
-  over distinct phrases), so the precision it estimates is the precision of every claim the
-  view makes. The `strongest` claims, by length and similarity, can be added for reading,
-  marked as such; they are never pooled into the precision. (`services/audit.draw_sample`
-  is the same seeded draw, stratified for part 4's links; it is typed on `LinkAssessment`,
-  so this module draws the same way over phrases.)
+  over distinct adopted phrases, not the displayed graph's population). The `strongest`
+  claims, by length and similarity, can be added for reading,
+  marked as such; they are never pooled into the precision.
 * `export_rows` writes the selection as JSON Lines (for `summarise`), CSV and Markdown (for a
   person).
 * `summarise` counts a claim only when at least two readers agree it is real or not real,
-  and reports precision with a Wilson interval over the sampled claims alone; the strongest
+  and reports precision with a Wilson interval over resolved sampled claims; the strongest
   claims are counted apart. Splits and "unclear" are reported and never decided for the
   readers.
 * `meets_gate` refuses to pass on too few resolved labels: an empty or tiny review never
   looks like a pass.
 
 "Coalition wording" means a phrase carried by amendments of at least `COALITION_GROUPS` (2)
-different known political groups, the rule `origin.coalition_phrase_ids` applies; an author
+different known political groups, the rule `coalition_phrase_ids` applies; an author
 whose group is unknown counts for no group.
 
 Run from the repository root:
 
     uv run --directory backend --locked python -m influence.practice.lineage_review \
-        export --view data/laws/2021-0106-COD/lineage.json --out review --n 30 --seed 0
+        export --view ../data/laws/2021-0106-COD/lineage.json --out ../data/review --n 30 --seed 0
     uv run --directory backend --locked python -m influence.practice.lineage_review \
-        summarise --rows review/rows.jsonl --labels review/labels.jsonl --floor 0.9
+        summarise --rows ../data/review/rows.jsonl --labels ../data/review/labels.jsonl --floor 0.9
 
 Selection is O(C log C) for C claims; summarising is linear in rows and labels.
 """
@@ -48,16 +46,18 @@ import json
 import random
 import sys
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from math import sqrt
 from pathlib import Path
 from typing import Literal, cast
 
 from pydantic import Field, ValidationError
 
-from influence.practice.harness import write_atomically
+from influence.extraction.files import write_bytes_atomic
 from influence.schemas.lineage import (
+    COALITION_GROUPS,
     AdoptedPhrase,
     AmendmentAdoption,
     LineageView,
@@ -65,9 +65,8 @@ from influence.schemas.lineage import (
     OriginMatch,
 )
 from influence.schemas.scoring import FrozenModel
-from influence.services.audit import AuditError, wilson_interval
-from influence.services.origin import coalition_phrase_ids
 
+Z_95 = 1.959963984540054
 PHRASE_CHARACTERS = 200
 type Selection = Literal["sample", "strongest"]
 type Verdict = Literal["real", "not_real", "unclear"]
@@ -97,6 +96,47 @@ COLUMNS = (
     "final_quote",
     "origins",
 )
+
+
+class AuditError(Exception):
+    """The labels do not describe the sample they claim to audit."""
+
+
+def wilson_interval(correct: int, total: int, z: float = Z_95) -> tuple[float, float]:
+    """Wilson score interval for a proportion. With no trials nothing is known: (0, 1).
+
+    Unlike the plain normal interval it stays inside [0, 1] and is honest at small n and at
+    proportions near 0 or 1: 30 of 30 correct bounds precision at about 0.886 from below.
+    """
+    if total <= 0:
+        return 0.0, 1.0
+    p = correct / total
+    scale = 1 + z * z / total
+    centre = (p + z * z / (2 * total)) / scale
+    half = z * sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / scale
+    # The formula is exact at the endpoints but floating point leaves a speck; pin them so the
+    # interval always holds the estimate.
+    low = 0.0 if correct == 0 else max(0.0, centre - half)
+    high = 1.0 if correct == total else min(1.0, centre + half)
+    return low, high
+
+
+def coalition_phrase_ids(
+    adoptions: Iterable[AmendmentAdoption], *, minimum: int = COALITION_GROUPS
+) -> frozenset[str]:
+    """Phrases carried by amendments of at least `minimum` different political groups.
+
+    The groups are the adoptions' `author_groups`. An author with no known group counts for
+    none, and committee text has no author, so it counts for no group either.
+    """
+    groups: defaultdict[str, set[str]] = defaultdict(set)
+    for adoption in adoptions:
+        if adoption.kind != "verbatim":
+            continue
+        known = {group for group in adoption.author_groups if group is not None}
+        for phrase_id in adoption.phrase_ids:
+            groups[phrase_id] |= known
+    return frozenset(phrase_id for phrase_id, found in groups.items() if len(found) >= minimum)
 
 
 class OriginRow(FrozenModel):
@@ -345,9 +385,9 @@ def export_rows(rows: Sequence[ReviewRow], seed: int, out: Path) -> tuple[Path, 
     """Write `rows.jsonl`, `rows.csv` and `rows.md` into `out` (created if absent)."""
     out.mkdir(parents=True, exist_ok=True)
     jsonl = out / "rows.jsonl"
-    write_atomically(jsonl, "".join(f"{row.model_dump_json()}\n" for row in rows))
-    write_atomically(out / "rows.csv", to_csv(rows))
-    write_atomically(out / "rows.md", to_markdown(rows, seed))
+    write_bytes_atomic(jsonl, "".join(f"{row.model_dump_json()}\n" for row in rows).encode("utf-8"))
+    write_bytes_atomic(out / "rows.csv", to_csv(rows).encode("utf-8"))
+    write_bytes_atomic(out / "rows.md", to_markdown(rows, seed).encode("utf-8"))
     return jsonl, out / "rows.csv", out / "rows.md"
 
 

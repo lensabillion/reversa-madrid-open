@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from test_collected import SLUG
 from test_lineage_views import built
-from test_pipeline import SLUG
 
 from influence.api import create_app
 from influence.routers import lineage

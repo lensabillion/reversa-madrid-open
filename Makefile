@@ -1,4 +1,4 @@
-# Repository quality gates. `make check` verifies everything and changes nothing.
+# Repository quality gates. `make check` runs local checks; containers are separate.
 # CI runs these same targets, so a local pass predicts a CI pass.
 
 # Supply-chain cool-off: uv ignores any package file uploaded in the last 14 days.
@@ -20,13 +20,13 @@ BACKEND := uv run --directory backend --locked
 NPM := cd frontend && npm
 
 .PHONY: check check-docs check-scripts fix-scripts backend-env check-backend \
-	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend setup collect atlas coordinated lineage channels directions audit-sample audit-score forecast batch report \
+	check-backend-quality check-backend-tests audit-backend fix-backend dev-backend setup collect lineage \
 	frontend-env check-frontend check-frontend-quality check-frontend-tests \
-	check-frontend-build audit-frontend fix-frontend dev-frontend fetch-lobbyplag fetch-qwen-embedding fetch-qwen-reranker evaluate-dense \
+	check-frontend-build audit-frontend fix-frontend dev-frontend \
 	up down check-containers
 
 # Audits come last: they need network access, and the local gates fail faster.
-check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run every gate.
+check: check-scripts check-docs check-backend check-frontend audit-backend audit-frontend  ## Run local checks and audits.
 
 check-scripts:  ## Ruff format and lint check of repository scripts.
 	$(RUFF) format --check scripts
@@ -65,11 +65,6 @@ fix-backend:  ## Apply Ruff's safe fixes, then formatting, to the backend.
 dev-backend:  ## Serve the API at http://127.0.0.1:8000, restarting when src/ changes.
 	$(BACKEND) uvicorn influence.api:app --reload --reload-dir src --port 8000
 
-# The any-law command: collect, then parts 3 to 7, into data/laws/<procedure>/atlas.json.
-atlas:  ## Collect one law and build its explorer view: make atlas LAW='2021/0106(COD)' [ARGS=...]
-	$(if $(LAW),,$(error LAW is required: make atlas LAW='2021/0106(COD)'))
-	$(BACKEND) influence atlas "$(LAW)" $(ARGS)
-
 # Run once per machine before the first `make collect` (needs network). Present files are
 # kept, so a rerun after a failure fetches only what is missing.
 setup:  ## Download collect's global inputs and build the Have Your Say index: make setup [ARGS='--only parltrack,register']
@@ -79,68 +74,10 @@ collect:  ## Collect one law's public record: make collect LAW='2021/0106(COD)' 
 	$(if $(LAW),,$(error LAW is required: make collect LAW='2021/0106(COD)'))
 	$(BACKEND) influence collect "$(LAW)" $(ARGS)
 
-# Atlas part 3, from Parltrack alone: the amendments and Members collect already read.
-coordinated:  ## List near-identical amendments tabled across political groups: make coordinated LAW='2021/0106(COD)' [ARGS=--no-attachments]
-	$(if $(LAW),,$(error LAW is required: make coordinated LAW='2021/0106(COD)'))
-	$(BACKEND) influence coordinated "$(LAW)" $(ARGS)
-
 # Lineage, outcome-first: the final act's new wording traced to amendments and documents.
 lineage:  ## Trace one law's adopted wording to its amendments and documents: make lineage LAW='2021/0106(COD)' [ARGS=--no-attachments]
 	$(if $(LAW),,$(error LAW is required: make lineage LAW='2021/0106(COD)'))
 	$(BACKEND) influence lineage "$(LAW)" $(ARGS)
-
-channels:  ## Count the channels one law was lobbied through: make channels LAW='2021/0106(COD)' [ARGS=--no-attachments]
-	$(if $(LAW),,$(error LAW is required: make channels LAW='2021/0106(COD)'))
-	$(BACKEND) influence channels "$(LAW)" $(ARGS)
-# Atlas part 7, TOWARDS: rule-based directions of the amendments and, through the atlas
-# view's published links, of each actor's asks.
-directions:  ## Count which way amendments and actors' asks move a law: make directions LAW='2021/0106(COD)' [ARGS=--no-attachments]
-	$(if $(LAW),,$(error LAW is required: make directions LAW='2021/0106(COD)'))
-	$(BACKEND) influence directions "$(LAW)" $(ARGS)
-# Atlas part 7, NEXT: reads every written atlas view; forecasts the named open laws' asks.
-# More laws go in ARGS, quoted one by one: ARGS="'2020/0361(COD)'".
-forecast:  ## Forecast the open asks of laws with an atlas view: make forecast LAW='2021/0106(COD)' [ARGS=...]
-	$(if $(LAW),,$(error LAW is required: make forecast LAW='2021/0106(COD)'))
-	$(BACKEND) influence forecast "$(LAW)" $(ARGS)
-
-# Gate 7, the blind audit: labels live under data/audit/ only, never in a law's view.
-audit-sample:  ## Draw two blind reader sheets from a view: make audit-sample LAW='2021/0106(COD)' SEED=<n> [SIZE=40] [ARGS='--status unconfirmed']
-	$(if $(LAW),,$(error LAW is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
-	$(if $(SEED),,$(error SEED is required: make audit-sample LAW='2021/0106(COD)' SEED=<n>))
-	$(BACKEND) influence audit sample "$(LAW)" --seed $(SEED) $(if $(SIZE),--size $(SIZE)) $(ARGS)
-
-audit-score:  ## Score two filled sheets against the key: make audit-score DIR=data/audit/<slug>/<sample-id>
-	$(if $(DIR),,$(error DIR is required: make audit-score DIR=data/audit/<slug>/<sample-id>))
-	$(BACKEND) influence audit score "$(abspath $(DIR))"
-
-# Plan gate 9: many laws at once, resumable, with a coverage banner in data/laws/batch.json.
-batch:  ## Collect many laws and run the per-law steps: make batch ARGS="--laws 'AI Act,DSA'" or ARGS='--since 2019 --with-amendments'
-	$(if $(ARGS),,$(error ARGS is required: make batch ARGS='--since 2019 --with-amendments'))
-	$(BACKEND) influence batch $(ARGS)
-
-# Part 8: the public report, read from the files the commands above wrote; collects nothing.
-# Several laws are separated by commas: make report LAW='AI Act, 2022/0140(COD)'.
-report:  ## Write the public report for one or more laws: make report LAW='2021/0106(COD)' [ARGS='--links 3 --seed 7 --out FILE']
-	$(if $(LAW),,$(error LAW is required: make report LAW='2021/0106(COD)'))
-	$(BACKEND) influence report "$(LAW)" $(ARGS)
-
-# The snapshot is pinned to a commit and verified against recorded SHA-256 digests.
-fetch-lobbyplag:  ## Download and verify LobbyPlag's data into data/lobbyplag/ (needs network).
-	$(BACKEND) python ../scripts/fetch_lobbyplag.py
-
-# The Qwen model files (about 1.8 GB) are pinned to a Hugging Face commit and verified by SHA-256.
-fetch-qwen-embedding:  ## Download and verify Qwen3-Embedding-0.6B (ONNX, 8-bit) into data/models/ (needs network).
-	$(BACKEND) python ../scripts/fetch_qwen_embedding.py
-
-fetch-qwen-reranker:  ## Download and verify Qwen3-Reranker-0.6B (ONNX) into data/models/ (needs network).
-	$(BACKEND) python ../scripts/fetch_qwen_reranker.py
-
-# The optional `models` dependency group holds the model runtime; nothing else installs it.
-evaluate-dense:  ## Measure the Qwen meaning signals on LobbyPlag (needs the models; see make fetch-qwen-*).
-	uv run --directory backend --locked --group models python -m influence.practice.dense \
-		--data "$(abspath data/lobbyplag)" --model "$(abspath data/models/qwen3-embedding-0.6b)" \
-		--reranker "$(abspath data/models/qwen3-reranker-0.6b)" \
-		--cache "$(abspath data/models/cache.sqlite3)" --out evaluation/dense-meaning.json
 
 frontend-env:  ## Install exactly what frontend/package-lock.json records; fail if it is stale.
 	$(NPM) ci

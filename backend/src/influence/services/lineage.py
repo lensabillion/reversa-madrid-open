@@ -65,7 +65,7 @@ from influence.schemas.lineage import (
     LineageCounts,
     credit_rank,
 )
-from influence.services.pipeline import Collected
+from influence.services.collected import Collected
 from influence.services.prose_match import Word, words_of
 from influence.services.tabling_groups import group_limitations, latest_groups, tabling_groups
 
