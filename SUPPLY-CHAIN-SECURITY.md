@@ -48,6 +48,7 @@ clears the window and the exception can be removed.
 | --- | --- | --- | --- | --- | --- |
 | `next`, `@next/env` and eight `@next/swc-*` binaries | 16.3.6 | 2026-09-22 | 16.3.5 has the critical advisory GHSA-vcvr-r3jv-pc5j; 16.3.6 is the first fixed version (note 1) | Lensa Billion, by merging PRs #5 and #8 on 2026-10-02 | 2026-10-06 |
 | `source-map-js` (transitive: postcss, `@tailwindcss/node`, jsdom's css-tree) | 1.2.2 | 2026-09-30 | 1.2.1 has the high advisory GHSA-68fv-2mgg-jv7q (CVE-2026-93749); 1.2.2 is the first fixed version and `make audit-frontend` fails on every branch until it is taken (note 2) | The owner, by merging PR #89 | 2026-10-14 |
+| `sharp` with its `@img/sharp-*` platform binaries and `@img/sharp-libvips-*` 1.3.4 (optional dependency of `next`) | 0.35.5 | 2026-09-27 | 0.35.4 has the high advisory GHSA-wq5f-xc86-pv6w (CVE-2026-96889 in the bundled librsvg); 0.35.5 is the first fixed version and `make audit-frontend` fails on every branch until it is taken (note 3) | The owner, by merging PR #93 | 2026-10-11 |
 
 Notes:
 
@@ -78,3 +79,17 @@ Notes:
    attestation; it is published by the maintainer account `7rulnik`, as every earlier
    version was. The exception was installed with `npm update source-map-js
    --min-release-age=0` and expires when the version clears the window.
+
+3. **sharp 0.35.5.** [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w),
+   published 2026-10-06: a vulnerability in librsvg, an SVG library bundled inside sharp's
+   prebuilt `@img/sharp-libvips-*` binaries, affects sharp below 0.35.5. sharp is Next.js's
+   optional image-optimisation dependency; this explorer serves no optimised images, so the
+   code path is never exercised here and the exposure is to the audit gate. Verified before
+   installing: the package and its binaries carry npm provenance attestations (SLSA v1,
+   `registry.npmjs.org/-/npm/v1/attestations/sharp@0.35.5`); the GitHub compare
+   `v0.35.4...v0.35.5` of `lovell/sharp` holds 23 commits, among them "Upgrade to libvips
+   v8.18.7" and "Upgrade to sharp-libvips v1.3.4", which carry the librsvg fix; no install
+   scripts run (`ignore-scripts` is on); next's range `^0.35.4` resolves to it, so
+   `package.json` is unchanged and only sharp, its platform binaries and the libvips
+   binaries moved. Installed with `npm update sharp --min-release-age=0`; the exception
+   expires when the version clears the window.
