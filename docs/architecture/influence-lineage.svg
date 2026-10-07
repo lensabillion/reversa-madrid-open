@@ -1,145 +1,147 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1120" viewBox="0 0 1500 1120" style="max-width:100%;height:auto" role="img" aria-labelledby="title description">
-  <title id="title">influence — from public records to the lineage explorer</title>
-  <desc id="description">Generation: setup downloads global Parltrack dumps, the Transparency Register and the Have Your Say index. Collection resolves one law, reads those global inputs and fetches proposal and final texts from CELLAR and EUR-Lex and consultation documents from Have Your Say. It saves JSONL records and a provenance and coverage manifest. The lineage engine compares final wording with the proposal, matches carrying amendments and traces consultation origins. An optional BM25 shortlist and Jev judgment with an answer cache adds reworded consultation origins only; final adoption always uses wording matching. The result is saved as data/laws/&lt;slug&gt;/lineage.json using schema lineage-1. Serving: FastAPI reads that snapshot through its lineage list and detail endpoints, Next.js proxies the read API, and the lineage website displays summary, graph, holders, evidence, a random sample and method. Browser GET requests never run collection or model calls. Shared wording is not proof of causal influence, and unknown inputs remain explicit.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" style="max-width:100%;height:auto" role="img" aria-labelledby="title description">
+  <title id="title">influence technical architecture</title>
+  <desc id="description">Public source data enters an offline Python pipeline. Setup downloads Parltrack and Transparency Register records and builds the Have Your Say index into global inputs. Collect reads these inputs, fetches CELLAR and EUR-Lex law texts and Have Your Say consultation documents, and writes per-law JSONL records and a provenance and coverage manifest. Lineage reads the bundle, traces lexical adoption and consultation origins, and writes lineage.json. Optional BM25 shortlisting, an external Jev judge, a spend cap and a request-keyed cache add reworded consultation origins only. Final adoption remains lexical. FastAPI validates saved views; Next.js proxies browser GET requests; JSON responses and ETags return to the lineage browser. HTTP reads never collect or call models. Independent quality review reads the snapshot and exports a seeded adopted-phrase sample. Those rows and separately stored human labels produce a review summary with agreement and Wilson intervals. Human labels never write back to production, and this review's population differs from graph links. Shared wording and model judgments do not establish authorship or causal influence.</desc>
   <defs>
-    <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 1 1 L 9 5 L 1 9 Z" fill="#228c83"/>
-    </marker>
-    <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M 1 1 L 9 5 L 1 9 Z" fill="#9168c2"/>
-    </marker>
-    <filter id="card-shadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#20243c" flood-opacity="0.045"/>
-    </filter>
+    <marker id="data-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#147d78" stroke-width="1.5"/></marker>
+    <marker id="request-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#63758c" stroke-width="1.5"/></marker>
+    <marker id="optional-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#8055ad" stroke-width="1.5"/></marker>
     <style>
-      text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
-      .title { font-family: Georgia, 'Times New Roman', serif; font-size: 43px; font-weight: 700; fill: #20243c; }
-      .subtitle { font-size: 22px; fill: #626878; }
-      .lane { font-size: 20px; font-weight: 700; letter-spacing: 2px; fill: #20243c; }
-      .card-title { font-size: 25px; font-weight: 650; fill: #20243c; }
-      .body { font-size: 19px; fill: #596273; }
-      .label { font-size: 18px; font-weight: 600; fill: #257d76; }
-      .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 18px; }
-      .white { fill: #f7fafb; }
-      .muted-white { fill: #c0cbd5; }
-      .step { font-size: 18px; font-weight: 700; fill: #257d76; }
-      .card { fill: #ffffff; stroke: #dedfdc; stroke-width: 1.5; filter: url(#card-shadow); }
-      .flow { fill: none; stroke: #228c83; stroke-width: 3; stroke-linejoin: round; marker-end: url(#arrow-teal); }
-      .optional-flow { fill: none; stroke: #9168c2; stroke-width: 2.5; stroke-dasharray: 7 6; stroke-linejoin: round; marker-end: url(#arrow-purple); }
+      text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; fill: #233247; }
+      .heading { font-size: 26px; font-weight: 650; }
+      .boundary-label { font-size: 20px; font-weight: 650; letter-spacing: 1px; }
+      .node-label { font-size: 23px; font-weight: 600; }
+      .body { font-size: 20px; fill: #526174; }
+      .small { font-size: 20px; fill: #526174; }
+      .mono { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; font-size: 20px; fill: #405268; }
+      .boundary { fill: #f8fafc; stroke: #d7dfe8; stroke-width: 1.5; }
+      .node { fill: white; stroke: #bccbd8; stroke-width: 1.5; }
+      .store { fill: #edf7f6; stroke: #62a49f; stroke-width: 1.5; }
+      .data { fill: none; stroke: #147d78; stroke-width: 2.5; stroke-linejoin: round; marker-end: url(#data-arrow); }
+      .request { fill: none; stroke: #63758c; stroke-width: 2; stroke-dasharray: 5 4; marker-end: url(#request-arrow); }
+      .optional { fill: none; stroke: #8055ad; stroke-width: 2; stroke-dasharray: 6 5; marker-end: url(#optional-arrow); }
+      .cache-use { fill: none; stroke: #99a9ba; stroke-width: 1.5; }
     </style>
   </defs>
+  <rect width="1200" height="1200" fill="white"/>
+  <text x="24" y="34" class="heading">influence / technical architecture</text>
 
-  <rect width="1500" height="1120" rx="24" fill="#f9f7f2"/>
-  <rect x="64" y="57" width="6" height="79" rx="3" fill="#228c83"/>
-  <text x="91" y="91" class="title">influence</text>
-  <text x="91" y="129" class="subtitle">Public records → wording lineage → an explorable evidence trail</text>
-  <rect x="1260" y="69" width="176" height="42" rx="21" fill="#ece8f3"/>
-  <text x="1348" y="97" text-anchor="middle" font-size="18" font-weight="600" fill="#74519a">LINEAGE ONLY</text>
+  <!-- Sources are grouped by the stage that obtains them. -->
+  <rect x="24" y="58" width="1152" height="160" rx="8" class="boundary"/>
+  <text x="44" y="86" class="boundary-label">PUBLIC SOURCES</text>
+  <rect x="44" y="100" width="480" height="94" rx="6" class="node"/>
+  <text x="62" y="130" class="node-label">Parltrack · Transparency Register</text>
+  <text x="62" y="159" class="small">Procedures, amendments, MEPs · organisations</text>
+  <text x="62" y="181" class="small">Have Your Say consultation index</text>
+  <rect x="670" y="100" width="480" height="94" rx="6" class="node"/>
+  <text x="688" y="130" class="node-label">CELLAR / EUR-Lex · Have Your Say</text>
+  <text x="688" y="161" class="small">Proposal + final act · consultation documents</text>
 
-  <circle cx="82" cy="182" r="18" fill="#228c83"/>
-  <text x="82" y="188" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">1</text>
-  <text x="114" y="189" class="lane">GENERATE THE SNAPSHOT</text>
-  <text x="1436" y="189" text-anchor="end" font-size="19" fill="#777d88">CLI · lineage collects and traces</text>
+  <rect x="24" y="246" width="1152" height="424" rx="8" class="boundary"/>
+  <text x="1152" y="276" text-anchor="end" class="boundary-label">OFFLINE GENERATION · Python CLI</text>
+  <path d="M140 194V312" class="data"/>
+  <text x="158" y="239" class="small">downloads + index</text>
+  <path d="M700 194V228H648V312" class="data"/>
+  <text x="668" y="301" class="small">fetch texts</text>
 
-  <!-- The four generation steps. Source ownership stays inside setup and collection. -->
-  <rect x="64" y="218" width="310" height="344" rx="18" class="card"/>
-  <rect x="84" y="240" width="42" height="32" rx="10" fill="#e8f3ee"/>
-  <text x="105" y="262" text-anchor="middle" class="step">01</text>
-  <text x="84" y="310" class="card-title">Prepare public inputs</text>
-  <text x="84" y="344" class="mono" fill="#257d76">make setup</text>
-  <path d="M84 369 H354" stroke="#e5e8e4"/>
-  <text x="84" y="400" class="body">Parltrack amendment + MEP</text>
-  <text x="84" y="428" class="body">and procedure dumps</text>
-  <text x="84" y="463" class="body">Transparency Register export</text>
-  <text x="84" y="498" class="body">Have Your Say index</text>
-  <text x="84" y="538" class="label">Global inputs · cached once</text>
+  <rect x="44" y="320" width="190" height="110" rx="6" class="node"/>
+  <text x="62" y="354" class="node-label">setup</text>
+  <text x="62" y="386" class="mono">make setup</text>
+  <text x="62" y="414" class="small">Global preparation</text>
+  <path d="M242 374H272" class="data"/>
+  <text x="255" y="358" text-anchor="middle" class="small">write</text>
 
-  <path d="M382 386 H410" class="flow"/>
-  <rect x="418" y="218" width="310" height="344" rx="18" class="card"/>
-  <rect x="438" y="240" width="42" height="32" rx="10" fill="#e8f3ee"/>
-  <text x="459" y="262" text-anchor="middle" class="step">02</text>
-  <text x="438" y="310" class="card-title">Collect one law</text>
-  <text x="438" y="344" class="mono" fill="#257d76">make collect LAW='…'</text>
-  <path d="M438 369 H708" stroke="#e5e8e4"/>
-  <text x="438" y="399" class="body">Resolve law · read global inputs</text>
-  <text x="438" y="431" class="body">Proposal + final texts:</text>
-  <text x="438" y="458" class="label">CELLAR / EUR-Lex</text>
-  <text x="438" y="489" class="body">Consultation documents:</text>
-  <text x="438" y="516" class="label">Have Your Say</text>
-  <text x="438" y="544" font-size="18" fill="#596273">JSONL + manifest · provenance</text>
+  <path d="M280 335V411C280 436 480 436 480 411V335Z" class="store"/>
+  <ellipse cx="380" cy="335" rx="100" ry="15" class="store"/>
+  <text x="380" y="373" text-anchor="middle" class="node-label">Global inputs</text>
+  <text x="380" y="402" text-anchor="middle" class="mono">raw/ + catalog/</text>
+  <path d="M488 374H530" class="data"/>
+  <text x="510" y="358" text-anchor="middle" class="small">read</text>
 
-  <path d="M736 386 H764" class="flow"/>
-  <rect x="772" y="218" width="310" height="344" rx="18" fill="#1d293d" filter="url(#card-shadow)"/>
-  <rect x="792" y="240" width="42" height="32" rx="10" fill="#344758"/>
-  <text x="813" y="262" text-anchor="middle" font-size="18" font-weight="700" fill="#89d1c1">03</text>
-  <text x="792" y="310" class="card-title white">Trace the wording</text>
-  <text x="792" y="344" class="mono" fill="#89d1c1">make lineage LAW='…'</text>
-  <path d="M792 369 H1062" stroke="#435064"/>
-  <text x="792" y="402" class="body white">Final act ↔ proposal</text>
-  <text x="792" y="434" class="body muted-white">Find adopted wording</text>
-  <text x="792" y="466" class="body muted-white">Match carrying amendments</text>
-  <text x="792" y="498" class="body muted-white">Trace consultation origins</text>
-  <text x="792" y="538" font-size="18" fill="#89d1c1">Also keeps tabled-only matches</text>
+  <rect x="538" y="320" width="228" height="110" rx="6" class="node"/>
+  <text x="556" y="354" class="node-label">collect</text>
+  <text x="556" y="385" class="body">Resolve · extract</text>
+  <text x="556" y="413" class="small">Actor resolution</text>
+  <path d="M774 374H836" class="data"/>
+  <text x="805" y="358" text-anchor="middle" class="small">write</text>
 
-  <path d="M1090 386 H1118" class="flow"/>
-  <rect x="1126" y="218" width="310" height="344" rx="18" class="card"/>
-  <rect x="1146" y="240" width="42" height="32" rx="10" fill="#e8f3ee"/>
-  <text x="1167" y="262" text-anchor="middle" class="step">04</text>
-  <text x="1146" y="310" class="card-title">Save the evidence</text>
-  <text x="1146" y="344" class="mono" fill="#257d76">lineage.json</text>
-  <path d="M1146 369 H1416" stroke="#e5e8e4"/>
-  <text x="1146" y="399" class="mono" fill="#596273">data/laws/&lt;slug&gt;/</text>
-  <text x="1146" y="431" class="body">Schema <tspan font-weight="700">lineage-1</tspan></text>
-  <text x="1146" y="466" class="body">Adopted + tabled phrases</text>
-  <text x="1146" y="498" class="body">Origins · holders · coverage</text>
-  <text x="1146" y="538" class="label">Exact source spans + dates</text>
+  <path d="M844 335V411C844 436 1144 436 1144 411V335Z" class="store"/>
+  <ellipse cx="994" cy="335" rx="150" ry="15" class="store"/>
+  <text x="994" y="369" text-anchor="middle" class="node-label">Per-law bundle</text>
+  <text x="994" y="394" text-anchor="middle" class="mono">JSONL + manifest.json</text>
+  <text x="994" y="417" text-anchor="middle" class="small">Provenance + coverage</text>
 
-  <!-- Optional matching adds consultation origins; it never decides final adoption. -->
-  <path d="M927 562 V601" class="optional-flow"/>
-  <rect x="772" y="609" width="584" height="139" rx="18" fill="#f0eaf8" stroke="#ab8fca" stroke-width="1.5" stroke-dasharray="7 6"/>
-  <circle cx="800" cy="641" r="6" fill="#9168c2"/>
-  <text x="816" y="648" font-size="19" font-weight="700" fill="#704897">OPTIONAL · --jev</text>
-  <text x="792" y="682" font-size="20" font-weight="600" fill="#68498b">BM25 shortlist → Jev judgment → cache</text>
-  <text x="792" y="711" font-size="19" fill="#765c92">Reworded consultation origins only</text>
-  <text x="792" y="738" font-size="18" fill="#765c92">Final adoption always uses wording matching</text>
-  <path d="M1356 654 H1380 V570" class="optional-flow"/>
+  <path d="M140 430V456M648 430V446H420V456" class="cache-use"/>
+  <rect x="44" y="456" width="430" height="32" rx="5" fill="#eff3f7" stroke="#cad5df"/>
+  <text x="62" y="478" class="small">HTTP response cache · data/cache/</text>
+  <path d="M994 436V480H648V504" class="data"/>
+  <text x="880" y="474" class="small">read bundle</text>
 
-  <rect x="64" y="609" width="650" height="139" rx="18" fill="#eceee9"/>
-  <text x="87" y="648" font-size="20" font-weight="600" fill="#424e58">Every run carries its receipts</text>
-  <text x="87" y="683" font-size="19" fill="#64716e">Source URLs · retrieval dates · hashes · coverage</text>
-  <text x="87" y="713" font-size="19" fill="#64716e">Missing inputs and uncertain chronology stay visible.</text>
+  <rect x="538" y="512" width="228" height="122" rx="6" class="node"/>
+  <text x="556" y="544" class="node-label">lineage</text>
+  <text x="556" y="576" class="body">Lexical adoption</text>
+  <text x="556" y="605" class="body">Consultation origins</text>
+  <path d="M774 573H836" class="data"/>
+  <text x="804" y="557" text-anchor="middle" class="small">write</text>
 
-  <circle cx="82" cy="803" r="18" fill="#228c83"/>
-  <text x="82" y="809" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">2</text>
-  <text x="114" y="810" class="lane">READ &amp; EXPLORE</text>
-  <text x="1436" y="810" text-anchor="end" font-size="19" fill="#777d88">Saved snapshot → API → proxy → website</text>
+  <path d="M844 527V611C844 636 1144 636 1144 611V527Z" class="store"/>
+  <ellipse cx="994" cy="527" rx="150" ry="15" class="store"/>
+  <text x="994" y="563" text-anchor="middle" class="node-label">lineage.json</text>
+  <text x="994" y="592" text-anchor="middle" class="mono">data/laws/&lt;slug&gt;/</text>
+  <text x="994" y="617" text-anchor="middle" class="small">Evidence · coverage · limits</text>
 
-  <!-- Data delivery wraps down the right rail, then flows from API to the website. -->
-  <path d="M1436 431 H1470 V950 H1444" class="flow"/>
-  <rect x="1126" y="850" width="310" height="187" rx="18" class="card"/>
-  <text x="1146" y="889" class="card-title">FastAPI</text>
-  <text x="1146" y="922" class="body">Reads the saved snapshot</text>
-  <text x="1146" y="957" class="mono" fill="#257d76">GET /api/v1/lineage</text>
-  <text x="1146" y="985" class="mono" fill="#257d76">GET …/lineage/{slug}</text>
-  <text x="1146" y="1018" font-size="18" fill="#596273">List + detail · read-only</text>
-  <path d="M1118 950 H1090" class="flow"/>
+  <rect x="44" y="512" width="430" height="122" rx="6" fill="#f7f3fc" stroke="#a688c5" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="62" y="544" class="node-label" style="fill:#6d4895">Optional origins · --jev</text>
+  <text x="62" y="573" class="body" style="fill:#6d4895">BM25 shortlist → Jev (external)</text>
+  <text x="62" y="598" class="small">Request-keyed cache · spend cap</text>
+  <text x="62" y="621" class="mono">data/cache/jev/</text>
+  <path d="M530 558H482" class="optional"/>
+  <path d="M482 604H530" class="optional"/>
+  <text x="44" y="655" class="small">make lineage = collect + lineage · setup is a prerequisite · paths are under data/</text>
 
-  <rect x="772" y="850" width="310" height="187" rx="18" class="card"/>
-  <text x="792" y="889" class="card-title">Next.js proxy</text>
-  <text x="792" y="922" class="body">Same-origin browser requests</text>
-  <text x="792" y="957" class="mono" fill="#257d76">/api/v1/…</text>
-  <text x="792" y="992" class="body">Forwards GET to FastAPI</text>
-  <text x="792" y="1018" font-size="18" fill="#596273">No collection or model calls</text>
-  <path d="M764 950 H736" class="flow"/>
+  <!-- Dashed arrows are requests; solid arrows are returned data. -->
+  <rect x="24" y="704" width="1152" height="225" rx="8" class="boundary"/>
+  <text x="44" y="736" class="boundary-label">READ-ONLY WEB APPLICATION</text>
+  <path d="M550 730H590" class="request"/>
+  <text x="602" y="736" class="small">GET</text>
+  <path d="M720 730H680" class="data"/>
+  <text x="732" y="736" class="small">JSON / ETag</text>
+  <path d="M994 634V777" class="data"/>
+  <text x="1010" y="694" class="small">read snapshot</text>
 
-  <rect x="64" y="850" width="664" height="187" rx="18" fill="#1d293d" filter="url(#card-shadow)"/>
-  <text x="87" y="889" class="card-title white">The lineage explorer</text>
-  <rect x="590" y="870" width="115" height="34" rx="10" fill="#344758"/>
-  <text x="647" y="893" text-anchor="middle" class="mono" fill="#89d1c1">/lineage</text>
-  <text x="87" y="927" font-size="20" fill="#dae3e9">Summary · graph · holders · evidence</text>
-  <text x="87" y="959" font-size="20" fill="#dae3e9">Random sample · method · coverage</text>
-  <text x="87" y="1004" font-size="19" fill="#89d1c1">Browser GET never runs collection or models.</text>
+  <rect x="44" y="785" width="430" height="110" rx="6" class="node"/>
+  <text x="62" y="816" class="node-label">/lineage browser</text>
+  <text x="62" y="846" class="body">Graph · counts · evidence</text>
+  <text x="62" y="875" class="small">Client-side aggregation</text>
+  <rect x="538" y="785" width="228" height="110" rx="6" class="node"/>
+  <text x="556" y="816" class="node-label">Next.js</text>
+  <text x="556" y="846" class="body">Same-origin proxy</text>
+  <text x="556" y="875" class="mono">/api/v1/*</text>
+  <rect x="844" y="785" width="300" height="110" rx="6" class="node"/>
+  <text x="862" y="816" class="node-label">FastAPI</text>
+  <text x="862" y="846" class="mono">/api/v1/lineage</text>
+  <text x="862" y="875" class="mono">/{slug} · list + detail</text>
+  <path d="M482 815H530" class="request"/>
+  <path d="M774 815H836" class="request"/>
+  <path d="M836 865H774" class="data"/>
+  <path d="M530 865H482" class="data"/>
+  <text x="44" y="918" class="small">Validated file reads only · browser GET never runs collection or calls Jev</text>
 
-  <path d="M64 1066 H1436" stroke="#dddcd4"/>
-  <text x="750" y="1100" text-anchor="middle" font-size="20" fill="#626878">Shared wording ≠ causal influence  ·  Unknown inputs remain explicit</text>
+  <!-- Independent QA consumes a snapshot; no edge returns to production. -->
+  <rect x="24" y="959" width="1152" height="171" rx="8" fill="white" stroke="#bdc8d4" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="44" y="989" class="boundary-label">INDEPENDENT QA · outside production</text>
+  <rect x="44" y="1012" width="430" height="78" rx="6" class="node"/>
+  <text x="62" y="1041" class="node-label">Seeded adopted-phrase review</text>
+  <text x="62" y="1069" class="small">Reads lineage.json · exports rows</text>
+  <rect x="538" y="1012" width="228" height="78" rx="6" class="node"/>
+  <text x="556" y="1041" class="node-label">Human labels</text>
+  <text x="556" y="1069" class="small">Separate JSONL</text>
+  <rect x="844" y="1012" width="300" height="78" rx="6" class="node"/>
+  <text x="862" y="1041" class="node-label">Review summary</text>
+  <text x="862" y="1069" class="small">Agreement + Wilson interval</text>
+  <path d="M774 1051H836" class="data"/>
+  <path d="M474 1051H500V1107H994V1098" class="data"/>
+  <text x="710" y="1123" text-anchor="middle" class="small">exported rows</text>
+
+  <text x="600" y="1160" text-anchor="middle" class="small">Experimental associations · shared wording is not proof of authorship or causal influence.</text>
+  <text x="600" y="1187" text-anchor="middle" class="small">Review samples phrases, not graph links; human labels never feed the website.</text>
 </svg>
