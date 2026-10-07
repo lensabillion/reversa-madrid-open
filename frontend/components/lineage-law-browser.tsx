@@ -10,6 +10,7 @@ import {
   type LineagePhraseRow,
   type PreparedLineage,
   prepareLineage,
+  type SupportedLineageClaim,
 } from "../lib/lineage";
 import {
   type LineageLawSummary,
@@ -26,7 +27,6 @@ import {
   type LineageChannels,
   lineageChannels,
   lineageFunnel,
-  linkPool,
   type OrganisationRanking,
   type PhraseFilter,
   phraseFacets,
@@ -39,7 +39,6 @@ import {
   Channels,
   FiveQuestions,
   LineageFunnel,
-  LinkCheck,
   questionsFor,
   WhoShaped,
 } from "./lineage-insights";
@@ -240,6 +239,42 @@ const evidenceChoices: readonly { value: PhraseFilter["evidence"]; label: string
 
 const fieldStyle =
   "rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-teal-700";
+
+/** The three exact source projections of one saved association support. */
+export function ClaimCard({ claim }: { claim: SupportedLineageClaim }) {
+  const { origin, adoption, support } = claim;
+  const amendment = (
+    adoption.author_names.length > 0 ? adoption.author_names : adoption.author_ids
+  ).join(", ");
+  return (
+    <li className="rounded-sm border border-stone-200 bg-white">
+      <article aria-label={`Association ${claim.claimId}`} className="grid gap-0 lg:grid-cols-3">
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>Submission supporting this association</h4>
+          <p className="text-sm font-medium text-stone-900">{origin.organisation}</p>
+          <p className="text-xs text-stone-500">
+            {day(origin.published_at)} · {origin.document_id}
+          </p>
+          <Quote span={support.submission_span} label="Submission wording" kind={origin.kind} />
+        </section>
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>Exact carrying amendment</h4>
+          <p className="font-mono text-xs text-stone-800">{support.amendment_id}</p>
+          <p className="text-xs text-stone-500">
+            {adoption.stage} · tabled {day(adoption.tabled_on)}
+          </p>
+          <p className="text-xs text-stone-600">{amendment}</p>
+          <Quote span={support.amendment_span} label="Amendment wording" kind="verbatim" />
+        </section>
+        <section className="space-y-2 p-4">
+          <h4 className={eyebrow}>Exact final-act occurrence</h4>
+          <Quote span={support.final_span} label="Final act wording" kind="verbatim" />
+          <p className="break-all font-mono text-xs text-stone-500">{claim.claimId}</p>
+        </section>
+      </article>
+    </li>
+  );
+}
 
 function Phrases({ lineage }: { lineage: PreparedLineage }) {
   const [tab, setTab] = useState<PhraseTab>("adopted");
@@ -476,7 +511,6 @@ type Prepared =
       lineage: PreparedLineage;
       organisations: OrganisationRanking;
       channels: LineageChannels;
-      pool: readonly LineagePhraseRow[];
     }
   | { ok: false; error: string };
 
@@ -493,7 +527,6 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
         lineage,
         organisations: rankOrganisations(view),
         channels: lineageChannels(view),
-        pool: linkPool(lineage.adopted),
       };
     } catch (error: unknown) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -514,7 +547,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       </StateMessage>
     );
   }
-  const { lineage, organisations, channels, pool } = prepared;
+  const { lineage, organisations, channels } = prepared;
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
@@ -528,7 +561,6 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
     { id: "check", label: "Check 3 links" },
     { id: "method", label: "Method" },
   ];
-  const card = (phrase: LineagePhraseRow) => <PhraseCard key={phrase.phraseId} phrase={phrase} />;
   return (
     <main className="mx-auto max-w-[1536px] space-y-6 px-5 py-6 sm:px-8">
       <header className="space-y-1">
@@ -546,6 +578,9 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           These links have not passed an independent accuracy audit. Shared wording and model
           judgments do not prove authorship or causal influence. Counts describe recorded matches.
         </p>
+        {lineage.supportedClaims.unavailableReason !== null && (
+          <p className="mt-2">{lineage.supportedClaims.unavailableReason}</p>
+        )}
       </aside>
       <div
         role="tablist"
@@ -579,7 +614,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       >
         {tab === "summary" && (
           <>
-            <LineageFunnel steps={lineageFunnel(view, organisations)} />
+            <LineageFunnel steps={lineageFunnel(view)} />
             <FiveQuestions
               questions={questionsFor(view, lineage, organisations, channels)}
               onOpen={(next) => setTab(next)}
@@ -594,10 +629,19 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
         )}
         {tab === "how" && <Channels channels={channels} />}
         {tab === "graph" && (
-          <LineageGraphExplorer view={view} phrases={lineage.adopted} renderPhrase={card} />
+          <LineageGraphExplorer
+            view={view}
+            renderClaim={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+          />
         )}
         {tab === "evidence" && <Phrases lineage={lineage} />}
-        {tab === "check" && <LinkCheck pool={pool} renderLink={card} />}
+        {tab === "check" && (
+          <p role="status" className="text-sm leading-6 text-amber-900">
+            Carrier-supported inspection sampling is unavailable until it uses the displayed graph's
+            support IDs and scope. Saved quotations remain inspectable in Evidence; this is not a
+            completed accuracy audit.
+          </p>
+        )}
         {tab === "method" && <LineageMethod view={view} />}
       </div>
       <details

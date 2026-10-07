@@ -95,9 +95,11 @@ export function questionsFor(
       question: "Which organisations have the most associations?",
       state: leader === undefined ? "missing" : "answered",
       answer:
-        leader === undefined
-          ? "No eligible organisation association is recorded for adopted wording."
-          : `${leader.name} has ${plural(leader.adoptedFirst, "adopted phrase")} associated with earlier submissions.${group === null ? "" : ` Top group: ${group}.`}`,
+        organisations.unavailableReason !== null
+          ? "Organisation associations are unavailable because this snapshot lacks current carrier-specific evidence."
+          : leader === undefined
+            ? "No eligible organisation association is recorded for adopted wording."
+            : `${leader.name} has ${plural(leader.adoptedFirst, "adopted phrase")} associated with earlier submissions.${group === null ? "" : ` Top group: ${group}.`}`,
       more: "who",
     },
     {
@@ -204,9 +206,6 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
             <th scope="col" className="py-1 font-normal">
               Adopted, said first
             </th>
-            <th scope="col" className="py-1 text-right font-normal">
-              Said first, not adopted
-            </th>
             {semantic && (
               <th scope="col" className="py-1 text-right font-normal">
                 <KindBadge kind="semantic" note="only" />
@@ -228,7 +227,6 @@ function OrganisationTable({ rows }: { rows: readonly OrganisationRow[] }) {
                   max={max}
                 />
               </td>
-              <td className="py-1.5 text-right">{count.format(row.tabledOnly)}</td>
               {semantic && <td className="py-1.5 text-right">{count.format(row.reworded)}</td>}
               <td className="py-1.5 text-right text-stone-500">
                 {row.firstSaid === null ? "undated" : row.firstSaid.slice(0, 10)}
@@ -252,6 +250,13 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
       : ranking.rows.filter((row) => row.name.toLowerCase().includes(folded));
   }, [ranking.rows, query]);
   const shown = all ? matching : matching.slice(0, ORGANISATIONS_SHOWN);
+  if (ranking.unavailableReason !== null) {
+    return (
+      <p role="status" className="text-sm leading-6 text-amber-900">
+        {ranking.unavailableReason}
+      </p>
+    );
+  }
   return (
     <section aria-labelledby="lineage-who" className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -278,6 +283,12 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
           />
         </label>
       </div>
+      {ranking.unsupportedOrigins > 0 && (
+        <p className="text-sm text-amber-900">
+          {ranking.unsupportedOrigins} adopted origins lack current carrier support and are excluded
+          here; their saved context remains in Evidence.
+        </p>
+      )}
       {ranking.rows.length === 0 ? (
         <p className="text-sm text-stone-600">
           No named organisation's submission says wording that amendments inserted.
@@ -440,9 +451,9 @@ function funnelCopy(step: FunnelStep): FunnelCopy {
       };
     case "documents":
       return {
-        headline: "of the consultation documents have eligible adopted-wording associations",
+        headline: "of the consultation documents have saved eligible adopted-wording origins",
         unit: "documents",
-        note: `Before any amendment carried it, from ${detail} named organisations. Shared wording is evidence, not proof of authorship.`,
+        note: `Saved context: before a carrying amendment, from ${detail} named organisations. These counts include origins without current carrier support; shared wording does not prove authorship.`,
       };
     default: {
       const unreachable: never = step.id;

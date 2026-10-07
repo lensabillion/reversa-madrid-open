@@ -8,3 +8,10 @@ export function fixtureView(): LineageView {
     readFileSync(resolve(process.cwd(), "../backend/tests/fixtures/lineage/view.json"), "utf8"),
   ) as LineageView;
 }
+
+/** Version 2 fixture preserves exact carrier supports. */
+export function fixtureSupportedView(): LineageView {
+  return JSON.parse(
+    readFileSync(resolve(process.cwd(), "../backend/tests/fixtures/lineage/view-v2.json"), "utf8"),
+  ) as LineageView;
+}

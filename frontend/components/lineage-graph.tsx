@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useMemo, useState } from "react";
-import type { LineagePhraseRow } from "../lib/lineage";
+import type { SupportedLineageClaim } from "../lib/lineage";
 import type { LineageView } from "../lib/lineage-api";
 import {
   buildLineageGraph,
@@ -70,9 +70,9 @@ function EdgePath({
   const y2 = to.y + ROW / 2 - 3;
   const middle = (x1 + x2) / 2;
   const d = `M${x1},${y1} C${middle},${y1} ${middle},${y2} ${x2},${y2}`;
-  const width = 1.2 + 5 * Math.sqrt(edge.phraseIds.length / Math.max(1, max));
+  const width = 1.2 + 5 * Math.sqrt(edge.claimIds.length / Math.max(1, max));
   const opacity = selected || lit ? 0.9 : dim ? 0.08 : 0.35;
-  const label = `${count.format(edge.phraseIds.length)} phrases, ${edge.lexical ? "lexical" : ""}${edge.lexical && edge.semantic ? " and " : ""}${edge.semantic ? "semantic" : ""}`;
+  const label = `${count.format(edge.claimIds.length)} supported associations, ${edge.lexical ? "lexical" : ""}${edge.lexical && edge.semantic ? " and " : ""}${edge.semantic ? "semantic" : ""}`;
   return (
     <g>
       {edge.lexical && (
@@ -175,16 +175,14 @@ function NodeBox({
 /**
  * The lineage as a clickable graph: organisation → who tabled → final-act provision. The
  * overview draws only the heaviest nodes of each column; clicking a node or a line focuses
- * the paths through it (only the phrases they share) and lists that evidence below.
+ * the paths through it (only the supports they share) and lists their exact evidence below.
  */
 export function LineageGraphExplorer({
   view,
-  phrases,
-  renderPhrase,
+  renderClaim,
 }: {
   view: LineageView;
-  phrases: readonly LineagePhraseRow[];
-  renderPhrase: (phrase: LineagePhraseRow) => ReactNode;
+  renderClaim: (claim: SupportedLineageClaim) => ReactNode;
 }) {
   const [tablers, setTablers] = useState<TablerLevel>("group");
   const [lexical, setLexical] = useState(true);
@@ -200,7 +198,6 @@ export function LineageGraphExplorer({
     [view, tablers, lexical, semantic],
   );
   const slice = useMemo(() => sliceGraph(graph, focus, limit), [graph, focus, limit]);
-  const byId = useMemo(() => new Map(phrases.map((row) => [row.phraseId, row])), [phrases]);
 
   function choose(next: GraphFocus) {
     setFocus(next);
@@ -215,7 +212,7 @@ export function LineageGraphExplorer({
   }
   const rows = Math.max(1, ...graphColumns.map((column) => slice.columns[column].shown.length));
   const height = TOP + rows * ROW + 4;
-  const max = slice.edges.reduce((top, edge) => Math.max(top, edge.phraseIds.length), 1);
+  const max = slice.edges.reduce((top, edge) => Math.max(top, edge.claimIds.length), 1);
   const litEdges = new Set(
     hover === null
       ? []
@@ -231,8 +228,8 @@ export function LineageGraphExplorer({
       : focusEdge !== undefined
         ? `${graph.nodes.get(focusEdge.source)?.label ?? ""} → ${graph.nodes.get(focusEdge.target)?.label ?? ""}`
         : null;
-  const evidence = slice.phraseIds.flatMap((id) => {
-    const row = byId.get(id);
+  const evidence = slice.claimIds.flatMap((id) => {
+    const row = graph.claims.get(id);
     return row === undefined ? [] : [row];
   });
   const folded = query.trim().toLowerCase();
@@ -247,6 +244,13 @@ export function LineageGraphExplorer({
   const field =
     "rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-teal-700";
 
+  if (graph.unavailableReason !== null) {
+    return (
+      <p role="status" className="text-sm leading-6 text-amber-900">
+        {graph.unavailableReason}
+      </p>
+    );
+  }
   return (
     <section aria-labelledby="lineage-graph" className="space-y-4">
       <div className="space-y-1">
@@ -254,10 +258,16 @@ export function LineageGraphExplorer({
           Experimental associations: organisation → tabler → provision
         </h3>
         <p className="max-w-3xl text-sm leading-6 text-stone-600">
-          Line thickness is the number of phrases. Click a node or a line to follow it and read its
-          evidence.
+          Line thickness is the number of carrier-supported associations. Click a node or a line to
+          follow it and read its evidence.
         </p>
         <KindLegend />
+        {graph.unsupportedOrigins > 0 && (
+          <p className="text-sm text-amber-900">
+            {graph.unsupportedOrigins} adopted origins lack current carrier support and are excluded
+            here; their saved context remains in Evidence.
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-end gap-4 rounded-sm border border-stone-200 bg-white p-3">
         <label className="relative flex min-w-56 flex-col gap-1 text-xs text-stone-600">
@@ -345,8 +355,8 @@ export function LineageGraphExplorer({
         ) : (
           <>
             <span className="text-stone-900">
-              Following <strong>{focusName}</strong>: {count.format(slice.phraseIds.length)}{" "}
-              phrases.
+              Following <strong>{focusName}</strong>: {count.format(slice.claimIds.length)}{" "}
+              supported associations.
             </span>
             <button type="button" onClick={() => choose(null)} className={retryStyle}>
               Back to the overview
@@ -450,7 +460,7 @@ export function LineageGraphExplorer({
             Evidence behind {focusName}
           </h4>
           <ol className="space-y-3">
-            {evidence.slice(0, shownPhrases).map((row) => renderPhrase(row))}
+            {evidence.slice(0, shownPhrases).map((row) => renderClaim(row))}
           </ol>
           {evidence.length > shownPhrases && (
             <button

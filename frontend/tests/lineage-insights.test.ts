@@ -11,9 +11,9 @@ import {
   phraseFacets,
   rankOrganisations,
 } from "../lib/lineage-insights";
-import { fixtureView } from "./lineage-fixture";
+import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
-const view = fixtureView();
+const view = fixtureSupportedView();
 const [origin] = view.origins;
 const [adoption] = view.adoptions;
 const [phrase] = view.adopted_phrases;
@@ -22,7 +22,18 @@ if (origin === undefined || adoption === undefined || phrase === undefined) {
 }
 
 function withOrigins(origins: OriginMatchRecord[]): LineageView {
-  return { ...view, origins };
+  return {
+    ...view,
+    origins: origins.map((item, index) => ({
+      ...item,
+      span: { ...item.span, record_id: item.document_id },
+      supports: (item.supports ?? []).map((support) => ({
+        ...support,
+        support_id: `${support.support_id}:${index}`,
+        submission_span: { ...support.submission_span, record_id: item.document_id },
+      })),
+    })),
+  };
 }
 
 test("an organisation's phrase counts once however many of its documents say it", () => {
@@ -71,12 +82,10 @@ test("only wording said first ranks; later, citing and unnamed matches stay apar
   expect(ranking.citations).toBe(1);
 });
 
-test("a phrase found only reworded is counted as reworded; one also found verbatim is not", () => {
+test("unsupported semantic origins do not enter current organisation associations", () => {
   const semantic: OriginMatchRecord = { ...origin, kind: "semantic", similarity: 0.8 };
   const alone = rankOrganisations(withOrigins([semantic])).rows[0];
-  expect([alone?.reworded, alone?.adoptedFirstLexical, alone?.adoptedFirstSemantic]).toEqual([
-    1, 0, 1,
-  ]);
+  expect(alone).toBeUndefined();
   expect(rankOrganisations(withOrigins([semantic, origin])).rows[0]?.reworded).toBe(0);
 });
 
@@ -176,7 +185,7 @@ test("a draw is distinct, bounded by the pool, and repeated by its seed", () => 
 });
 
 test("the funnel quotes the view's counts and provision coverage, never a stand-in", () => {
-  const steps = lineageFunnel(view, rankOrganisations(view));
+  const steps = lineageFunnel(view);
   const { counts } = view;
   expect(steps.map((step) => step.id)).toEqual([
     "proposal",
@@ -205,10 +214,7 @@ test("the funnel quotes the view's counts and provision coverage, never a stand-
 test("the funnel counts a document reworded-only when it has no word-for-word origin", () => {
   const reworded = { ...origin, document_id: "doc:hys_feedback:77", kind: "semantic" as const };
   const both = { ...origin, document_id: "doc:hys_feedback:78" };
-  const steps = lineageFunnel(
-    withOrigins([origin, reworded, both, { ...both, kind: "semantic" }]),
-    rankOrganisations(view),
-  );
+  const steps = lineageFunnel(withOrigins([origin, reworded, both, { ...both, kind: "semantic" }]));
   expect(steps[4]?.split).toEqual({ lexical: 2, semantic: 1 });
 });
 
@@ -216,12 +222,12 @@ test("a funnel step reads unknown when its text was not fully collected", () => 
   const coverage = view.coverage.map((row) =>
     row.layer === "final_act" ? { ...row, status: "partial" as const, reason: "cut" } : row,
   );
-  const steps = lineageFunnel({ ...view, coverage }, rankOrganisations(view));
+  const steps = lineageFunnel({ ...view, coverage });
   expect(steps[1]?.part).toBeNull();
 });
 
 test("the funnel counts adopted-origin documents, not two tabled-only documents", () => {
-  const adoptedDocument = { ...origin, kind: "semantic" as const };
+  const adoptedDocument = origin;
   const tabled = {
     ...origin,
     phrase_id: "phrase:tabled-only",
@@ -241,20 +247,19 @@ test("the funnel counts adopted-origin documents, not two tabled-only documents"
     ],
     origins: [
       adoptedDocument,
-      adoptedDocument,
       // This document has both populations: its tabled lexical match must not change the
-      // adopted semantic-only classification, nor count the document twice.
+      // adopted lexical classification, nor count the document twice.
       { ...tabled, document_id: adoptedDocument.document_id },
       { ...tabled, document_id: "doc:tabled-one" },
       { ...tabled, document_id: "doc:tabled-two", kind: "semantic" },
     ],
   };
-  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toEqual({
+  expect(lineageFunnel(lineage)[4]).toEqual({
     id: "documents",
     part: 1,
     whole: 3,
     detail: 1,
-    split: { lexical: 0, semantic: 1 },
+    split: { lexical: 1, semantic: 0 },
   });
 });
 
@@ -276,13 +281,13 @@ test("the funnel excludes citations, later and undated origins but includes unna
     },
     { ...origin, document_id: "doc:unnamed", organisation: null, actor_id: null },
   ]);
-  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toMatchObject({
+  expect(lineageFunnel(lineage)[4]).toMatchObject({
     part: 1,
     detail: 0,
     split: { lexical: 1, semantic: 0 },
   });
   const empty = withOrigins([]);
-  expect(lineageFunnel(empty, rankOrganisations(empty))[4]).toMatchObject({
+  expect(lineageFunnel(empty)[4]).toMatchObject({
     part: 0,
     detail: 0,
     split: { lexical: 0, semantic: 0 },
@@ -294,9 +299,48 @@ test.each<LineageView>([
   { ...view, counts: { ...view.counts, documents_read: null } },
   { ...view, counts: { ...view.counts, documents_with_origin: null } },
 ])("the funnel keeps uncomputed adopted-document figures unknown (%#)", (lineage) => {
-  expect(lineageFunnel(lineage, rankOrganisations(lineage))[4]).toMatchObject({
+  expect(lineageFunnel(lineage)[4]).toMatchObject({
     part: null,
     detail: null,
     split: null,
+  });
+});
+
+test("legacy organisation associations are unavailable while adoption counts remain known", () => {
+  const legacy = fixtureView();
+  expect(rankOrganisations(legacy).unavailableReason).toContain("carrier-specific");
+  expect(rankOrganisations(legacy).rows).toEqual([]);
+  expect(lineageFunnel(legacy)[2]?.part).toBe(legacy.counts.linked_units);
+});
+
+test("all unsupported adopted origins report unavailable, not a measured zero", () => {
+  const unsupported = withOrigins([{ ...origin, supports: [] }]);
+  const ranking = rankOrganisations(unsupported);
+  expect(ranking.unavailableReason).toContain("carrier-specific evidence");
+  expect(ranking.unsupportedOrigins).toBe(1);
+  expect(ranking.rows).toEqual([]);
+});
+
+test("legacy and mixed-support summaries count organisations from the same saved origins", () => {
+  const legacy = fixtureView();
+  expect(lineageFunnel(legacy)[4]).toMatchObject({
+    part: 1,
+    detail: 1,
+    split: { lexical: 1, semantic: 0 },
+  });
+  const unsupported = {
+    ...origin,
+    document_id: "doc:unsupported",
+    actor_id: null,
+    organisation: "Other saved organisation",
+    kind: "semantic" as const,
+    supports: [],
+  };
+  const mixed = withOrigins([origin, unsupported]);
+  expect(rankOrganisations(mixed).rows).toHaveLength(1);
+  expect(lineageFunnel(mixed)[4]).toMatchObject({
+    part: 2,
+    detail: 2,
+    split: { lexical: 1, semantic: 1 },
   });
 });

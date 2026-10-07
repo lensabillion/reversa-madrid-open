@@ -1,10 +1,12 @@
 import type {
+  AdoptionEvidenceRecord,
   AmendmentAdoptionRecord,
   CreditRecord,
   LineageHolderKind,
   LineageMatchKind,
   LineageView,
   OriginMatchRecord,
+  OriginSupportRecord,
 } from "./lineage-api";
 import type { SourceSpan } from "./source-span";
 
@@ -21,6 +23,7 @@ export interface LineageAmendmentRow {
   /** Words of the amendment's new text inside adopted wording, of all its words; `null` for tabled wording. */
   adoptedWords: number | null;
   newWords: number | null;
+  evidence: readonly AdoptionEvidenceRecord[];
 }
 
 /** A submission that says the phrase, with the exact quotation and its date order. */
@@ -36,6 +39,7 @@ export interface LineageOriginRow {
   /** Dated before every carrying amendment and not a citation: the backend's `counts_as_origin`. */
   countsAsOrigin: boolean;
   kind: LineageMatchKind;
+  supports: readonly OriginSupportRecord[];
 }
 
 /** One phrase with every record that cites it, ready to show side by side. */
@@ -78,6 +82,7 @@ export interface PreparedLineage {
   adopted: readonly LineagePhraseRow[];
   tabled: readonly LineagePhraseRow[];
   credits: readonly LineageCreditTable[];
+  supportedClaims: SupportedLineageClaims;
 }
 
 function originRow(origin: OriginMatchRecord): LineageOriginRow {
@@ -91,6 +96,7 @@ function originRow(origin: OriginMatchRecord): LineageOriginRow {
     isCitation: origin.is_citation,
     countsAsOrigin: origin.eligibility === "ask_first" && !origin.is_citation,
     kind: origin.kind,
+    supports: origin.supports ?? [],
   };
 }
 
@@ -104,6 +110,7 @@ function adoptionRow(adoption: AmendmentAdoptionRecord): LineageAmendmentRow {
     tabledOn: adoption.tabled_on,
     adoptedWords: adoption.adopted_words,
     newWords: adoption.new_words,
+    evidence: adoption.evidence ?? [],
   };
 }
 
@@ -132,6 +139,7 @@ function tabledRow(amendmentId: string): LineageAmendmentRow {
     tabledOn: null,
     adoptedWords: null,
     newWords: null,
+    evidence: [],
   };
 }
 
@@ -171,7 +179,7 @@ function creditRow(credit: CreditRecord): LineageCreditRow {
  * Linear in the records of the view, plus sorting the phrases.
  */
 export function prepareLineage(view: LineageView): PreparedLineage {
-  if (view.schema_version !== "lineage-1") {
+  if (view.schema_version !== "lineage-1" && view.schema_version !== "lineage-2") {
     throw new Error(`Unsupported lineage view schema: ${String(view.schema_version)}`);
   }
   const adoptedIds = new Set(view.adopted_phrases.map((phrase) => phrase.phrase_id));
@@ -215,15 +223,21 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     const row = originRow(origin);
     // A reworded match is judged per amendment, so one passage can back the same phrase
     // through several carrying amendments; the card shows that passage once.
-    const repeated = rows.some(
+    const repeated = rows.find(
       (other) =>
         other.documentId === row.documentId &&
         other.kind === row.kind &&
         other.quote.start === row.quote.start &&
         other.quote.end === row.quote.end,
     );
-    if (!repeated) {
+    if (repeated === undefined) {
       rows.push(row);
+    } else {
+      repeated.supports = [
+        ...new Map(
+          [...repeated.supports, ...row.supports].map((support) => [support.support_id, support]),
+        ).values(),
+      ];
     }
     origins.set(origin.phrase_id, rows);
   }
@@ -277,5 +291,149 @@ export function prepareLineage(view: LineageView): PreparedLineage {
     adopted: [...adopted].sort(byEvidence),
     tabled: [...tabled].sort(byEvidence),
     credits,
+    supportedClaims: collectSupportedClaims(view),
+  };
+}
+
+/** One saved carrier-specific association; coauthors share this support identity. */
+export interface SupportedLineageClaim {
+  claimId: string;
+  phraseId: string;
+  origin: OriginMatchRecord;
+  adoption: AmendmentAdoptionRecord;
+  evidence: AdoptionEvidenceRecord;
+  support: OriginSupportRecord;
+}
+
+export interface SupportedLineageClaims {
+  claims: readonly SupportedLineageClaim[];
+  /** Legacy and unknown snapshots cannot supply current carrier-specific associations. */
+  unavailableReason: string | null;
+  /** Eligible adopted origins without current support remain inspectable as saved context. */
+  unsupportedOrigins: number;
+}
+
+function sameSpan(left: SourceSpan, right: SourceSpan): boolean {
+  return (
+    left.record_id === right.record_id &&
+    left.field === right.field &&
+    left.start === right.start &&
+    left.end === right.end &&
+    left.text === right.text &&
+    left.page === right.page
+  );
+}
+
+function projectsFrom(parent: SourceSpan, child: SourceSpan): boolean {
+  return (
+    parent.record_id === child.record_id &&
+    parent.field === child.field &&
+    parent.start <= child.start &&
+    child.start < child.end &&
+    child.end <= parent.end &&
+    [...parent.text].slice(child.start - parent.start, child.end - parent.start).join("") ===
+      child.text
+  );
+}
+
+/**
+ * Joins saved support IDs to their own carrier and final occurrence. It never infers a
+ * carrier from a merged phrase. Linear in records plus the quoted text checked at joins.
+ * The backend validates the matching rules; these checks protect referential identity.
+ */
+export function collectSupportedClaims(view: LineageView): SupportedLineageClaims {
+  if (view.schema_version === "lineage-1") {
+    return {
+      claims: [],
+      unavailableReason:
+        "This legacy snapshot lacks carrier-specific evidence. Current graph associations and organisation ranking are unavailable; saved quotations and adoption counts remain inspectable.",
+      unsupportedOrigins: 0,
+    };
+  }
+  if (view.status === "unknown") {
+    return {
+      claims: [],
+      unavailableReason: "Adoption is unknown, so carrier-specific associations are unavailable.",
+      unsupportedOrigins: 0,
+    };
+  }
+  const phrases = new Map(view.adopted_phrases.map((phrase) => [phrase.phrase_id, phrase]));
+  const carriers = new Map<
+    string,
+    { adoption: AmendmentAdoptionRecord; evidence: AdoptionEvidenceRecord }
+  >();
+  for (const adoption of view.adoptions) {
+    for (const evidence of adoption.evidence ?? []) {
+      const phrase = phrases.get(evidence.phrase_id);
+      if (carriers.has(evidence.evidence_id)) {
+        throw new Error(`Duplicate carrier evidence: ${evidence.evidence_id}`);
+      }
+      if (
+        phrase === undefined ||
+        adoption.kind !== "verbatim" ||
+        phrase.kind !== "verbatim" ||
+        !adoption.phrase_ids.includes(evidence.phrase_id) ||
+        evidence.amendment_span.record_id !== adoption.amendment_id ||
+        evidence.amendment_span.field !== "new_text" ||
+        evidence.final_span.field !== "text" ||
+        evidence.inserted_word_offsets.length === 0 ||
+        !phrase.final_spans.some((span) => projectsFrom(span, evidence.final_span))
+      ) {
+        throw new Error(`Invalid carrier evidence: ${evidence.evidence_id}`);
+      }
+      carriers.set(evidence.evidence_id, { adoption, evidence });
+    }
+  }
+  const claims: SupportedLineageClaim[] = [];
+  const supportIds = new Set<string>();
+  let unsupportedOrigins = 0;
+  for (const origin of view.origins) {
+    if (
+      !phrases.has(origin.phrase_id) ||
+      origin.eligibility !== "ask_first" ||
+      origin.is_citation ||
+      origin.organisation === null
+    ) {
+      continue;
+    }
+    if (origin.kind !== "verbatim" || (origin.supports ?? []).length === 0) {
+      unsupportedOrigins += 1;
+      continue;
+    }
+    for (const support of origin.supports ?? []) {
+      const carrier = carriers.get(support.adoption_evidence_id);
+      if (supportIds.has(support.support_id)) {
+        throw new Error(`Duplicate association support: ${support.support_id}`);
+      }
+      supportIds.add(support.support_id);
+      if (
+        carrier === undefined ||
+        carrier.adoption.amendment_id !== support.amendment_id ||
+        carrier.evidence.phrase_id !== origin.phrase_id ||
+        !origin.amendment_ids.includes(support.amendment_id) ||
+        support.submission_span.record_id !== origin.document_id ||
+        !sameSpan(support.submission_span, origin.span) ||
+        !projectsFrom(carrier.evidence.amendment_span, support.amendment_span) ||
+        !projectsFrom(carrier.evidence.final_span, support.final_span)
+      ) {
+        throw new Error(`Invalid association support: ${support.support_id}`);
+      }
+      claims.push({
+        claimId: support.support_id,
+        phraseId: origin.phrase_id,
+        origin,
+        adoption: carrier.adoption,
+        evidence: carrier.evidence,
+        support,
+      });
+    }
+  }
+  return {
+    claims: claims.sort((left, right) => left.claimId.localeCompare(right.claimId)),
+    unavailableReason:
+      claims.length === 0 && unsupportedOrigins > 0
+        ? "Saved adopted origins lack carrier-specific evidence. Current graph associations and organisation ranking are unavailable; saved quotations and adoption counts remain inspectable."
+        : null,
+    unsupportedOrigins,
   };
 }

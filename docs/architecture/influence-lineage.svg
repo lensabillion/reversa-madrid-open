@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1120" viewBox="0 0 1500 1120" style="max-width:100%;height:auto" role="img" aria-labelledby="title description">
   <title id="title">influence — from public records to the lineage explorer</title>
-  <desc id="description">Generation: setup downloads global Parltrack dumps, the Transparency Register and the Have Your Say index. Collection resolves one law, reads those global inputs and fetches proposal and final texts from CELLAR and EUR-Lex and consultation documents from Have Your Say. It saves JSONL records and a provenance and coverage manifest. The lineage engine compares final wording with the proposal, matches carrying amendments and traces consultation origins. An optional BM25 shortlist and Jev judgment with an answer cache adds reworded consultation origins only; final adoption always uses wording matching. The result is saved as data/laws/&lt;slug&gt;/lineage.json using schema lineage-1. Serving: FastAPI reads that snapshot through its lineage list and detail endpoints, Next.js proxies the read API, and the lineage website displays summary, graph, holders, evidence, a random sample and method. Browser GET requests never run collection or model calls. Shared wording is not proof of causal influence, and unknown inputs remain explicit.</desc>
+  <desc id="description">Generation: setup downloads global Parltrack dumps, the Transparency Register and the Have Your Say index. Collection resolves one law, reads those global inputs and fetches proposal and final texts from CELLAR and EUR-Lex and consultation documents from Have Your Say. It saves JSONL records and a provenance and coverage manifest. The lineage engine compares final wording with the proposal, matches carrying amendments and traces consultation origins. An optional BM25 shortlist and Jev judgment with an answer cache adds reworded consultation origins only; final adoption always uses wording matching. The result is saved as data/laws/&lt;slug&gt;/lineage.json using schema lineage-2. Serving: FastAPI reads that snapshot through its lineage list and detail endpoints, Next.js proxies the read API, and the lineage website displays summary, graph, holders, evidence, a random sample and method. Browser GET requests never run collection or model calls. Shared wording is not proof of causal influence, and unknown inputs remain explicit.</desc>
   <defs>
     <marker id="arrow-teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 1 1 L 9 5 L 1 9 Z" fill="#228c83"/>
@@ -89,7 +89,7 @@
   <text x="1146" y="344" class="mono" fill="#257d76">lineage.json</text>
   <path d="M1146 369 H1416" stroke="#e5e8e4"/>
   <text x="1146" y="399" class="mono" fill="#596273">data/laws/&lt;slug&gt;/</text>
-  <text x="1146" y="431" class="body">Schema <tspan font-weight="700">lineage-1</tspan></text>
+  <text x="1146" y="431" class="body">Schema <tspan font-weight="700">lineage-2</tspan></text>
   <text x="1146" y="466" class="body">Adopted + tabled phrases</text>
   <text x="1146" y="498" class="body">Origins · holders · coverage</text>
   <text x="1146" y="538" class="label">Exact source spans + dates</text>

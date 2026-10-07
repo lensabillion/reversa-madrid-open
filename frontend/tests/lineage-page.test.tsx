@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import LineagePage from "../app/lineage/page";
 import { PHRASES_PER_PAGE } from "../components/lineage-law-browser";
 import type { LineageLawList, LineageView } from "../lib/lineage-api";
-import { fixtureView } from "./lineage-fixture";
+import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 // Next.js re-renders `useSearchParams` readers after `history.pushState`; outside its router,
 // this stand-in reads jsdom's URL and is notified by the pushState spy installed below.
@@ -21,7 +21,7 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-const view = fixtureView();
+const view = fixtureSupportedView();
 const slug = view.slug;
 const laws: LineageLawList = {
   laws: [
@@ -137,6 +137,10 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
     throw new Error("Organisation section missing");
   }
   expect(within(orgSection).getByRole("row", { name: /Acme Unknown Lobby/ })).toBeDefined();
+  expect(
+    within(orgSection).queryByRole("columnheader", { name: "Said first, not adopted" }),
+  ).toBeNull();
+  expect(within(summary).getByText(/Saved context:/)).toBeDefined();
   expect(screen.getByText("Political groups · lexical")).toBeDefined();
   expect(within(card).getByText(/joint: credited to several holders/)).toBeDefined();
   expect(within(card).getByText(/18 of 18 words in the final act/)).toBeDefined();
@@ -184,32 +188,13 @@ test("the tabled tab, the evidence filter and the search change which phrases ar
   expect(screen.getByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
 });
 
-test("drawing three links shows the drawn link with its seed", async () => {
+test("sampling is explicitly unavailable during support integration", async () => {
   window.history.replaceState(null, "", `/lineage?law=${slug}`);
   serve(view);
-  vi.spyOn(crypto, "getRandomValues").mockImplementation((array) => {
-    if (array instanceof Uint32Array) {
-      array[0] = 42;
-    }
-    return array;
-  });
   render(<LineagePage />);
-
   await openTab("Check 3 links");
-  const heading = await screen.findByRole("heading", {
-    name: "Inspect three experimental associations",
-  });
-  const section = heading.closest("section");
-  if (section === null) {
-    throw new Error("Link check section missing");
-  }
-  expect(within(section).queryByRole("article")).toBeNull();
-  fireEvent.click(within(section).getByRole("button", { name: "Draw 3 links" }));
-  expect(within(section).getByText(/Seed 42/)).toBeDefined();
-  const drawn = within(section).getAllByRole("article");
-  expect(drawn).toHaveLength(1);
-  expect(within(drawn[0] as HTMLElement).getByText("Acme Unknown Lobby")).toBeDefined();
-  expect(within(section).getByRole("button", { name: "Draw again" })).toBeDefined();
+  expect(screen.getByText(/Carrier-supported inspection sampling is unavailable/)).toBeDefined();
+  expect(screen.queryByRole("button", { name: "Draw 3 links" })).toBeNull();
 });
 
 test("a long list is paged, and an undated or citing submission is labelled as such", async () => {
@@ -460,7 +445,17 @@ test("clicking a graph node follows its paths and lists their evidence", async (
   expect(within(section).queryByRole("article")).toBeNull();
   fireEvent.click(within(section).getByRole("button", { name: /Acme Unknown Lobby: 1 phrases/ }));
   expect(within(section).getByText(/Following/).textContent).toContain("Acme Unknown Lobby");
-  expect(within(section).getAllByRole("article")).toHaveLength(1);
+  const cards = within(section).getAllByRole("article");
+  expect(cards).toHaveLength(1);
+  const support = view.origins[0]?.supports?.[0];
+  if (support === undefined) {
+    throw new Error("Missing exact support");
+  }
+  expect(
+    within(cards[0] as HTMLElement)
+      .getAllByRole("blockquote")
+      .map((quote) => quote.lastChild?.textContent),
+  ).toEqual([support.submission_span.text, support.amendment_span.text, support.final_span.text]);
   fireEvent.click(within(section).getByRole("button", { name: "Back to the overview" }));
   expect(within(section).queryByRole("article")).toBeNull();
 });
@@ -491,4 +486,17 @@ test("the Method tab walks the four steps with this law's own counts", async () 
   expect(within(sources).getByText("8 proposal provisions")).toBeDefined();
   expect(within(sources).getByText("2 committee amendments")).toBeDefined();
   expect(within(sources).getByRole("link", { name: /Have Your Say/ })).toBeDefined();
+});
+
+test("legacy carrier evidence is unavailable but saved quotations remain inspectable", async () => {
+  window.history.replaceState(null, "", `/lineage?law=${slug}`);
+  serve(fixtureView());
+  render(<LineagePage />);
+  await openTab("Graph");
+  expect(
+    screen.getAllByText(/This legacy snapshot lacks carrier-specific evidence/).length,
+  ).toBeGreaterThan(0);
+  await openTab("Evidence");
+  expect(await screen.findByRole("article", { name: /Phrase phrase:/ })).toBeDefined();
+  expect(screen.getAllByRole("blockquote")).toHaveLength(2);
 });

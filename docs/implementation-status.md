@@ -27,6 +27,30 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Exact Lexical Carrier Evidence — 7 October 2026
+
+The R2 backend repair (`rev-0q9m`) emits `lineage-2`: accepted amendment/final runs and
+exact submission/amendment/final support spans survive merged-phrase grouping. A document
+is linked only to carriers whose qualifying overlap contains inserted wording; chronology
+uses those carriers. Legacy views remain readable without fabricated supports. Semantic
+target binding remains R3; version 2 alone does not prove a semantic origin has evidence.
+
+Backend verification: 679 tests, full line/branch coverage, Ruff and strict types. An
+independent Astra review passed a 400-case interval oracle. A four-law offline rehearsal
+verified 221 supports against 663 raw-source slices; adopted phrases, holder credits,
+tabled phrases and amendment metadata remain unchanged (adoption arrays now sort by ID).
+All 328 source files retained content and timestamps. See the
+[recorded measurements and limits](reviews/lineage-carrier-rehearsal-2026-10-07.md).
+Frontend graph joins and organisation rankings now use exact support identifiers. Clicking a
+graph association shows its submission, carrying amendment and own final-act occurrence.
+Legacy and wholly unsupported associations are unavailable with an explanation; saved
+counts and quotations remain readable. Summary organisation counts use the same saved
+adopted-origin population as its document count. The adopted-only ranking does not display
+a misleading tabled-only zero. Independent Astra review approved these joins and guards.
+The frontend gate passes 83 tests, strict types, Biome and a production build; a live DMA
+preview verified the notice, saved counts, graph focus and three exact quotations. Sampling
+is explicitly unavailable until R5 binds it to the displayed complete paths.
+
 ### Experimental Presentation Policy — 7 October 2026
 
 The owner chose to keep unaudited associations visible with explicit experimental labels

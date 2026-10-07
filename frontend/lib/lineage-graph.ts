@@ -1,14 +1,14 @@
+import { collectSupportedClaims, type SupportedLineageClaim } from "./lineage";
 import type { LineageView } from "./lineage-api";
 
 /**
  * The lineage view as an explorable graph, in the brief's direction:
  * organisation (its submission) → who tabled the carrying amendment → final-act provision.
  *
- * Every edge carries the adopted phrases that support it, so a path is consistent: focusing
- * a node keeps only the edges that share its phrases, never an edge that merely touches a
+ * Every edge carries the saved support IDs that establish its exact carrier path, so a path is consistent: focusing
+ * a node keeps only the edges that share those support IDs, never an edge that merely touches a
  * neighbour. Only adopted wording that a named organisation's submission said before the
- * amendments is drawn (citations excluded): wording said later cannot have shaped them. Linear in the
- * origins times the authors and provisions of each phrase, plus sorting.
+ * amendments is drawn (citations excluded): wording said later cannot have shaped them. Linear in saved supports times the number of carrier authors, plus sorting.
  */
 
 export type GraphColumn = "organisation" | "tabler" | "provision";
@@ -29,6 +29,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
+  claimIds: readonly string[];
+  /** Phrase IDs are display context, never graph join identity. */
   phraseIds: readonly string[];
   /** Some supporting match is word for word / some is reworded and judged by Jev. */
   lexical: boolean;
@@ -38,6 +40,9 @@ export interface GraphEdge {
 export interface LineageGraph {
   nodes: ReadonlyMap<string, GraphNode>;
   edges: readonly GraphEdge[];
+  claims: ReadonlyMap<string, SupportedLineageClaim>;
+  unavailableReason: string | null;
+  unsupportedOrigins: number;
 }
 
 export interface GraphOptions {
@@ -105,22 +110,19 @@ function tablersOf(
 
 /** Builds the whole graph; the component cuts and focuses it for display. */
 export function buildLineageGraph(view: LineageView, options: GraphOptions): LineageGraph {
-  const names = new Map(
-    view.credits.filter((credit) => credit.holder_kind === "mep").map((c) => [c.holder_id, c.name]),
+  const supported = collectSupportedClaims(view);
+  const claims = new Map(
+    supported.claims
+      .filter((claim) => (claim.origin.kind === "semantic" ? options.semantic : options.lexical))
+      .map((claim) => [claim.claimId, claim]),
   );
-  const phrases = new Map(view.adopted_phrases.map((phrase) => [phrase.phrase_id, phrase]));
-  const adoptions = new Map<string, LineageView["adoptions"][number]>();
-  for (const adoption of view.adoptions) {
-    adoptions.set(adoption.amendment_id, adoption);
-  }
+  const names = new Map(
+    view.credits
+      .filter((credit) => credit.holder_kind === "mep")
+      .map((credit) => [credit.holder_id, credit.name]),
+  );
   const nodes = new Map<string, GraphNode & { through: Set<string> }>();
-  const edges = new Map<
-    string,
-    { source: string; target: string; phrases: Set<string> } & {
-      lexical: boolean;
-      semantic: boolean;
-    }
-  >();
+  const edges = new Map<string, { source: string; target: string; claims: Set<string> }>();
   function node(
     id: string,
     column: GraphColumn,
@@ -128,53 +130,37 @@ export function buildLineageGraph(view: LineageView, options: GraphOptions): Lin
     detail: string | null,
     phraseId: string,
   ) {
-    const existing = nodes.get(id) ?? { id, column, label, detail, phrases: 0, through: new Set() };
+    const existing = nodes.get(id) ?? {
+      id,
+      column,
+      label,
+      detail,
+      phrases: 0,
+      through: new Set<string>(),
+    };
     existing.through.add(phraseId);
     nodes.set(id, existing);
   }
-  function edge(source: string, target: string, phraseId: string, semantic: boolean) {
+  function edge(source: string, target: string, claimId: string) {
     const id = `${source}→${target}`;
-    const existing = edges.get(id) ?? {
-      source,
-      target,
-      phrases: new Set<string>(),
-      lexical: false,
-      semantic: false,
-    };
-    existing.phrases.add(phraseId);
-    existing.lexical ||= !semantic;
-    existing.semantic ||= semantic;
+    const existing = edges.get(id) ?? { source, target, claims: new Set<string>() };
+    existing.claims.add(claimId);
     edges.set(id, existing);
   }
-  for (const origin of view.origins) {
-    const phrase = phrases.get(origin.phrase_id);
-    const semantic = origin.kind === "semantic";
-    if (
-      phrase === undefined ||
-      origin.is_citation ||
-      origin.organisation === null ||
-      origin.eligibility !== "ask_first" ||
-      (semantic ? !options.semantic : !options.lexical)
-    ) {
-      continue;
+  for (const claim of claims.values()) {
+    const name = claim.origin.organisation;
+    if (name === null) {
+      throw new Error(`Supported association has no named organisation: ${claim.claimId}`);
     }
-    const organisation = `org:${origin.actor_id ?? origin.organisation}`;
-    node(organisation, "organisation", origin.organisation, null, phrase.phrase_id);
-    const provisions = [...new Set(phrase.final_spans.map((span) => span.record_id))];
-    for (const amendmentId of origin.amendment_ids) {
-      const adoption = adoptions.get(amendmentId);
-      if (adoption === undefined) {
-        continue;
-      }
-      for (const tabler of tablersOf(adoption, options.tablers, names)) {
-        node(tabler.id, "tabler", tabler.label, tabler.detail, phrase.phrase_id);
-        edge(organisation, tabler.id, phrase.phrase_id, semantic);
-        for (const recordId of provisions) {
-          const provision = `prov:${recordId}`;
-          node(provision, "provision", provisionLabel(recordId), null, phrase.phrase_id);
-          edge(tabler.id, provision, phrase.phrase_id, semantic);
-        }
-      }
+    const organisation = `org:${claim.origin.actor_id ?? name}`;
+    const recordId = claim.support.final_span.record_id;
+    const provision = `prov:${recordId}`;
+    node(organisation, "organisation", name, null, claim.phraseId);
+    node(provision, "provision", provisionLabel(recordId), null, claim.phraseId);
+    for (const tabler of tablersOf(claim.adoption, options.tablers, names)) {
+      node(tabler.id, "tabler", tabler.label, tabler.detail, claim.phraseId);
+      edge(organisation, tabler.id, claim.claimId);
+      edge(tabler.id, provision, claim.claimId);
     }
   }
   return {
@@ -188,10 +174,21 @@ export function buildLineageGraph(view: LineageView, options: GraphOptions): Lin
       id,
       source: value.source,
       target: value.target,
-      phraseIds: [...value.phrases].sort(),
-      lexical: value.lexical,
-      semantic: value.semantic,
+      claimIds: [...value.claims].sort(),
+      phraseIds: [
+        ...new Set(
+          [...value.claims].flatMap((claimId) => {
+            const claim = claims.get(claimId);
+            return claim === undefined ? [] : [claim.phraseId];
+          }),
+        ),
+      ].sort(),
+      lexical: true,
+      semantic: false,
     })),
+    claims,
+    unavailableReason: supported.unavailableReason,
+    unsupportedOrigins: supported.unsupportedOrigins,
   };
 }
 
@@ -201,6 +198,7 @@ export const graphColumns: readonly GraphColumn[] = ["organisation", "tabler", "
 export type GraphFocus = { kind: "node"; id: string } | { kind: "edge"; id: string } | null;
 
 export interface GraphSlice {
+  claimIds: readonly string[];
   /** Shown nodes per column, largest first, and how many more the column holds. */
   columns: Record<GraphColumn, { shown: readonly GraphNode[]; hidden: number }>;
   edges: readonly GraphEdge[];
@@ -214,22 +212,22 @@ function byWeight(left: GraphNode, right: GraphNode): number {
 
 /**
  * What to draw. Without a focus: the `limit` heaviest nodes of each column and the edges
- * among them. With a focus: the edges sharing a phrase with it, restricted to those phrases,
+ * among them. With a focus: the edges sharing a support with it, restricted to those supports,
  * and their nodes, still cut to `limit` per column so a hub stays readable.
  */
 export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number): GraphSlice {
   let edges = graph.edges;
-  let focusPhrases: Set<string> | null = null;
+  let focusClaims: Set<string> | null = null;
   if (focus !== null) {
     const touching =
       focus.kind === "edge"
         ? graph.edges.filter((edge) => edge.id === focus.id)
         : graph.edges.filter((edge) => edge.source === focus.id || edge.target === focus.id);
-    focusPhrases = new Set(touching.flatMap((edge) => edge.phraseIds));
-    const phrasesInFocus = focusPhrases;
+    focusClaims = new Set(touching.flatMap((edge) => edge.claimIds));
+    const claimsInFocus = focusClaims;
     edges = graph.edges.flatMap((edge) => {
-      const shared = edge.phraseIds.filter((id) => phrasesInFocus.has(id));
-      return shared.length === 0 ? [] : [{ ...edge, phraseIds: shared }];
+      const shared = edge.claimIds.filter((id) => claimsInFocus.has(id));
+      return shared.length === 0 ? [] : [{ ...edge, claimIds: shared }];
     });
     if (focus.kind === "node") {
       // Keep paths through the focused node: on its own column, only itself.
@@ -246,8 +244,11 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
   for (const edge of edges) {
     for (const end of [edge.source, edge.target]) {
       const set = weights.get(end) ?? new Set<string>();
-      for (const id of edge.phraseIds) {
-        set.add(id);
+      for (const id of edge.claimIds) {
+        const claim = graph.claims.get(id);
+        if (claim !== undefined) {
+          set.add(claim.phraseId);
+        }
       }
       weights.set(end, set);
     }
@@ -277,6 +278,16 @@ export function sliceGraph(graph: LineageGraph, focus: GraphFocus, limit: number
   return {
     columns,
     edges: drawn,
-    phraseIds: [...(focusPhrases ?? new Set(drawn.flatMap((edge) => edge.phraseIds)))].sort(),
+    claimIds: [...(focusClaims ?? new Set(drawn.flatMap((edge) => edge.claimIds)))].sort(),
+    phraseIds: [
+      ...new Set(
+        drawn
+          .flatMap((edge) => edge.claimIds)
+          .flatMap((id) => {
+            const claim = graph.claims.get(id);
+            return claim === undefined ? [] : [claim.phraseId];
+          }),
+      ),
+    ].sort(),
   };
 }

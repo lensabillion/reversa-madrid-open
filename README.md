@@ -36,7 +36,8 @@ application reads that view and turns its records into a graph, counts and evide
 4. **Save the result.** `lineage.json` contains phrases, amendment links, consultation
    origins, holder credits, source spans, counts, coverage and limitations. Missing
    proposal or final text produces an explicit `unknown` result, and origin searches
-   are skipped. The persisted view uses the `lineage-1` schema.
+   are skipped. New snapshots use `lineage-2` with exact lexical carrier supports; legacy `lineage-1`
+   snapshots remain readable without fabricated evidence.
 5. **Serve and explore.** FastAPI reads saved views at `GET /api/v1/lineage` and
    `GET /api/v1/lineage/{slug}`. Next.js proxies these requests; the `/lineage` browser
    page derives its graph layout and organisation aggregates from the returned records.
