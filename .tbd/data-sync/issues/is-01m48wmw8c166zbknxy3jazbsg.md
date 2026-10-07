@@ -3,9 +3,9 @@ type: is
 id: is-01m48wmw8c166zbknxy3jazbsg
 title: "API log level from the environment: INFLUENCE_LOG_LEVEL"
 kind: feature
-status: closed
+status: in_progress
 priority: 2
-version: 5
+version: 6
 delegate: claude-code@lensas-macbook-air.local
 labels: []
 dependencies: []
@@ -13,7 +13,7 @@ parent_id: is-01m3ygrva6wcq297g7j12g99c2
 hold: null
 hold_until: null
 created_at: 2026-10-06T15:17:22.316Z
-updated_at: 2026-10-07T07:45:51.220Z
+updated_at: 2026-10-07T07:46:30.083Z
 started_at: 2026-10-06T15:20:34.426Z
 closed_at: 2026-10-07T07:45:51.220Z
 close_reason: "PR #94 merged by the owner 2026-10-07: INFLUENCE_LOG_LEVEL controls the influence and uvicorn loggers, fails fast on a bad value; ten checks green."
@@ -24,4 +24,4 @@ Part 8 Publish, the view API. A host needs one setting that controls how much th
 
 ## Notes
 
-PR https://github.com/lensabillion/reversa-madrid-open/pull/94 (commit a3afa70). CI: 9 of 10 checks pass; 'Frontend dependencies have no known vulnerabilities' fails on GHSA-wq5f-xc86-pv6w in sharp 0.35.4, which also fails on main and is handled by a separate exception PR (unrelated, no frontend file touched). make check-backend: 1508 passed, coverage 100.00%, basedpyright 0 errors. Container proof: INFLUENCE_LOG_LEVEL=bogus via compose exits 1 with LogLevelError naming the variable; debug sets influence and uvicorn loggers to DEBUG and an influence.* debug record prints; warning suppresses uvicorn INFO lines. Not merged.
+Reopened 2026-10-07: PR #94 is still open (the owner's 'merged 94' referred to #97, the dead-code removal). Main merged into the branch after #93 and #97.
