@@ -20,7 +20,6 @@ from influence.schemas.atlas import (
 )
 from influence.services.outcomes import (
     _word_set,  # pyright: ignore[reportPrivateUsage]
-    outcome_result,
     trace_outcomes,
 )
 
@@ -254,13 +253,6 @@ def test_a_direct_deletion_instruction_is_judged_on_what_remains() -> None:
     same = [_version("final_act", "Providers shall keep logs and audit reports.")]
     assert trace_outcomes(ask, None, None, same)[0].result == "not_observed"
     assert trace_outcomes(ask, None, None, gone)[0].result == "full"
-
-
-def test_outcome_result_reads_a_stage_or_none() -> None:
-    amendment = _amendment(OLD, NEW)
-    outcomes = trace_outcomes(_ask(NEW), amendment, _link(amendment), [])
-    assert outcome_result(outcomes, "heard") == "full"
-    assert outcome_result(outcomes[:1], "final_act") is None
 
 
 WORDS = st.sampled_from(["providers", "shall", "may", "keep", "logs", "six", "months", "not", "."])

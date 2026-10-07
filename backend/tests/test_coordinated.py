@@ -505,8 +505,7 @@ def test_the_atlas_command_writes_the_clusters_beside_the_view(
         "political_groups",
         "inserted",
     }
-    (listed,) = pipeline.list_views(tmp_path).laws
-    assert (listed.slug, listed.cross_group_clusters) == (SLUG, 1)
+    assert coordinated.cross_group_clusters(tmp_path, SLUG) == 1
 
 
 def test_reading_unknown_and_broken_clusters(
@@ -519,11 +518,5 @@ def test_reading_unknown_and_broken_clusters(
     (tmp_path / "laws" / SLUG / coordinated.VIEW_FILE).write_text("{}")
     with pytest.raises(coordinated.CoordinationError, match="are invalid"):
         coordinated.read_coordination(tmp_path, SLUG)
-    # A broken cluster file leaves the law listed with an unknown count, and says why.
-    listing = pipeline.list_views(tmp_path)
-    (listed,) = listing.laws
-    assert (listed.slug, listed.cross_group_clusters) == (SLUG, None)
-    (invalid,) = listing.invalid
-    assert invalid.slug == SLUG
-    assert "are invalid" in invalid.reason
+    # A broken cluster file does not touch the law's own view.
     assert pipeline.read_view(tmp_path, SLUG) is not None

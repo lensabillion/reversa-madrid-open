@@ -105,7 +105,7 @@ def _texts(fixture: AtlasFixture) -> dict[tuple[str, str], str]:
 
 
 def _spans(fixture: AtlasFixture) -> list[SourceSpan]:
-    spans = [item.span for item in (*fixture.passages, *fixture.asks, *fixture.positions)]
+    spans = [item.span for item in (*fixture.passages, *fixture.asks)]
     for item in fixture.links:
         spans.extend((*item.amendment_spans, *item.ask_spans))
     for item in fixture.outcomes:

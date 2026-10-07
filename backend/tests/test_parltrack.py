@@ -502,43 +502,6 @@ def mep_record(mep_id: object, name: object = "Brando BENIFEI") -> Record:
     }
 
 
-def test_mep_actors_returns_only_the_requested_members(tmp_path: Path) -> None:
-    records: list[Record] = [
-        mep_record(1, "Someone ELSE"),
-        mep_record("124867"),
-        mep_record(124867),
-        {"UserID": 197665, "Name": {"full": " Dragoş TUDORACHE "}},
-        mep_record(2, "Never REACHED"),
-    ]
-    dump = write_dump(tmp_path / "ep_meps.json.zst", records)
-
-    first, second = parltrack.mep_actors(dump, [124867, 197665])
-
-    assert first.model_dump(exclude_defaults=True) == {
-        "actor_id": "actor:mep:124867",
-        "kind": "mep",
-        "name": "Brando BENIFEI",
-        "mep_id": 124867,
-        "country": "Italy",
-        "political_group": "S&D",
-        "resolution": "mep_id",
-    }
-    assert (second.name, second.country, second.political_group) == ("Dragoş TUDORACHE", None, None)
-
-
-def test_mep_actors_skips_and_counts_members_it_cannot_describe(tmp_path: Path) -> None:
-    records: list[Record] = [mep_record(7, None), mep_record(0), mep_record(8)]
-    dump = write_dump(tmp_path / "ep_meps.json.zst", records)
-    skipped: Counter[str] = Counter()
-
-    # 99 is absent from the dump, so the reader runs to the end of the file.
-    actors = list(parltrack.mep_actors(dump, {7, 0, 8, 99}, skipped))
-
-    assert [actor.mep_id for actor in actors] == [8]
-    assert skipped == {"no_name": 1, "invalid": 1}
-    assert list(parltrack.mep_actors(dump, [])) == []
-
-
 def switcher(mep_id: int = 197000) -> Record:
     """A Member who moved from Renew to the EPP in July 2024."""
     return {
@@ -608,3 +571,40 @@ def test_latest_date_is_how_far_a_dump_reaches(tmp_path: Path) -> None:
     assert parltrack.latest_date(write_dump(tmp_path / "none.json.zst", [{"id": 1}])) is None
     with pytest.raises(ParltrackError, match="unreadable Parltrack dump"):
         parltrack.latest_date(tmp_path / "absent.json.zst")
+
+
+def test_mep_members_returns_only_the_requested_members_and_stops_early(tmp_path: Path) -> None:
+    records: list[Record] = [
+        mep_record(1, "Someone ELSE"),
+        mep_record("124867"),
+        mep_record(124867),
+        {"UserID": 197665, "Name": {"full": " Dragoş TUDORACHE "}},
+        mep_record(2, "Never REACHED"),
+    ]
+    dump = write_dump(tmp_path / "ep_meps.json.zst", records)
+
+    first, second = (member.actor for member in parltrack.mep_members(dump, [124867, 197665]))
+
+    assert first.model_dump(exclude_defaults=True) == {
+        "actor_id": "actor:mep:124867",
+        "kind": "mep",
+        "name": "Brando BENIFEI",
+        "mep_id": 124867,
+        "country": "Italy",
+        "political_group": "S&D",
+        "resolution": "mep_id",
+    }
+    assert (second.name, second.country, second.political_group) == ("Dragoş TUDORACHE", None, None)
+
+
+def test_mep_members_skips_and_counts_members_it_cannot_describe(tmp_path: Path) -> None:
+    records: list[Record] = [mep_record(7, None), mep_record(0), mep_record(8)]
+    dump = write_dump(tmp_path / "ep_meps.json.zst", records)
+    skipped: Counter[str] = Counter()
+
+    # 99 is absent from the dump, so the reader runs to the end of the file.
+    members = list(parltrack.mep_members(dump, {7, 0, 8, 99}, skipped))
+
+    assert [member.actor.mep_id for member in members] == [8]
+    assert skipped == {"no_name": 1, "invalid": 1}
+    assert list(parltrack.mep_members(dump, [])) == []

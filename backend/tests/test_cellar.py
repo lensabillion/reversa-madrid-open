@@ -177,41 +177,30 @@ def test_a_celex_number_maps_back_to_its_procedure_with_the_procedure_type(
     fetcher, scripted = fetcher_for(
         tmp_path, [('STR(?c) = "32024R1689"', sparql({"ref": "2021/0106/COD"}))]
     )
-    assert cellar.procedure_for_celex(fetcher, "32024R1689") == AI_ACT
+    assert cellar.procedures_for_celex(fetcher, "32024R1689") == (AI_ACT,)
     assert "procedure_code_interinstitutional_reference_procedure" in scripted.calls[0]
 
 
-def test_a_celex_in_several_or_no_dossiers_has_no_single_procedure(tmp_path: Path) -> None:
+def test_a_celex_lists_every_dossier_it_sits_in_and_skips_malformed_references(
+    tmp_path: Path,
+) -> None:
     rows = [{"ref": "2016/0280/COD"}, {"ref": "2021/0106/COD"}, {"ref": "not a reference"}]
     fetcher, _ = fetcher_for(
         tmp_path,
         [('"32019L0790"', sparql(*rows)), ('"39999R9999"', sparql())],
     )
     assert cellar.procedures_for_celex(fetcher, "32019L0790") == ("2016/0280(COD)", AI_ACT)
-    assert cellar.procedure_for_celex(fetcher, "32019L0790") is None
-    assert cellar.procedure_for_celex(fetcher, "39999R9999") is None
+    assert cellar.procedures_for_celex(fetcher, "39999R9999") == ()
 
 
 def test_text_that_is_not_a_celex_never_reaches_a_query_or_a_url(tmp_path: Path) -> None:
     fetcher, scripted = fetcher_for(tmp_path, [])
     injection = '32024R1689") } DROP'
     with pytest.raises(CellarError, match="Not a CELEX number"):
-        cellar.procedure_for_celex(fetcher, injection)
+        cellar.procedures_for_celex(fetcher, injection)
     with pytest.raises(CellarError, match="Not a CELEX number"):
         cellar.fetch_act(fetcher, "../procedure/2021_106")
     assert scripted.calls == []
-
-
-def test_parliament_positions_are_the_adopted_texts_filed_in_the_dossier(tmp_path: Path) -> None:
-    rows = [
-        {"celex": "52021PC0206"},
-        {"celex": "52024AP0138"},
-        {"celex": "32024R1689"},
-        {"celex": "52021AE2482"},
-    ]
-    fetcher, scripted = fetcher_for(tmp_path, [("dossier_contains_work", sparql(*rows))])
-    assert cellar.resolve_position_celex(fetcher, AI_ACT) == ("52024AP0138",)
-    assert "procedure/2021_106>" in scripted.calls[0]
 
 
 # --- Fetching an act --------------------------------------------------------------------

@@ -16,7 +16,6 @@ from influence.services.judge import (
     SUFFIX,
     JudgeError,
     amendment_query,
-    best_sentence,
     change_query,
     clipped_fields,
     judge_pairs,
@@ -71,11 +70,6 @@ def test_the_prompt_can_show_the_change_instead_of_the_whole_amendment() -> None
     assert "<Query>: Amendment adds: d; removes: c\n" in changes
     pairs = [("a b c", "a b d", "magic")]
     assert judge_pairs(pairs, MagicJudge(), model_id="m", changes_only=True)[0] > 0.9
-
-
-def test_the_evidence_can_be_chosen_with_the_change_prompt() -> None:
-    evidence = best_sentence("a", "a b", PASSAGE, MagicJudge(), model_id="m", changes_only=True)
-    assert evidence.text == "The lobbyist wants the magic change here."
 
 
 def test_the_prompt_is_the_models_trained_format() -> None:
@@ -157,44 +151,3 @@ def test_a_scorer_that_returns_the_wrong_count_or_a_non_finite_score_is_an_error
         judge_pairs([(None, "n", "a")], lambda prompts: [math.nan], model_id="m")
     with pytest.raises(ValueError, match="batch_size"):
         judge_pairs([(None, "n", "a")], MagicJudge(), model_id="m", batch_size=0)
-
-
-PASSAGE = "Intro words come first. The lobbyist wants the magic change here. Closing words follow."
-
-
-def test_the_evidence_is_the_best_sentence_with_its_exact_offsets() -> None:
-    evidence = best_sentence(None, "n", PASSAGE, MagicJudge(), model_id="m")
-    assert evidence.text == "The lobbyist wants the magic change here."
-    assert PASSAGE[evidence.start : evidence.end] == evidence.text
-    assert evidence.probability == pytest.approx(0.993, abs=1e-3)
-
-
-def test_with_no_better_sentence_the_first_wins_and_offsets_survive_unicode() -> None:
-    text = "\N{LATIN CAPITAL LETTER U WITH DIAERESIS}ber first. Second one. Third one."
-    evidence = best_sentence(None, "n", text, MagicJudge(), model_id="m")
-    assert (evidence.start, evidence.text) == (
-        0,
-        "\N{LATIN CAPITAL LETTER U WITH DIAERESIS}ber first.",
-    )
-    assert text[evidence.start : evidence.end] == evidence.text
-
-
-def test_a_passage_without_a_sentence_has_no_evidence() -> None:
-    with pytest.raises(ValueError, match="no sentence"):
-        best_sentence(None, "n", "  \n ", MagicJudge(), model_id="m")
-
-
-SENTENCES = st.lists(
-    st.sampled_from(["Magic is here.", "Nothing here.", "Another plain line.", "Magic again."]),
-    min_size=1,
-    max_size=6,
-)
-
-
-@given(SENTENCES, st.text(alphabet=" \n", max_size=2))
-def test_the_evidence_is_always_a_substring_of_the_passage(sentences: list[str], gap: str) -> None:
-    passage = (" " + gap).join(sentences)
-    evidence = best_sentence(None, "n", passage, MagicJudge(), model_id="m")
-    assert passage[evidence.start : evidence.end] == evidence.text
-    assert evidence.text.strip() == evidence.text
-    assert ("Magic" in passage) == ("Magic" in evidence.text)

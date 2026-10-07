@@ -65,7 +65,6 @@ from influence.services.collect import (
     CollectResult,
     CollectSettings,
 )
-from influence.services.law_query import com_reference_from_celex
 
 AI_ACT = "2021/0106(COD)"
 ONGOING = "2024/0100(COD)"
@@ -503,10 +502,8 @@ def test_a_com_reference_maps_to_its_proposal_celex() -> None:
     year=st.integers(min_value=1958, max_value=2099),
     number=st.integers(min_value=1, max_value=9999),
 )
-def test_every_com_number_round_trips_through_its_proposal_celex(year: int, number: int) -> None:
-    celex = collect.proposal_celex(f"COM({year}){number}")
-    assert celex is not None
-    assert com_reference_from_celex(celex) == f"COM({year}){number}"
+def test_every_com_number_has_a_proposal_celex_in_the_cellar_shape(year: int, number: int) -> None:
+    assert collect.proposal_celex(f"COM({year}){number}") == f"5{year}PC{number:04d}"
 
 
 # --- Gaps that become labels ----------------------------------------------------------------

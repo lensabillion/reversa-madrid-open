@@ -61,7 +61,6 @@ _CELLAR_REFERENCE = re.compile(r"(\d{4})/(\d{4})/([A-Z]{3})")
 _CELEX = re.compile(r"[0-9A-Z()]{6,24}")
 _COM_PROPOSAL = re.compile(r"5(\d{4})PC(\d{4})")
 _CORRIGENDUM = re.compile(r"R\(\d+\)$")
-_PARLIAMENT_POSITION = re.compile(r"5\d{4}AP\d{4}")
 _STREAM = re.compile(
     r'<a href="([^"]+)".*?title="stream_name">([^<]*)<.*?title="stream_order"[^>]*>(\d+)<',
     re.DOTALL,
@@ -198,33 +197,6 @@ def procedures_for_celex(
         for reference in _distinct(_select(fetcher, query, refresh=refresh), "ref")
     )
     return tuple(f"{match[1]}/{match[2]}({match[3]})" for match in matches if match is not None)
-
-
-def procedure_for_celex(fetcher: CachedFetcher, celex: str, *, refresh: bool = False) -> str | None:
-    """The one procedure behind a CELEX, or None when there is none or more than one.
-
-    Several procedures is a real case (an act amended by later procedures can sit in
-    more than one dossier); `procedures_for_celex` lists them for the caller to choose.
-    """
-    return _only(procedures_for_celex(fetcher, celex, refresh=refresh))
-
-
-def resolve_position_celex(
-    fetcher: CachedFetcher, procedure_id: str, *, refresh: bool = False
-) -> tuple[str, ...]:
-    """CELEX numbers of Parliament's adopted texts (`5YYYYAPNNNN`) filed in the dossier.
-
-    The dossier lists what was filed, which for the AI Act is the first-reading
-    resolution of March 2024 and not the June 2023 amendments, so the result is every
-    candidate and may be empty.
-    """
-    query = (
-        f"{_PREFIXES}SELECT DISTINCT ?celex WHERE {{ "
-        f"?d owl:sameAs <{procedure_uri(procedure_id)}> . "
-        "?d cdm:dossier_contains_work ?w . ?w cdm:resource_legal_id_celex ?celex . }"
-    )
-    contained = _distinct(_select(fetcher, query, refresh=refresh), "celex")
-    return tuple(celex for celex in contained if _PARLIAMENT_POSITION.fullmatch(celex))
 
 
 # --- Fetching an act --------------------------------------------------------------------

@@ -25,7 +25,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, cast
 
-MODEL_NAME = "qwen3-embedding-0.6b"
 MODEL_ID = "qwen3-embedding-0.6b-onnx-int8@c25a394"
 WEIGHTS = Path("onnx") / "model_int8.onnx"
 TOKENIZER = Path("tokenizer.json")
