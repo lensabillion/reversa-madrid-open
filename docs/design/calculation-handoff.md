@@ -1,5 +1,11 @@
 # Calculation Implementation and Evaluation
 
+> **Status, 6 October 2026.** `services/calculation.py` (`calculate_links`, the publication
+> policy described under "Publication" below) was removed as dead code: the live
+> `influence atlas` path never called it, and only its own tests did. The signal, ranking
+> and calibration modules it composed stay, measured by `benchmarks/calculation_plan.py`.
+> The rest of this document is kept as the record of the design and its evaluation.
+
 The calculation belongs to parts 3 (find candidates), 4 (verify links), and the
 practice loop of the [consolidated plan](../plan.md). It extends Agent 2's merged
 retrieval, passage-change reader, assessment and audit services. The existing graph

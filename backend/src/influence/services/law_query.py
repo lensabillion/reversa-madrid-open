@@ -19,7 +19,6 @@ type QueryKind = Literal["procedure", "celex", "com", "title"]
 _PROCEDURE = re.compile(r"^(\d{4})\s*/\s*(\d{1,4})([A-Z]?)\s*\(?\s*([A-Za-z]{3})\s*\)?$")
 _CELEX = re.compile(r"^(?:CELEX[:\s]*)?(\d{5}[A-Za-z]{1,2}\d{4})$", re.IGNORECASE)
 _COM = re.compile(r"^COM\s*[(/]?\s*(\d{4})\s*[)/]?\s*/?\s*0*(\d{1,4})(?:\s*final)?$", re.IGNORECASE)
-_PROPOSAL_CELEX = re.compile(r"^5(\d{4})PC0*(\d{1,4})$")
 _WORD = re.compile(r"[^\W_]+")
 # Inside a name these join rather than separate: "A.I." is "AI", "Europe's" is "Europes".
 _JOINERS = re.compile(r"[.'\N{RIGHT SINGLE QUOTATION MARK}]")
@@ -182,14 +181,6 @@ def parse_query(text: str) -> LawQuery:
     if com is not None:
         return LawQuery("com", f"COM({com.group(1)}){int(com.group(2))}")
     return LawQuery("title", trimmed)
-
-
-def com_reference_from_celex(celex: str) -> str | None:
-    """`52021PC0206` is the proposal `COM(2021)206`; other CELEX sectors have no COM form."""
-    match = _PROPOSAL_CELEX.match(celex)
-    if match is None:
-        return None
-    return f"COM({match.group(1)}){int(match.group(2))}"
 
 
 def title_tokens(title: str) -> frozenset[str]:
