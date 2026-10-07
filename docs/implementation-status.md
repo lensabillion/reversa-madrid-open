@@ -752,3 +752,26 @@ signal, ranking, calibration and evaluation-artifact modules that
 `benchmarks/calculation_plan.py` imports. Frontend exports used only inside their own file
 were left as they are. No part's behaviour changes; `make check` is the evidence (in the
 PR).
+
+## Repository Consistency Review — 7 October 2026
+
+Read-only product audit at `efea068` (`rev-1i73`):
+[review and ordered repair plan](reviews/repository-consistency-2026-10-07.md).
+`make check` exited 0: 1,400 backend tests, 100% coverage (8,864 statements,
+2,284 branches), 59 frontend tests, strict types, lint/format, six catalogs,
+production build and clean configured dependency audits. These checks do not establish
+influence accuracy. Deterministic probes reproduced unsupported origin edges from
+merged adjacent final-text intervals, semantic requests attached to unrelated adopted
+phrases, and future test features accepted by forecast validation. Snapshot checks also
+confirmed different graph/sample populations and tabled-only documents counted in the
+adoption funnel. The review records fourteen prioritized findings with follow-up beads;
+forecast work reuses `rev-iuyf`. No analytical fixes, paid model calls, fresh collection,
+local Docker verification or independent human precision audit were performed. The current
+publication-policy/documentation mismatch remains open; this review adopts no new policy.
+
+The owner subsequently named the project **influence** (`rev-3n26`). Current UI, API,
+CLI help, generated report and guide branding use that name. The Python package and CLI
+were already named influence; the private frontend package is now `influence-web`.
+Existing `atlas` command/artifact/schema identifiers retain their technical meaning.
+The full local `make check` passed again after the branding update with the same test
+counts and coverage. These presentation changes do not resolve the analytical findings.
