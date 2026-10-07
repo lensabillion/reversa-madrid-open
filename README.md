@@ -8,19 +8,17 @@ amendments to consultation documents, with counts and recorded limitations. Shar
 wording and model judgments do not establish causal influence. Forecasts and the older
 ask-first Atlas pipeline are no longer supported.
 
-The organizers replaced the first Challenge 03 brief (Influence Graph: score 60 supplied
-pairs into CSVs) at kickoff on 3 October 2026. The
-[Atlas brief](docs/brief/influence-atlas-challenge-brief.pdf) is the one that counts; the
-[first brief](docs/brief/madrid-open-reversa-challenges.pdf) is kept for the record.
-
 ## Architecture
 
-One data path powers the website. A command builds a saved view for each law; the web
-application reads that view and turns its records into a graph, counts and evidence cards.
+The Python CLI generates per-law snapshots from public sources. The read-only web
+application serves those saved records; independent human review reads them separately
+and never writes its labels back into the production view.
 
-![Architecture of influence: public records are collected and traced into lineage.json; a read-only API and Next.js proxy serve the lineage explorer. Optional Jev judgments add reworded consultation origins.](docs/architecture/influence-lineage.svg)
+![Technical architecture of influence: public sources feed offline collection and lineage generation; saved snapshots serve a read-only API, Next.js proxy and browser. Optional Jev judgments add consultation origins; independent human review stores labels separately from production output.](docs/architecture/influence-lineage.svg)
 
-[Open the full-size diagram](docs/architecture/influence-lineage.svg).
+[Open the full-size diagram](docs/architecture/influence-lineage.svg). Solid arrows carry
+data; dashed web arrows are GET requests. The purple branch is optional. Storage paths
+are under `data/`; `setup` is a prerequisite, and `make lineage` runs collection and tracing.
 
 1. **Prepare the public inputs.** `make setup` downloads Parltrack's law, amendment and
    Member of Parliament records, the Transparency Register, and the Have Your Say
@@ -73,11 +71,6 @@ There is no hidden test and no supplied data. The jury scores 100 points live at
 | Insight | 25 | Reads our answers to five questions: who, on what, towards what, how, what next |
 | Report | 15 | Reads our public report and opens this repository |
 | Ambition | 15 | How much of Europe since 2019 we cover, and our forecast |
-
-The original challenge requested a graph, a report and an open repository. The owner
-subsequently narrowed the maintained product to the lineage website on 7 October. The
-challenge documents remain historical context; [implementation status](docs/implementation-status.md)
-and the [backend guide](backend/README.md) define the supported system.
 
 ## Quickstart
 
