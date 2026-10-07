@@ -5,18 +5,18 @@ title: Retire the Atlas branch and keep the lineage website
 kind: task
 status: in_progress
 priority: 1
-version: 9
+version: 10
 delegate: unknown@lensas-macbook-air.local
 labels: []
 dependencies: []
 hold: null
 hold_until: null
 created_at: 2026-10-07T13:04:08.639Z
-updated_at: 2026-10-07T13:57:45.837Z
+updated_at: 2026-10-07T13:59:56.909Z
 started_at: 2026-10-07T13:06:37.535Z
 ---
 Final owner decision 7 October 2026 after viewing the temporary Saved analysis preview: remove it, the whole line on atlas.json. Remove the uncommitted analysis page/API and the Atlas producer plus offline-only forecast/report/audit/directions/channels/coordinated/batch/practice/model experiment code. Keep the lineage website, health/lineage API, setup/collect/lineage CLI including optional Jev, source/provenance/cache helpers, persisted collection/lineage compatibility, build/test/quality tooling. Preserve every document, evaluation evidence and ignored user data. Parts 1-8 scope reduction authorized; Astra judges boundaries and reviews, Sol handles mechanics. No analytic accuracy fixes claimed. Verify identical fixed-input lineage/Jev behavior, no unreachable obsolete runtime imports, full make check, populated website browser pass and CI.
 
 ## Notes
 
-Self-review correction pushed as50dd222 toPR102. Retained independent lineage_review +tests; localminimalWilson/coalitionhelpers, existingatomicwriter. RestoredUnicode/mixedscript/numeric span regression. Correctedbackendgate:665tests,4054statements1082branches100%,Ruff/typespass. RealAIAct+DataAct nojudge/fixedclock lineageoutputs byteidenticalvs015bdac;224inputfiles hashes/sizes/mtimeunchanged;22schemacontractsequivalentexcept2descriptionstrings;all11evaluationJSON+committedsnapshotsGitidentical. IndependentAstrareviewofactualPR100and101diffsfoundnointroducedblockers. CorrectedPR102CIpending; priorheadgreenisnotclaimedfornewhead. Accuracyfindingsremainopen; QAtoolnotpublicationgate.
+FINAL correctedhead50dd222e257f82a10164f0b17b954197b816f080: all10PR102CIchecksSUCCESS includingBackend665tests/fullcoverage59s andContainers1m7s. IndependentlineageQAtoolretained, productionJevretained, realAI/DataActlexicalviewsunchanged, mockJevunchanged. PR100/101actualdiffsindependentlyreviewedwithnointroducedblockers, both10green ontheirheads;PR100behindmain. No PRmerged. WorkcompleteinPR; beadremainsin_progressuntilmerge. Knownanalyticalaccuracyfindingsremainopen—not100%correctnessclaim.
