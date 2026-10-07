@@ -45,7 +45,6 @@ ArticleId = Annotated[str, StringConstraints(pattern=r"^art:\S+$")]
 CandidateId = Annotated[str, StringConstraints(pattern=r"^cand:\S+$")]
 LinkId = Annotated[str, StringConstraints(pattern=r"^link:\S+$")]
 OutcomeId = Annotated[str, StringConstraints(pattern=r"^outcome:\S+$")]
-PositionId = Annotated[str, StringConstraints(pattern=r"^position:\S+$")]
 ForecastId = Annotated[str, StringConstraints(pattern=r"^forecast:\S+$")]
 
 _UNSAFE_ID_CHARACTERS = re.compile(r"[^A-Za-z0-9._-]+")
@@ -460,24 +459,7 @@ class Outcome(AtlasRecord):
         return self
 
 
-# --- Part 7: public positions and forecasts ---------------------------------------------
-
-type Attribution = Literal["self_statement", "news_attribution"]
-
-
-class PublicPosition(AtlasRecord):
-    """A dated public statement by an actor, kept beside its asks as context."""
-
-    position_id: PositionId
-    actor_id: ActorId
-    document_id: DocumentId
-    span: SourceSpan
-    stated_at: AwareDatetime | None
-    attribution: Attribution
-    topic: str | None = None
-    procedure_id: ProcedureId | None = None
-    direction: Direction = "unknown"
-
+# --- Part 7: forecasts ------------------------------------------------------------------
 
 type ForecastScoreType = Literal["probability", "scenario", "rule"]
 

@@ -1,6 +1,6 @@
 # Implementation Status and Handoff
 
-Updated 3 October 2026, 17:00 CEST. Update this file when a capability or its
+Updated 7 October 2026. Update this file when a capability or its
 verification changes. Issue ownership and PR state live in tbd; implementation contracts
 live in the [backend README](../backend/README.md). The
 [Influence Atlas brief](brief/influence-atlas-challenge-brief.pdf) defines the
@@ -370,6 +370,7 @@ Open decisions are not settled until the project owner agrees.
 | No live frontend demo | Decided by the team 2026-10-03 | The explorer stays in the repository; the demo does not depend on it |
 | Re-scope gate 7: audit a seeded random sample of unconfirmed prose links to set the prose threshold | **Proposed** 2026-10-03; only the owner decides | Gate 3 needs a threshold that only an audit can give; the last real AI Act run (`rules-3`) published 0 links, so a blind audit of published links has nothing to sample. [Plan §8](plan.md#8-acceptance-gates-in-order) |
 | Remove the first brief's surfaces: the demo routes, `make submit`, the rehearsal scripts, `backend/validation/` and the evidence workspace | Decided 2026-10-06 by the owner | Bead `rev-xyd0`. Nothing in the Atlas pipeline calls them. The comparison, scoring and PDF-extraction services and the LobbyPlag reader stay because parts 1 and 4 and the practice loop import them |
+| Dead code is deleted, not kept for a future part: a definition no reachable path uses goes with its tests, and returns with the part that needs it | Decided 2026-10-07 by the owner ("every single one has to be deleted"); bead `rev-p3l4` | A test-only module is maintained, type-checked and covered at 100% for nothing, and it misleads the next reader about what the pipeline does (`services/calculation.py` read as the publication policy while `assessment.py` was). `PublicPosition` and `calculate_links` were designed work; the design documents keep their record |
 | D6: open licence and public repository | Decided 2026-10-06: the owner asked for the licence; Apache-2.0 for the code and documentation, as the bead proposed. The repository has been public since 3 October | Bead `rev-nzqr`. Derived data keeps its sources' terms (Parltrack ODbL, EU reuse policy); the report is CC BY 4.0. Tracked files and the whole history were scanned for keys, tokens and `.env` files on 2026-10-06: none found; `data/` and `attic/` were never committed |
 
 ## Next Work in Competition Order
@@ -725,3 +726,28 @@ The ask-first explorer page `/atlas`, its components and libraries (6,900 lines)
 shared with that code, moved into `lib/api-client.ts`, `lib/coverage.ts`,
 `lib/source-span.ts` and `components/view-state.tsx`. `make atlas` and `atlas.json`
 stay as inputs of the forecast, the report, the actor directions and the blind audit.
+
+## Dead Code Removed — 7 October 2026
+
+Bead `rev-p3l4`. An AST cross-reference of every top-level definition in `backend/src`,
+`backend/benchmarks`, `backend/models`, `scripts` and `frontend` against the whole
+repository, a module import graph, and vulture 2.14 found code that nothing on a reachable
+path (a `make` target, a documented `python -m` command, the API or the explorer) used.
+Deleted with their tests, fixtures and docstrings (908 lines): `extraction/manifest.py`
+and `extraction/tables.py` (the first row models, replaced by `schemas/atlas.py`);
+`services/calculation.py` (`calculate_links`, off the live path since the Jev and
+rules-based assessor decisions, called only by its tests); the `ActorIndex` resolver in
+`extraction/names.py` that `services/actors.py` replaced; `pipeline.list_views` and the
+`AtlasLaw*` models that served the removed `/api/v1/atlas` list; `judge.best_sentence`;
+`cellar.procedure_for_celex` and `resolve_position_celex`; `parltrack.mep_actors`;
+`register.register_export_date`; `calibration.precision_report`;
+`law_query.com_reference_from_celex`; `outcomes.outcome_result`;
+`ranking_signals.reciprocal_rank_fusion`; the `PublicPosition` record no part produced or
+read (the design doc's row says so); `SourceSpec.target_tables`; `DataLayout.table`,
+`.parsed` and `.manifest`; and the constants `PROMPT_REVISION`, `OWN_WORDING`,
+`MODEL_NAME` and `SIX_MONTHS`. Kept because a documented command reaches them: the
+`practice/*` commands, `benchmarks/*`, `backend/models/`, the extraction CLI, and the
+signal, ranking, calibration and evaluation-artifact modules that
+`benchmarks/calculation_plan.py` imports. Frontend exports used only inside their own file
+were left as they are. No part's behaviour changes; `make check` is the evidence (in the
+PR).

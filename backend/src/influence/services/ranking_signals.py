@@ -62,27 +62,6 @@ def background_signals(pairs: Sequence[RankedPair]) -> dict[str, dict[str, float
     }
 
 
-def reciprocal_rank_fusion(
-    rankings: Sequence[Sequence[str]], *, limit: int, offset: int = 60
-) -> tuple[tuple[str, float], ...]:
-    """Fuse lexical/dense ranked IDs without letting repeated IDs add credit.
-
-    O(N + U log U), N input ranking entries and U distinct candidates. This is the
-    plan's sum(1/(60+rank)); ties resolve by stable candidate identifier.
-    """
-    if limit < 1 or offset < 0:
-        raise ValueError("Need a positive limit and nonnegative rank offset")
-    scores: dict[str, float] = {}
-    for ranking in rankings:
-        seen: set[str] = set()
-        for identifier in ranking:
-            if identifier in seen:
-                continue
-            seen.add(identifier)
-            scores[identifier] = scores.get(identifier, 0.0) + 1 / (offset + len(seen))
-    return tuple(sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:limit])
-
-
 def cosine(left: Sequence[float], right: Sequence[float]) -> float:
     """Finite cosine for recorded dense embeddings; zero vectors are missing evidence."""
     if not left or len(left) != len(right):

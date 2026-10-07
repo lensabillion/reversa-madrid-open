@@ -20,7 +20,6 @@ Three facts about the real file shape this module (measured on the export of 202
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import cast
@@ -32,7 +31,6 @@ from influence.schemas.scoring import FrozenModel
 
 _ENTRY_TAG = "interestRepresentative"
 _CONTAINER_TAG = "resultList"
-_EXPORT_DATE_TAG = "exportDate"
 _EURO = "€"
 _CHARACTER_REFERENCE = re.compile(rb"&#(x[0-9a-fA-F]+|[0-9]+);")
 _AMOUNT = re.compile(r"\d+(\.\d+)?")
@@ -356,25 +354,6 @@ def iter_register(path: Path, *, skipped: list[str] | None = None) -> Iterator[R
             container.clear()
     if seen == 0:
         raise RegisterError(f"No {_ENTRY_TAG} element in the Transparency Register export {path}")
-
-
-def register_export_date(path: Path) -> datetime | None:
-    """When the register produced this export; None when the file does not say.
-
-    The date sits in the metadata block before the first entry, so only the head of the
-    file is read.
-    """
-    for event, element in _events(path):
-        if event == "start":
-            if element.tag == _ENTRY_TAG:
-                break
-            continue
-        if element.tag == _EXPORT_DATE_TAG:
-            try:
-                return datetime.fromisoformat((element.text or "").strip())
-            except ValueError as error:
-                raise RegisterError(f"Unreadable export date {element.text!r} in {path}") from error
-    return None
 
 
 def to_actor(entry: RegisterEntry) -> Actor:

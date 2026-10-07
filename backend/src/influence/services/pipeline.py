@@ -48,14 +48,7 @@ from influence.schemas.atlas import (
     SourceDocument,
     id_part,
 )
-from influence.schemas.atlas_view import (
-    AtlasBundleView,
-    AtlasLawList,
-    AtlasLawSummary,
-    AtlasView,
-    InvalidAtlasView,
-    RankingRow,
-)
+from influence.schemas.atlas_view import AtlasBundleView, AtlasView, RankingRow
 from influence.schemas.retrieval import SourcePassage
 from influence.services.assessment import (
     DEFAULT_PUBLISHABLE,
@@ -66,7 +59,6 @@ from influence.services.assessment import (
 )
 from influence.services.atlas_analysis import MIN_ASSESSED_ASKS, aggregate_outcomes
 from influence.services.atlas_graph import build_graph
-from influence.services.coordinated import CoordinationError, cross_group_clusters
 from influence.services.masking import QuotedLaw
 from influence.services.modes import mode_labels
 from influence.services.outcomes import trace_outcomes
@@ -686,36 +678,3 @@ def remove_stale_view(bundle: Path, run_id: str) -> bool:
         return False
     path.unlink()
     return True
-
-
-def list_views(data_root: Path) -> AtlasLawList:
-    """Every law with a valid written view, newest procedure first.
-
-    A view that cannot be read is listed under `invalid` with its reason instead of
-    failing the whole list, so one broken law does not hide every other.
-    """
-    laws: list[AtlasLawSummary] = []
-    invalid: list[InvalidAtlasView] = []
-    for path in sorted((data_root / "laws").glob(f"*/{VIEW_FILE}"), reverse=True):
-        try:
-            view = _load_view(path)
-        except PipelineError as error:
-            invalid.append(InvalidAtlasView(slug=path.parent.name, reason=str(error)))
-            continue
-        try:
-            clusters = cross_group_clusters(data_root, view.slug)
-        except CoordinationError as error:
-            # The law's view is fine; only its cluster count is unknown, and says why.
-            clusters = None
-            invalid.append(InvalidAtlasView(slug=view.slug, reason=str(error)))
-        laws.append(
-            AtlasLawSummary(
-                slug=view.slug,
-                procedure_id=view.procedure_id,
-                title=view.title,
-                run_id=view.run_id,
-                published_links=sum(link.status == "published" for link in view.bundle.links),
-                cross_group_clusters=clusters,
-            )
-        )
-    return AtlasLawList(laws=tuple(laws), invalid=tuple(invalid))

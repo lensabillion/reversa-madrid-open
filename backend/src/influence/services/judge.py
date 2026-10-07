@@ -3,25 +3,21 @@
 Words shared between an amendment and a passage are a clue, not an answer: "keep logs for six
 months" and "retain records for half a year" share none, and "keep logs for at most thirty days"
 shares nearly all and asks for something else. A reranker model reads both texts together and
-answers yes or no. This module builds the question, turns the model's answer into a probability,
-caches it, and finds the sentence of the passage that answers it best.
+answers yes or no. This module builds the question, turns the model's answer into a probability
+and caches it.
 
 The model is a function passed in (`ScoreFunction`: prompts in, log-odds of "yes" out), so this
 module and its tests need no model; `services/qwen_reranker.py` supplies the real one. The model
-only scores; it writes no text. The evidence for a verdict is therefore chosen, never generated:
-each sentence of the passage is judged on its own and the best one is returned with its exact
-offsets, so the quotation is always a substring of the passage.
+only scores; it writes no text.
 
-Cost: one model call per (amendment, passage) pair, and one per sentence for the evidence.
+Cost: one model call per (amendment, passage) pair.
 """
 
 import math
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 
 from influence.schemas.scoring import TextChange
 from influence.services.embedding import EmbeddingCache, cache_key
-from influence.services.passages import split_sentences
 from influence.services.scoring import changed_spans
 
 # Prompts -> the model's log-odds of "yes" for each, in order (positive means yes).
@@ -150,45 +146,3 @@ def judge_pairs(
         if cache is not None:
             cache.store(fresh)
     return [probability(known[keys[prompt]][0]) for prompt in prompts]
-
-
-@dataclass(frozen=True, slots=True)
-class Evidence:
-    """The sentence of a passage that best answers the question, with its exact offsets."""
-
-    start: int
-    end: int
-    text: str
-    probability: float
-
-
-def best_sentence(
-    old: str | None,
-    new: str,
-    passage: str,
-    score: ScoreFunction,
-    *,
-    model_id: str,
-    cache: EmbeddingCache | None = None,
-    batch_size: int = BATCH_SIZE,
-    changes_only: bool = False,
-) -> Evidence:
-    """Judge each sentence on its own and return the best, so the quote is a real substring.
-
-    The first sentence wins a tie. `passage[start:end] == text`. Raises ValueError when the
-    passage has no sentence.
-    """
-    sentences = split_sentences(passage)
-    if not sentences:
-        raise ValueError("The passage has no sentence to quote")
-    chances = judge_pairs(
-        [(old, new, passage[start:end]) for start, end, _ in sentences],
-        score,
-        model_id=model_id,
-        cache=cache,
-        batch_size=batch_size,
-        changes_only=changes_only,
-    )
-    best = max(range(len(sentences)), key=lambda index: (chances[index], -index))
-    start, end, _ = sentences[best]
-    return Evidence(start, end, passage[start:end], chances[best])

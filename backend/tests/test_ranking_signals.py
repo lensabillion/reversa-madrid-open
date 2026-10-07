@@ -9,7 +9,6 @@ from influence.services.ranking_signals import (
     background_signals,
     cosine,
     feature_vector,
-    reciprocal_rank_fusion,
 )
 
 
@@ -38,16 +37,6 @@ def test_constant_empty_and_invalid_backgrounds() -> None:
         background_signals([row, row])
     with pytest.raises(ValueError, match="finite"):
         background_signals([RankedPair("a", "am", "ask", math.nan)])
-
-
-def test_rank_fusion_deduplicates_and_preserves_alternatives() -> None:
-    actual = reciprocal_rank_fusion([["a", "a", "b"], ["b", "c"]], limit=3)
-    assert actual == (("b", 1 / 62 + 1 / 61), ("a", 1 / 61), ("c", 1 / 62))
-    assert reciprocal_rank_fusion([["b"], ["a"]], limit=1) == (("a", 1 / 61),)
-    assert reciprocal_rank_fusion([], limit=3) == ()
-    for limit, offset in ((0, 60), (1, -1)):
-        with pytest.raises(ValueError, match="positive limit"):
-            reciprocal_rank_fusion([], limit=limit, offset=offset)
 
 
 def test_cosine_and_invalid_embeddings() -> None:

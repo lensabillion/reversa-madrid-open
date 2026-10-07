@@ -1,44 +1,13 @@
-"""Row and response builders shared by the extraction tests."""
+"""Response builders shared by the extraction tests."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import Message
-from typing import TypedDict
 
 from influence.extraction.fetching import RawResponse
-from influence.extraction.tables import ActorRow
 
 FETCHED_AT = datetime(2026, 10, 3, 9, 30, tzinfo=UTC)
-
-
-class ProvenanceFields(TypedDict):
-    """The three provenance fields every row carries, typed so `**` unpacking checks."""
-
-    source_url: str
-    fetched_at: datetime
-    extraction_method: str
-
-
-PROVENANCE: ProvenanceFields = {
-    "source_url": "https://transparency-register.europa.eu/",
-    "fetched_at": FETCHED_AT,
-    "extraction_method": "test",
-}
-
-
-def make_actor(actor_id: str, name: str, acronym: str | None = None) -> ActorRow:
-    return ActorRow(
-        actor_id=actor_id,
-        name=name,
-        acronym=acronym,
-        category="trade_association",
-        country="BE",
-        budget_eur=None,
-        budget_raw=None,
-        interests=(),
-        **PROVENANCE,
-    )
 
 
 @dataclass
