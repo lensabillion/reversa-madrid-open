@@ -1,7 +1,8 @@
-# Reversa Challenges, Madrid Open 2026
+# influence
 
-Our entry for Reversa's track at the Madrid Open (Saturday 3 October 2026, Mad Tech Campus).
-We compete in **Challenge 03: The Influence Atlas**: an open, public map of who shapes
+**influence** is our entry for Reversa's track at the Madrid Open (Saturday 3 October 2026,
+Mad Tech Campus). The organizers called Challenge 03 **The Influence Atlas**; our project
+is named **influence**. It is an open, public map of who shapes
 EU law since 2019. For any law, it shows which organizations' asks reached amendments and
 the final text, with the evidence side by side; it ranks who actually wins, explains how,
 and forecasts who will win next.
@@ -76,7 +77,7 @@ The public report, once published, is offered under
 - [Backend guide](backend/README.md): run the evidence API, obtain the public snapshot,
   understand the layers and scoring limits, and verify the implementation.
 - [Frontend guide](frontend/README.md): run the evidence workspace and connect it to the API.
-- [The Atlas explainer](docs/explainer/influence-atlas-primer.md): the current challenge,
+- [The influence explainer](docs/explainer/influence-atlas-primer.md): the current challenge,
   what changed, the architecture, the data, the models and the plan to win, from first
   principles.
 - [The first explainer](docs/explainer/influence-graph-primer.md): written for the first

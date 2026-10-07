@@ -673,7 +673,7 @@ export function LineageLawBrowser() {
     <div className="min-h-dvh bg-stone-50 text-stone-900">
       <header className="flex h-[76px] items-center justify-between gap-4 border-b border-stone-200 bg-white px-5 sm:px-8">
         <div className="flex items-center gap-4">
-          <span className="text-xl font-semibold tracking-tight text-stone-900">Influence</span>
+          <span className="text-xl font-semibold tracking-tight text-stone-900">influence</span>
           <span className="hidden h-5 w-px bg-stone-300 sm:block" />
           <span className="hidden text-sm text-stone-500 sm:block">Lineage explorer</span>
         </div>

@@ -32,7 +32,7 @@ def create_app(atlas_data_root: Path | None = None) -> FastAPI:
     """
     # First, so a wrong INFLUENCE_LOG_LEVEL stops startup before anything is served.
     configure_logging()
-    app = FastAPI(title="Influence Atlas API", version=VERSION)
+    app = FastAPI(title="influence API", version=VERSION)
     app.add_middleware(CORSMiddleware, allow_origins=LOCAL_ORIGINS, allow_methods=("GET",))
     # Added last, so outermost: it wraps every other layer and compresses the body as it leaves.
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_BYTES)

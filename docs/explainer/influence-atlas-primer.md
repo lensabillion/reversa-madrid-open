@@ -1,6 +1,9 @@
 # Who Writes Europe's Laws?
 
-**Influence Atlas Primer** · Reversa × Madrid Open · Challenge 03 · Saturday 3 October 2026
+**influence Primer** · Reversa × Madrid Open · Challenge 03 · Saturday 3 October 2026
+
+The owner named the project **influence** on 7 October 2026. “The Influence Atlas” is
+the organizers' challenge title used in the historical account below.
 
 This page explains, from zero, the challenge the organizers handed out this morning, what
 changed from the brief we prepared for, and how we intend to win it: the data, the

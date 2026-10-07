@@ -1,4 +1,7 @@
-# Influence Atlas Architecture and Delivery Design
+# influence Architecture and Delivery Design
+
+The project is **influence**, named by the owner on 7 October 2026. “The Influence Atlas”
+is the title of the organizers' brief; existing `atlas` identifiers remain technical names.
 
 3 October 2026. Proposed design requested by the project owner; implementation is planned unless
 explicitly marked delivered. Tracked by `rev-f090`. The [consolidated plan](../plan.md)

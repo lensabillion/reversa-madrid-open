@@ -1,6 +1,6 @@
-# Influence Atlas Backend
+# influence Backend
 
-The Python service and pipeline behind our Influence Atlas entry (Reversa Challenge 03,
+The Python service and pipeline behind influence (Reversa Challenge 03,
 [Atlas brief](../docs/brief/influence-atlas-challenge-brief.pdf)). The `influence`
 command collects one EU law's public record (proposal, amendments, final act,
 consultation feedback and its senders), proposes and verifies links from an
@@ -12,7 +12,7 @@ explains the design from first principles; the
 [implementation status](../docs/implementation-status.md) records what is verified,
 decided and next.
 
-Two pieces built for the superseded first brief remain because the Atlas uses them: the
+Two pieces built for the superseded first brief remain because influence uses them: the
 lexical comparison (`services/scoring.py`, `services/comparison.py`) that part 4 builds
 on, and the practice harness over LobbyPlag's labelled pairs. The first brief's HTTP
 routes, its `influence submit` command and the evidence workspace were removed on

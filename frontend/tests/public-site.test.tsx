@@ -34,17 +34,17 @@ test("robots lets every crawler read every page and names no sitemap", () => {
 test("metadata carries the Open Graph and Twitter previews and omits metadataBase when unset", async () => {
   vi.stubEnv("INFLUENCE_PUBLIC_URL", undefined);
   const metadata = await freshMetadata();
-  expect(metadata.title).toBe("Influence Atlas");
+  expect(metadata.title).toBe("influence");
   expect(metadata.openGraph).toEqual({
-    title: "Influence Atlas",
+    title: "influence",
     description: metadata.description,
-    siteName: "Influence Atlas",
+    siteName: "influence",
     type: "website",
     locale: "en",
   });
   expect(metadata.twitter).toEqual({
     card: "summary",
-    title: "Influence Atlas",
+    title: "influence",
     description: metadata.description,
   });
   expect("metadataBase" in metadata).toBe(false);

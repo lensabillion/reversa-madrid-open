@@ -347,6 +347,7 @@ Open decisions are not settled until the project owner agrees.
 
 | Decision | Status | Reasoning |
 | --- | --- | --- |
+| Project name: **influence** (lowercase) | Decided 2026-10-07 by the owner; `rev-3n26` | “The Influence Atlas” is the organizers' challenge title, not our product name. Current branding uses influence; existing `atlas` commands, artifacts and schema identifiers name the ask-first pipeline. |
 | Compete in Challenge 03 | Decided 2026-10-02 for the first brief; the owner asked on 2026-10-03 to re-plan for the Atlas brief | [Research](research/research-2026-10-02-reversa-challenges.md); [Atlas explainer §1](explainer/influence-atlas-primer.md#1-what-changed-this-morning) |
 | The Influence Atlas brief replaces the first Challenge 03 brief | Reported by the owner 2026-10-03 | The new brief's rules ("We hand out nothing"), schedule (demos 19:30, no 19:00 inputs) and scoring leave no hidden test |
 | Architecture: eight parts plus a practice loop (Atlas) | Decided 2026-10-03: the owner merged PR [#21](https://github.com/lensabillion/reversa-madrid-open/pull/21) at 11:33 | [Atlas explainer §6](explainer/influence-atlas-primer.md#6-the-architecture), [technical design](design/influence-atlas-design.md); supersedes the seven-part design of 2026-10-02 ([first explainer §11](explainer/influence-graph-primer.md#11-proposed-architecture)) |

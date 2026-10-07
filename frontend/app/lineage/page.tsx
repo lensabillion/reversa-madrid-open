@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { LineageLawBrowser } from "../../components/lineage-law-browser";
 
 export const metadata: Metadata = {
-  title: "Influence · Lineage explorer",
+  title: "influence · Lineage explorer",
   description:
     "See which wording of collected EU laws came from which amendments, who tabled them, and which submissions said it first.",
 };

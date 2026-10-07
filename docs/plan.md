@@ -1,4 +1,8 @@
-# The Influence Atlas: Consolidated Execution Plan
+# influence: Consolidated Execution Plan
+
+Project name: **influence**, decided 7 October 2026. “The Influence Atlas” below refers
+to the organizers' challenge title; existing `atlas` commands and record names describe
+the ask-first pipeline.
 
 3 October 2026, Madrid. Tracked by bead `rev-f090`. Status: `decided`: the owner merged
 the pull request that added this file to `main`, and bead `rev-f090` is closed. The

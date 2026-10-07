@@ -23,6 +23,11 @@ actions rather than telling them to run commands.
 
 ## What This Project Is
 
+The project is named **influence** (lowercase), by the owner's decision on 7 October 2026.
+Use that name in current product branding and documentation. **The Influence Atlas** is
+the organizers' challenge title; `atlas` in commands, artifacts and schema identifiers
+names the existing ask-first pipeline, not the project.
+
 Our entry for Reversa's Challenge 03, **The Influence Atlas**, at the Madrid Open on
 Saturday 3 October 2026. It maps who shapes EU law since 2019: whose asks reached
 amendments and the final law, who wins, how, and what they will win next. We hand in a

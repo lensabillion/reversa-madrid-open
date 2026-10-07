@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-const title = "Influence Atlas";
+const title = "influence";
 const description =
   "Who shapes EU law: asks traced to amendments and to the final text, with the evidence side by side.";
 
 /**
- * The public origin (for example https://atlas.example.org), set by the host so link
+ * The public origin (for example https://influence.example.org), set by the host so link
  * previews carry absolute URLs. Unset, the key is left out and Next.js uses its own
  * default rather than a guessed address.
  */

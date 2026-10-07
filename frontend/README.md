@@ -1,4 +1,4 @@
-# Influence Atlas Explorer
+# influence Explorer
 
 The Next.js web app that shows what the pipeline wrote. It reads the
 [backend API](../backend/README.md) through a same-origin proxy (`/api/v1/…`, in
