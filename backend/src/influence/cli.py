@@ -734,7 +734,7 @@ def _batch(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="influence", description="Influence Atlas commands that run without the server."
+        prog="influence", description="influence commands that run without the server."
     )
     commands = parser.add_subparsers(dest="command", required=True)
     setup = commands.add_parser(

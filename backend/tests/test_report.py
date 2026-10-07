@@ -99,7 +99,7 @@ def test_every_question_has_a_headline_evidence_and_a_limitation(tmp_path: Path)
     law = report.load_law(root, SLUG)
     text = markdown([law])
 
-    assert text.startswith("# The Influence Atlas: who shaped Artificial Intelligence Act\n")
+    assert text.startswith("# influence: who shaped Artificial Intelligence Act\n")
     for heading in ("WHO wins", "WHAT they win", "TOWARDS what", "HOW they win"):
         body = section(text, heading)
         assert "Headline: " in body, heading
@@ -165,7 +165,7 @@ def test_no_published_link_falls_back_to_labelled_lineage_adoptions(tmp_path: Pa
     )
     text = markdown([law, fallback])
 
-    assert text.startswith("# The Influence Atlas: who shaped 2 EU laws\n")
+    assert text.startswith("# influence: who shaped 2 EU laws\n")
     links = section(text, "Links side by side")
     assert "0 published links across 1 of 2 laws with an atlas view." in links
     assert "**not published links**: 1 of 1 verbatim adoptions" in links
@@ -421,7 +421,7 @@ def test_the_command_writes_the_report_and_prints_the_link_sample(
     assert "WHO wins" in printed
     written = out.read_text()
     # Both spellings name one law: it is reported once.
-    assert written.startswith("# The Influence Atlas: who shaped Artificial Intelligence Act\n")
+    assert written.startswith("# influence: who shaped Artificial Intelligence Act\n")
     assert "--links 2 --seed 11" in written
     assert list(out.parent.iterdir()) == [out]
 
