@@ -35,6 +35,13 @@ read the law bundles that `make atlas` and `make lineage` write under `data/laws
 view answers 404 with the command that builds it. `make up` serves the same API from a
 container (root README).
 
+`INFLUENCE_LOG_LEVEL` sets how much the API logs: `debug`, `info` (the default), `warning`,
+`error` or `critical`, in any case. It applies to the API's own `influence.*` loggers
+(one line per record on stderr: time, level, logger name, message) and to uvicorn's
+startup and access loggers; other libraries keep Python's default, WARNING. The app reads
+it when it is created, so any other value stops startup with an error that names the
+variable and the accepted values, rather than running at a level nobody chose.
+
 The local frontend origins `http://localhost:3000` and `http://127.0.0.1:3000` are allowed
 by CORS for GET requests; the explorer normally reaches the API through Next.js's
 same-origin proxy and needs no CORS. There is no authentication: every route reads public

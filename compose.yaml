@@ -5,9 +5,14 @@
 # INFLUENCE_DATA names the host directory mounted at /data: the repository's data/ by
 # default (what `make atlas` and `make lineage` write), or mock-data/ for the committed
 # snapshots: INFLUENCE_DATA=./mock-data make up
+#
+# INFLUENCE_LOG_LEVEL (debug, info, warning, error, critical; default info) sets how much
+# the API logs: INFLUENCE_LOG_LEVEL=debug make up
 services:
   backend:
     build: ./backend
+    environment:
+      INFLUENCE_LOG_LEVEL: ${INFLUENCE_LOG_LEVEL:-info}
     volumes:
       - ${INFLUENCE_DATA:-./data}:/data:ro
     ports:
