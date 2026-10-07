@@ -37,11 +37,13 @@ async function errorDetail(response: Response): Promise<string> {
   return response.statusText || "no detail was supplied";
 }
 
-/** Reads one answer of the backend read API ; the caller owns the check of `T`. */
+/** Reads one answer of the backend read API; the caller owns the check of `T`. */
 export async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(url, { signal, cache: "no-store" });
+    // no-cache: every read revalidates with the API's ETag, so a view the pipeline has
+    // rewritten shows at once and an unchanged one costs a bodiless 304, not a download.
+    response = await fetch(url, { signal, cache: "no-cache" });
   } catch (error: unknown) {
     if (signal.aborted) {
       throw error;
