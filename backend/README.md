@@ -299,9 +299,12 @@ identify its content without reading it (`routers/view_cache.py`):
   for that long. The seconds come from `INFLUENCE_VIEW_MAX_AGE` (default 3600), read when
   the API starts; anything but a whole number of seconds, 0 or more, stops the API with an
   error naming the variable. `0` makes every reuse a revalidation.
-- `ETag`: a strong tag hashed from the installed package version and each view file's
-  slug, size and modification time in nanoseconds. For the list it covers every view, so
-  it changes when any view is added, rewritten or removed.
+- `ETag`: a weak tag (`W/"…"`) hashed from the installed package version and each view
+  file's slug, size and modification time in nanoseconds. For the list it covers every
+  view, so it changes when any view is added, rewritten or removed. It is weak because the
+  same file is served gzip-compressed or plain depending on the client, and RFC 9110
+  requires a strong tag to differ between those representations; `If-None-Match` compares
+  weakly, so revalidation works the same.
 - `Last-Modified`: the view file's modification time; for the list, the newest view's
   (absent when there is none).
 - A request whose `If-None-Match` matches the current tag (RFC 9110, section 13.1.2: weak

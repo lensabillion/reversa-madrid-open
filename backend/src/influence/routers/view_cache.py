@@ -44,15 +44,22 @@ def max_age_from(environ: Mapping[str, str]) -> int:
 
 
 def etag(stats: Iterable[ViewStat]) -> str:
-    """A strong entity tag for the response built from these view files.
+    """A weak entity tag for the response built from these view files.
 
     Hashing (slug, size, mtime_ns) of every file makes a listing's tag change when any
     view is added, rewritten or removed; for one view it is the same rule over one file.
+
+    Weak (`W/`), not strong: the same files go out gzip-compressed or plain depending on
+    the client's Accept-Encoding, and RFC 9110 section 8.8.1 requires a strong tag to
+    differ between those two representations, which the file stats cannot express. A weak
+    tag promises only that the representations are equivalent, which they are. Revalidation
+    is unaffected, because If-None-Match compares weakly (section 13.1.2); only byte-range
+    requests need a strong tag, and the API serves none.
     """
     digest = hashlib.sha256(_VERSION.encode())
     for stat in stats:
         digest.update(f"\n{stat.slug}\t{stat.size}\t{stat.mtime_ns}".encode())
-    return f'"{digest.hexdigest()[:32]}"'
+    return f'W/"{digest.hexdigest()[:32]}"'
 
 
 def validators(stats: tuple[ViewStat, ...], max_age: int) -> dict[str, str]:
