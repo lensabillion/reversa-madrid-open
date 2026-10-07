@@ -27,6 +27,67 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Sampling the Displayed Associations — 7 October 2026
+
+R5 (`rev-ha8p`) shares graph method/tabler/focus settings and node clipping with the
+random-check tab. Its unit is a unique support identifier with a complete rendered
+organisation → same tabler → final-provision path. Coauthors do not multiply its selection
+probability. Sorting identifiers before a seeded shuffle makes the draw reproducible;
+the UI shows the population, sample size, seed and scope. Scope changes reset the draw.
+Unsupported legacy claims remain unavailable. This sample is for inspection, not a
+precision estimate or an independent audit.
+
+The frontend gate passed 84 tests in seven files, Biome, strict types and a production
+build. Independent Astra review checked complete paths, clipping, focus, deduplication and
+refresh lifecycle. Semantic support integration remains the separately tested R3 layer.
+
+### Exact Lexical Carrier Evidence — 7 October 2026
+
+The R2 backend repair (`rev-0q9m`) emits `lineage-2`: accepted amendment/final runs and
+exact submission/amendment/final support spans survive merged-phrase grouping. A document
+is linked only to carriers whose qualifying overlap contains inserted wording; chronology
+uses those carriers. Legacy views remain readable without fabricated supports. Semantic
+target binding remains R3; version 2 alone does not prove a semantic origin has evidence.
+
+Backend verification: 679 tests, full line/branch coverage, Ruff and strict types. An
+independent Astra review passed a 400-case interval oracle. A four-law offline rehearsal
+verified 221 supports against 663 raw-source slices; adopted phrases, holder credits,
+tabled phrases and amendment metadata remain unchanged (adoption arrays now sort by ID).
+All 328 source files retained content and timestamps. See the
+[recorded measurements and limits](reviews/lineage-carrier-rehearsal-2026-10-07.md).
+Frontend graph joins and organisation rankings now use exact support identifiers. Clicking a
+graph association shows its submission, carrying amendment and own final-act occurrence.
+Legacy and wholly unsupported associations are unavailable with an explanation; saved
+counts and quotations remain readable. Summary organisation counts use the same saved
+adopted-origin population as its document count. The adopted-only ranking does not display
+a misleading tabled-only zero. Independent Astra review approved these joins and guards.
+The frontend gate passes 83 tests, strict types, Biome and a production build; a live DMA
+preview verified the notice, saved counts, graph focus and three exact quotations. Sampling
+is explicitly unavailable until R5 binds it to the displayed complete paths.
+
+### Experimental Presentation Policy — 7 October 2026
+
+The owner chose to keep unaudited associations visible with explicit experimental labels
+(`rev-u2rn`). A notice above every loaded law’s tabs explains that shared wording and model
+judgments do not establish authorship or causal influence. Organisation, graph and summary
+headings describe associations, and complete collection status is explicitly not validation.
+This changes presentation only; carrier support, semantic targeting and sample consistency
+remain separate repairs.
+
+### Adopted-Origin Funnel Count — 7 October 2026
+
+rev-is6b fixes the website's consultation-document funnel numerator: it counts distinct
+eligible, non-citation documents attached to adopted phrases, excluding tabled-only origins.
+The lexical/semantic split uses that same adopted population, with a document counted as
+lexical when it has both kinds of adopted origin. Named organisations already use eligible
+adopted phrases. Unknown views or uncomputed document counts keep these figures unknown.
+No backend records, schemas, stored data or other interface labels change.
+
+Verified in the isolated worktree: make check-frontend passes with 66 tests in seven files,
+Biome, Next.js route types, strict TypeScript and the production build. Regression cases
+cover one adopted-origin document plus two tabled-only documents, duplicate/shared documents,
+method precedence, citation/later/undated exclusions, unnamed sources and unknown inputs.
+
 ### Technical README Diagram — 7 October 2026
 
 rev-1asy replaces the README architecture illustration with a native SVG showing public

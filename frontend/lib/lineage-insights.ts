@@ -1,4 +1,8 @@
-import type { LineagePhraseRow } from "./lineage";
+import {
+  collectSupportedClaims,
+  type LineagePhraseRow,
+  type SupportedLineageClaim,
+} from "./lineage";
 import type { LineageView, OriginMatchRecord } from "./lineage-api";
 
 /**
@@ -35,6 +39,8 @@ export interface OrganisationRow {
 /** Origins with no organisation name: citizens or unnamed attachments, never given a name. */
 export interface OrganisationRanking {
   rows: readonly OrganisationRow[];
+  unsupportedOrigins: number;
+  unavailableReason: string | null;
   unnamedDocuments: number;
   /** Matches that quote another act or the proposal: shared wording, not a request. */
   citations: number;
@@ -65,11 +71,13 @@ function earlier(left: string | null, right: string | null): string | null {
 }
 
 /**
- * Organisations ranked by adopted phrases they said first, then by other adopted phrases,
- * then by tabled ones; the name breaks ties so the order is the same on every render.
+ * Organisations ranked by distinct adopted phrases with saved eligible carrier supports.
+ * The name breaks ties so the order is the same on every render.
  * A phrase counts once per organisation however many of its documents say it.
  */
 export function rankOrganisations(view: LineageView): OrganisationRanking {
+  const supported = collectSupportedClaims(view);
+  const supportedOrigins = new Set(supported.claims.map((claim) => claim.origin));
   const adopted = new Set(view.adopted_phrases.map((phrase) => phrase.phrase_id));
   const tallies = new Map<string, OrganisationTally>();
   const unnamed = new Set<string>();
@@ -87,6 +95,9 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
     }
     if (origin.organisation === null) {
       unnamed.add(origin.document_id);
+      continue;
+    }
+    if (!supportedOrigins.has(origin)) {
       continue;
     }
     const key = origin.actor_id ?? `name:${origin.organisation}`;
@@ -133,7 +144,14 @@ export function rankOrganisations(view: LineageView): OrganisationRanking {
       left.name.localeCompare(right.name) ||
       left.key.localeCompare(right.key),
   );
-  return { rows, unnamedDocuments: unnamed.size, citations, notFirst };
+  return {
+    rows,
+    unavailableReason: supported.unavailableReason,
+    unsupportedOrigins: supported.unsupportedOrigins,
+    unnamedDocuments: unnamed.size,
+    citations,
+    notFirst,
+  };
 }
 
 /** How many of something, under one label; rows are sorted by count, then by label. */
@@ -332,32 +350,19 @@ function generator(seed: number): () => number {
 }
 
 /**
- * The phrases a published link can be drawn from: adopted wording that a submission said
- * word for word before the amendments, so the link reads submission → amendment → final
- * act. Semantic (Jev) matches are left out of the draw: word-for-word wording is the
- * strongest evidence, while a reworded match can pair the same safeguard on a different
- * object (on the AI Act, trade secrets in technical documentation, Art. 11, with personal
- * data in the sandbox, Art. 54(1)(g)).
+ * Draws `size` distinct support claims from the stable ID-sorted `pool` with a partial Fisher–Yates shuffle seeded by
+ * `seed`; the same seed and support-ID population always draw the same claims.
+ * O(n log n) time for stable sorting, O(n) memory; intended for a law's visible claims.
  */
-export function linkPool(adopted: readonly LineagePhraseRow[]): readonly LineagePhraseRow[] {
-  return adopted.filter(
-    (phrase) =>
-      phrase.adopted &&
-      phrase.origins.some((origin) => origin.countsAsOrigin && origin.kind === "verbatim"),
-  );
-}
-
-/**
- * Draws `size` distinct phrases from `pool` with a partial Fisher–Yates shuffle seeded by
- * `seed`; the same seed always draws the same links. O(pool) time for the copy.
- */
-export function drawLinks(
-  pool: readonly LineagePhraseRow[],
+export function drawClaims(
+  pool: readonly SupportedLineageClaim[],
   size: number,
   seed: number,
-): readonly LineagePhraseRow[] {
+): readonly SupportedLineageClaim[] {
   const random = generator(seed);
-  const items = [...pool];
+  const items = [...new Map(pool.map((claim) => [claim.claimId, claim])).values()].sort(
+    (left, right) => left.claimId.localeCompare(right.claimId),
+  );
   const taken = Math.min(size, items.length);
   for (let index = 0; index < taken; index += 1) {
     const pick = index + Math.floor(random() * (items.length - index));
@@ -397,19 +402,25 @@ function provisions(view: LineageView, layer: "proposal" | "final_act"): number 
  * the final act's provisions and its new words, the new words traced to amendments (in how
  * many adopted phrases), the amendments that carry them, and the consultation documents that
  * said that wording first (from how many named organisations). Only counts already in the
- * view; nothing is estimated.
+ * view and its eligible adopted-origin records; nothing is estimated.
  */
-export function lineageFunnel(
-  view: LineageView,
-  ranking: OrganisationRanking,
-): readonly FunnelStep[] {
+export function lineageFunnel(view: LineageView): readonly FunnelStep[] {
   const { counts } = view;
+  const documentsKnown =
+    view.status !== "unknown" &&
+    counts.documents_read !== null &&
+    counts.documents_with_origin !== null;
+  const adopted = new Set(view.adopted_phrases.map((phrase) => phrase.phrase_id));
   const kinds = new Map<string, Set<OriginMatchRecord["kind"]>>();
+  const organisations = new Set<string>();
   for (const origin of view.origins) {
-    if (countsAsOrigin(origin)) {
+    if (adopted.has(origin.phrase_id) && countsAsOrigin(origin)) {
       const seen = kinds.get(origin.document_id) ?? new Set();
       seen.add(origin.kind);
       kinds.set(origin.document_id, seen);
+      if (origin.organisation !== null) {
+        organisations.add(origin.actor_id ?? `name:${origin.organisation}`);
+      }
     }
   }
   const lexical = [...kinds.values()].filter((seen) => seen.has("verbatim")).length;
@@ -438,11 +449,10 @@ export function lineageFunnel(
     },
     {
       id: "documents",
-      part: counts.documents_with_origin,
+      part: documentsKnown ? kinds.size : null,
       whole: counts.documents_read,
-      detail: ranking.rows.filter((row) => row.adoptedFirst > 0).length,
-      split:
-        counts.documents_with_origin === null ? null : { lexical, semantic: kinds.size - lexical },
+      detail: documentsKnown ? organisations.size : null,
+      split: documentsKnown ? { lexical, semantic: kinds.size - lexical } : null,
     },
   ];
 }

@@ -10,6 +10,7 @@ import {
   type LineagePhraseRow,
   type PreparedLineage,
   prepareLineage,
+  type SupportedLineageClaim,
 } from "../lib/lineage";
 import {
   type LineageLawSummary,
@@ -21,12 +22,20 @@ import {
   readLineageView,
 } from "../lib/lineage-api";
 import {
+  buildLineageGraph,
+  describeGraphScope,
+  type GraphScope,
+  type GraphSlice,
+  type LineageGraph,
+  sliceGraph,
+  visibleClaims,
+} from "../lib/lineage-graph";
+import {
   anyPhrase,
   filterPhrases,
   type LineageChannels,
   lineageChannels,
   lineageFunnel,
-  linkPool,
   type OrganisationRanking,
   type PhraseFilter,
   phraseFacets,
@@ -34,7 +43,7 @@ import {
 } from "../lib/lineage-insights";
 import type { SourceSpan } from "../lib/source-span";
 import { useResource } from "../lib/use-resource";
-import { LineageGraphExplorer } from "./lineage-graph";
+import { GRAPH_NODES_PER_COLUMN, LineageGraphExplorer } from "./lineage-graph";
 import {
   Channels,
   FiveQuestions,
@@ -241,6 +250,42 @@ const evidenceChoices: readonly { value: PhraseFilter["evidence"]; label: string
 const fieldStyle =
   "rounded-sm border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-teal-700";
 
+/** The three exact source projections of one saved association support. */
+export function ClaimCard({ claim }: { claim: SupportedLineageClaim }) {
+  const { origin, adoption, support } = claim;
+  const amendment = (
+    adoption.author_names.length > 0 ? adoption.author_names : adoption.author_ids
+  ).join(", ");
+  return (
+    <li className="rounded-sm border border-stone-200 bg-white">
+      <article aria-label={`Association ${claim.claimId}`} className="grid gap-0 lg:grid-cols-3">
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>Submission supporting this association</h4>
+          <p className="text-sm font-medium text-stone-900">{origin.organisation}</p>
+          <p className="text-xs text-stone-500">
+            {day(origin.published_at)} · {origin.document_id}
+          </p>
+          <Quote span={support.submission_span} label="Submission wording" kind={origin.kind} />
+        </section>
+        <section className="space-y-2 border-b border-stone-200 p-4 lg:border-r lg:border-b-0">
+          <h4 className={eyebrow}>Exact carrying amendment</h4>
+          <p className="font-mono text-xs text-stone-800">{support.amendment_id}</p>
+          <p className="text-xs text-stone-500">
+            {adoption.stage} · tabled {day(adoption.tabled_on)}
+          </p>
+          <p className="text-xs text-stone-600">{amendment}</p>
+          <Quote span={support.amendment_span} label="Amendment wording" kind="verbatim" />
+        </section>
+        <section className="space-y-2 p-4">
+          <h4 className={eyebrow}>Exact final-act occurrence</h4>
+          <Quote span={support.final_span} label="Final act wording" kind="verbatim" />
+          <p className="break-all font-mono text-xs text-stone-500">{claim.claimId}</p>
+        </section>
+      </article>
+    </li>
+  );
+}
+
 function Phrases({ lineage }: { lineage: PreparedLineage }) {
   const [tab, setTab] = useState<PhraseTab>("adopted");
   const [filter, setFilter] = useState<PhraseFilter>(anyPhrase);
@@ -405,7 +450,7 @@ function CreditList({ title, rows }: { title: string; rows: readonly LineageCred
               Name
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Amendments adopted
+              Amendments with matched final wording
             </th>
             <th scope="col" className="py-1 text-right font-normal">
               Rate
@@ -445,10 +490,10 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
   return (
     <section aria-labelledby="lineage-credits" className="space-y-4">
       <h3 id="lineage-credits" className="font-serif text-xl text-stone-900">
-        Who gets their way: Members and political groups
+        Amendment wording matches by Member and political group
       </h3>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
-        Ranked by the share of their amendments that reached the final act.
+        Ordered by the share of their amendments that contain matching final wording.
       </p>
       {tables.length === 0 ? (
         <p className="text-sm text-stone-600">No adopted wording, so no credit.</p>
@@ -476,7 +521,8 @@ type Prepared =
       lineage: PreparedLineage;
       organisations: OrganisationRanking;
       channels: LineageChannels;
-      pool: readonly LineagePhraseRow[];
+      graph: LineageGraph;
+      slice: GraphSlice;
     }
   | { ok: false; error: string };
 
@@ -485,20 +531,34 @@ export type LawTab = "summary" | "who" | "how" | "graph" | "evidence" | "check" 
 
 function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => void }) {
   const [tab, setTab] = useState<LawTab>("summary");
+  const [scope, setScope] = useState<GraphScope>({
+    tablers: "group",
+    lexical: true,
+    semantic: true,
+    focus: null,
+    limit: GRAPH_NODES_PER_COLUMN,
+  });
+  const [inspectionSeed, setInspectionSeed] = useState<number | null>(null);
+  function changeScope(next: GraphScope) {
+    setScope(next);
+    setInspectionSeed(null);
+  }
   const prepared = useMemo<Prepared>(() => {
     try {
       const lineage = prepareLineage(view);
+      const graph = buildLineageGraph(view, scope);
       return {
         ok: true,
+        graph,
+        slice: sliceGraph(graph, scope.focus, scope.limit),
         lineage,
         organisations: rankOrganisations(view),
         channels: lineageChannels(view),
-        pool: linkPool(lineage.adopted),
       };
     } catch (error: unknown) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [view]);
+  }, [view, scope]);
   if (!prepared.ok) {
     return (
       <StateMessage announce="alert" title={`The lineage data for ${view.title} is invalid`}>
@@ -514,21 +574,21 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       </StateMessage>
     );
   }
-  const { lineage, organisations, channels, pool } = prepared;
+  const { lineage, organisations, channels, graph, slice } = prepared;
+  const pool = visibleClaims(graph, slice);
   const gaps = view.coverage.flatMap((row) => {
     const note = coverageNote(row);
     return note === null ? [] : [note];
   });
   const tabs: readonly { id: LawTab; label: string }[] = [
     { id: "summary", label: "Summary" },
-    { id: "who", label: "Who" },
+    { id: "who", label: "Associations" },
     { id: "how", label: "How" },
     { id: "graph", label: "Graph" },
     { id: "evidence", label: "Evidence" },
     { id: "check", label: "Check 3 links" },
     { id: "method", label: "Method" },
   ];
-  const card = (phrase: LineagePhraseRow) => <PhraseCard key={phrase.phraseId} phrase={phrase} />;
   return (
     <main className="mx-auto max-w-[1536px] space-y-6 px-5 py-6 sm:px-8">
       <header className="space-y-1">
@@ -537,6 +597,19 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           {view.procedure_id} · run {view.run_id}
         </p>
       </header>
+      <aside
+        aria-label="Association status"
+        className="rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+      >
+        <p className="font-semibold">Experimental wording associations</p>
+        <p>
+          These links have not passed an independent accuracy audit. Shared wording and model
+          judgments do not prove authorship or causal influence. Counts describe recorded matches.
+        </p>
+        {lineage.supportedClaims.unavailableReason !== null && (
+          <p className="mt-2">{lineage.supportedClaims.unavailableReason}</p>
+        )}
+      </aside>
       <div
         role="tablist"
         aria-label="Views of this law"
@@ -569,7 +642,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
       >
         {tab === "summary" && (
           <>
-            <LineageFunnel steps={lineageFunnel(view, organisations)} />
+            <LineageFunnel steps={lineageFunnel(view)} />
             <FiveQuestions
               questions={questionsFor(view, lineage, organisations, channels)}
               onOpen={(next) => setTab(next)}
@@ -584,10 +657,29 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
         )}
         {tab === "how" && <Channels channels={channels} />}
         {tab === "graph" && (
-          <LineageGraphExplorer view={view} phrases={lineage.adopted} renderPhrase={card} />
+          <LineageGraphExplorer
+            graph={graph}
+            slice={slice}
+            scope={scope}
+            onScopeChange={changeScope}
+            renderClaim={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+          />
         )}
         {tab === "evidence" && <Phrases lineage={lineage} />}
-        {tab === "check" && <LinkCheck pool={pool} renderLink={card} />}
+        {tab === "check" &&
+          (graph.unavailableReason !== null ? (
+            <p role="status" className="text-sm leading-6 text-amber-900">
+              {graph.unavailableReason}
+            </p>
+          ) : (
+            <LinkCheck
+              seed={inspectionSeed}
+              onSeed={setInspectionSeed}
+              pool={pool}
+              scopeLabel={describeGraphScope(scope, graph)}
+              renderLink={(claim) => <ClaimCard key={claim.claimId} claim={claim} />}
+            />
+          ))}
         {tab === "method" && <LineageMethod view={view} />}
       </div>
       <details
@@ -605,7 +697,10 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
             <li key={limitation}>{sentence(limitation)}</li>
           ))}
           {gaps.length === 0 ? (
-            <li>Every source layer recorded for this law is complete.</li>
+            <li>
+              All recorded source layers have complete collection status. This does not validate the
+              associations.
+            </li>
           ) : (
             gaps.map((gap) => <li key={gap}>{gap}</li>)
           )}
@@ -736,8 +831,8 @@ export function LineageLawBrowser() {
         collected.length > 0 && (
           <StateMessage announce={null} title="Choose a law">
             <p>
-              Open a collected law to see which of its final wording came from which amendments, who
-              tabled them, and which submissions said it first.
+              Open a collected law to inspect experimental wording associations between final text,
+              amendments, their tablers, and earlier submissions.
             </p>
           </StateMessage>
         )

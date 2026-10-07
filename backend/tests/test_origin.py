@@ -1,5 +1,6 @@
 """Origins: exact quotations, honest dates, citations flagged, coalition wording visible."""
 
+from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime
 from functools import partial
 
@@ -16,9 +17,15 @@ from influence.schemas.atlas import (
     SourceSpan,
     span_matches,
 )
-from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS, AdoptedPhrase, AmendmentAdoption
+from influence.schemas.lineage import (
+    MIN_ADOPTED_RUN_WORDS,
+    AdoptedPhrase,
+    AdoptionEvidence,
+    AmendmentAdoption,
+    OriginMatch,
+)
 from influence.services import origin
-from influence.services.lineage import Rarity
+from influence.services.lineage import Rarity, evidence_id_of
 from influence.services.origin import (
     OriginError,
     is_citation,
@@ -28,7 +35,66 @@ from influence.services.prose_match import words_of
 
 # No word is common, so these tests see the run-length rules alone; rarity has its own tests.
 EVERY_WORD_RARE = Rarity(frozenset())
-find_origins = partial(origin.find_origins, rarity=EVERY_WORD_RARE)
+
+
+def find_origins(
+    phrases: Sequence[AdoptedPhrase],
+    adoptions: Sequence[AmendmentAdoption],
+    documents: Sequence[tuple[SourceDocument, DocumentText]],
+    *,
+    amendments: Mapping[str, Amendment] | None = None,
+    submitters: Mapping[str, Actor] | None = None,
+    rarity: Rarity = EVERY_WORD_RARE,
+) -> tuple[OriginMatch, ...]:
+    """Single-carrier synthetic worlds explicitly accept each supplied whole phrase.
+
+    These existing tests isolate dates, citation detection and document matching. The
+    carrier regressions use real adoption instead of this intentionally simpler world.
+    """
+    by_id = {item.phrase_id: item for item in phrases if item.kind == "verbatim"}
+    accepted: list[AmendmentAdoption] = []
+    for item in adoptions:
+        evidence: list[AdoptionEvidence] = []
+        for phrase_id in item.phrase_ids:
+            phrase = by_id.get(phrase_id)
+            if phrase is None or item.kind != "verbatim":
+                continue
+            amendment_span = SourceSpan(
+                record_id=item.amendment_id,
+                field="new_text",
+                start=0,
+                end=len(phrase.text),
+                text=phrase.text,
+            )
+            final_span = SourceSpan(
+                record_id=FINAL.record_id,
+                start=0,
+                end=len(phrase.text),
+                text=phrase.text,
+            )
+            offsets = tuple(range(phrase.words))
+            evidence.append(
+                AdoptionEvidence(
+                    evidence_id=evidence_id_of(
+                        "adoption-evidence", phrase_id, (amendment_span, final_span), offsets
+                    ),
+                    phrase_id=phrase_id,
+                    amendment_span=amendment_span,
+                    final_span=final_span,
+                    inserted_word_offsets=offsets,
+                )
+            )
+        accepted.append(item.model_copy(update={"evidence": tuple(evidence)}))
+    return origin.find_origins(
+        phrases,
+        accepted,
+        documents,
+        rarity=rarity,
+        amendments=amendments,
+        submitters=submitters,
+    )
+
+
 find_tabled_origins = partial(origin.find_tabled_origins, rarity=EVERY_WORD_RARE)
 
 SHA = "0" * 64
@@ -172,7 +238,7 @@ def test_a_missing_tabling_date_falls_back_to_the_amendment_record() -> None:
         stage="committee",
         tabled_on=date(2099, 5, 5),
         old_text="old",
-        new_text="new",
+        new_text=REQUEST,
     )
     records = {record.amendment_id: record}
     missing = adoption(tabled_on=None)
@@ -484,6 +550,6 @@ def test_every_tabled_origin_quotes_its_document_and_names_carriers_of_its_phras
 def test_a_run_of_the_laws_common_words_is_no_origin_adopted_or_tabled() -> None:
     common = Rarity(frozenset(REQUEST.split()))
     docs = [document(text=REQUEST)]
-    assert origin.find_origins([phrase()], [adoption()], docs, rarity=common) == ()
+    assert find_origins([phrase()], [adoption()], docs, rarity=common) == ()
     tabled = origin.find_tabled_origins([amendment()], docs, rarity=common)
     assert (tabled.phrases, tabled.origins) == ((), ())

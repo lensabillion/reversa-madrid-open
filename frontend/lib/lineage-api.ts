@@ -54,6 +54,25 @@ export interface TabledPhraseRecord {
   amendment_ids: readonly string[];
 }
 
+/** One exact accepted amendment run and its paired final-act occurrence. */
+export interface AdoptionEvidenceRecord {
+  evidence_id: string;
+  phrase_id: string;
+  amendment_span: SourceSpan;
+  final_span: SourceSpan;
+  inserted_word_offsets: readonly number[];
+}
+
+/** Exact three-source projection of one accepted amendment carrier. */
+export interface OriginSupportRecord {
+  support_id: string;
+  adoption_evidence_id: string;
+  amendment_id: string;
+  submission_span: SourceSpan;
+  amendment_span: SourceSpan;
+  final_span: SourceSpan;
+}
+
 /** One amendment whose inserted wording reached the final act. */
 export interface AmendmentAdoptionRecord {
   amendment_id: string;
@@ -70,6 +89,8 @@ export interface AmendmentAdoptionRecord {
   inserted_words: number;
   new_words: number;
   longest_run: number;
+  /** Absent on legacy snapshots; never reconstructed by the browser. */
+  evidence?: readonly AdoptionEvidenceRecord[];
 }
 
 /** A submission that says a phrase, dated against the amendments that carry it. */
@@ -90,6 +111,8 @@ export interface OriginMatchRecord {
   eligibility: LineageEligibility;
   /** A quotation of another act or of the proposal: shared wording, not a request. */
   is_citation: boolean;
+  /** Absent on legacy or unsupported records; never inferred from phrase IDs. */
+  supports?: readonly OriginSupportRecord[];
 }
 
 /**
@@ -122,7 +145,7 @@ export interface LineageCounts {
 
 /** Everything the explorer shows for one law's lineage, from one run. */
 export interface LineageView {
-  schema_version: "lineage-1";
+  schema_version: "lineage-1" | "lineage-2";
   procedure_id: string;
   slug: string;
   title: string;

@@ -32,19 +32,20 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
     {
       id: "amendment",
       title: "Find the amendment",
-      question: "Which Parliament amendment wrote that new wording?",
+      question: "Which Parliament amendment contains matching new wording?",
       rules: [
         "An amendment wrote the same 8 or more words, and inserted at least one of them.",
-        "The stretch holds 3 or more words specific to this law, so boilerplate does not count.",
+        "The stretch holds 3 or more words specific to this law, to reduce common wording matches.",
       ],
       result: `${known(counts.adopted_phrases)} phrases from ${known(counts.amendments_adopting)} amendments`,
     },
     {
       id: "origin",
       title: "Find who said it first",
-      question: "Which consultation document asked for it before Parliament did?",
+      question:
+        "Which earlier consultation documents have matching wording or a model-judged association?",
       rules: [
-        "The document has the same 8 or more words, or Jev judges it asks for the same legal change (all four of its answers at 0.67 or more).",
+        "The document has the same 8 or more words, or Jev judges it asks for the same legal change (each of four support dimensions meets the provisional 0.67 cutoff).",
         "It was published before every amendment carrying the wording.",
         "Quotes of legal titles and Official Journal references are not counted: same words, but not a request.",
       ],
@@ -53,13 +54,13 @@ function stepsFor(view: LineageView): readonly MethodStep[] {
     {
       id: "rank",
       title: "Rank and check",
-      question: "Who got their wording in, and can a reader verify it?",
+      question: "Which associations are recorded, and what evidence can a reader inspect?",
       rules: [
         "Everyone who carried a phrase gets whole credit; shared phrases are marked joint.",
         "Members and groups are ranked by the share of their amendments that made it in.",
-        "Three links drawn at random, side by side, with a seed to repeat the draw.",
+        "Three experimental associations drawn for inspection, with a seed to repeat the draw; this is not an accuracy audit.",
       ],
-      result: "Who, How and Check 3 links tabs",
+      result: "Associations, How and Check 3 links tabs",
     },
   ];
 }
@@ -274,8 +275,8 @@ export function LineageMethod({ view }: { view: LineageView }) {
             influence through them is not seen.
           </li>
           <li>
-            Wording rephrased before adoption is missed, so Parliament's share is a floor, not a
-            ceiling.
+            Reworded adoption may be missed; match rates are not estimates of Parliament's causal
+            contribution.
           </li>
         </ul>
       </div>

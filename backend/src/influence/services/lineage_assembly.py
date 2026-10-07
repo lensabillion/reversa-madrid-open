@@ -33,7 +33,7 @@ from influence.services.origin import (
 
 VIEW_FILE = "lineage.json"
 METHOD = "verbatim-adopted-phrases"
-METHOD_REVISION = "lineage-1.1"
+METHOD_REVISION = "lineage-2.0"
 VERBATIM_ONLY = "Verbatim wording only: a request the final act says in other words is not traced."
 LIMITATIONS = (
     VERBATIM_ONLY,

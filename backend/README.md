@@ -48,8 +48,9 @@ Existing ignored data is not deleted, but `atlas.json` is no longer read or prod
 
 Collection, source identities, passages and manifests retain their persisted `atlas-1`
 record format; the shared schema filename is not an Atlas output dependency. Lineage
-keeps lexical adoption/origins and optional BM25/Jev origins. Its result remains
-`lineage-1`, compatible with the committed snapshots. Browser aggregation and graph
+keeps lexical adoption/origins and optional BM25/Jev origins. New results use
+`lineage-2` with exact lexical carrier evidence; the reader still accepts `lineage-1`
+snapshots without inventing missing support. Browser aggregation and graph
 layout remain in the existing frontend; no forecast or ask-level win-rate model is used.
 
 ## Setup Command
@@ -263,6 +264,26 @@ for wording amendments inserted that was not adopted. The output is
 `data/laws/<procedure>/lineage.json` (`schemas/lineage.py`, `LineageView`), written
 atomically, with `status`, `reason`, `counts`, `adopted_phrases`, `tabled_phrases`,
 `adoptions`, `origins`, `credits` and `limitations`.
+
+**Exact lexical carrier evidence.** An adopted phrase can merge adjacent or overlapping
+runs from several amendments. Each amendment now retains its accepted run as
+`adoptions[].evidence[]`: an evidence ID, phrase ID, exact amendment `new_text` span,
+exact final `text` span, and inserted-word offsets relative to that run. These word
+indices are distinct from the Unicode character offsets in source spans.
+
+An adopted verbatim origin carries `supports[]`. Each support binds one submission
+quote to one accepted amendment run and one exact final occurrence, with stable IDs and
+all three original quotations. The consultation overlap itself must contain at least
+eight consecutive words, three distinct rare words and an inserted word; touching a merged
+phrase is insufficient. Chronology uses only the supported carriers. Repeated text at a
+different offset is not interchangeable evidence. Raw slices and rarity are checked by
+the producer; the reader validates embedded joins, aligned spans and insertion offsets.
+
+The new schema does not certify accuracy. Legacy views and semantic origins without
+supports remain readable as unsupported suggestions; schema version alone never proves
+that an origin has carrier evidence. Shared wording does not establish causality.
+The four-law offline comparison is recorded in
+[the carrier rehearsal](../docs/reviews/lineage-carrier-rehearsal-2026-10-07.md).
 
 **Reworded origins with Jev** (`--jev`, `make lineage LAW='AI Act' ARGS='--jev'`). Verbatim
 search misses requests made in other words. With `--jev` (key in `TYPESAFE_API_KEY`;

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { prepareLineage } from "../lib/lineage";
+import { collectSupportedClaims, prepareLineage } from "../lib/lineage";
 import type { LineageView, OriginMatchRecord } from "../lib/lineage-api";
-import { fixtureView } from "./lineage-fixture";
+import { fixtureSupportedView, fixtureView } from "./lineage-fixture";
 
 function only<T>(rows: readonly T[]): T {
   expect(rows).toHaveLength(1);
@@ -181,8 +181,8 @@ test("refuses a view whose records name what it does not hold", () => {
   const origin = only(view.origins);
 
   expect(() =>
-    prepareLineage({ ...view, schema_version: "lineage-2" as unknown as "lineage-1" }),
-  ).toThrow("Unsupported lineage view schema: lineage-2");
+    prepareLineage({ ...view, schema_version: "lineage-99" as unknown as "lineage-1" }),
+  ).toThrow("Unsupported lineage view schema: lineage-99");
   expect(() =>
     prepareLineage({ ...view, adoptions: [{ ...adoption, phrase_ids: ["phrase:missing"] }] }),
   ).toThrow("names phrase:missing, which the view does not list");
@@ -203,4 +203,59 @@ test("one passage judged for several carrying amendments is shown once per phras
   const semantic = { ...origin, kind: "semantic" as const, similarity: 0.8 };
   const [phrase] = prepareLineage({ ...view, origins: [origin, semantic, semantic] }).adopted;
   expect(phrase?.origins.map((row) => row.kind)).toEqual(["verbatim", "semantic"]);
+});
+
+test("v2 preparation retains the saved carrier pair and exact support", () => {
+  const view = fixtureSupportedView();
+  const prepared = prepareLineage(view);
+  expect(prepared.supportedClaims.claims).toHaveLength(1);
+  const claim = only(prepared.supportedClaims.claims);
+  expect(claim.support).toEqual(only(view.origins).supports?.[0]);
+  expect(only(only(prepared.adopted).amendments).evidence).toEqual(only(view.adoptions).evidence);
+  expect(only(only(prepared.adopted).origins).supports).toEqual(only(view.origins).supports);
+});
+
+test.each(["carrier", "submission", "amendment", "final", "duplicate"])(
+  "rejects a malformed %s support instead of reconstructing it",
+  (broken) => {
+    const view = fixtureSupportedView();
+    const origin = only(view.origins);
+    const support = only(origin.supports ?? []);
+    const changed = {
+      ...support,
+      adoption_evidence_id: broken === "carrier" ? "missing" : support.adoption_evidence_id,
+      submission_span: {
+        ...support.submission_span,
+        record_id: broken === "submission" ? "other" : support.submission_span.record_id,
+      },
+      amendment_span: {
+        ...support.amendment_span,
+        text: broken === "amendment" ? "wrong quotation" : support.amendment_span.text,
+      },
+      final_span: {
+        ...support.final_span,
+        record_id: broken === "final" ? "other occurrence" : support.final_span.record_id,
+      },
+    };
+    expect(() =>
+      collectSupportedClaims({
+        ...view,
+        origins: [{ ...origin, supports: broken === "duplicate" ? [support, support] : [changed] }],
+      }),
+    ).toThrow(/association support/);
+  },
+);
+
+test.each<Partial<OriginMatchRecord>>([
+  { eligibility: "unknown_date", precedes: null },
+  { eligibility: "amendment_first", precedes: false },
+  { is_citation: true },
+  { organisation: null },
+  { supports: [] },
+  { kind: "semantic", supports: [] },
+])("excluded and unsupported origins never become claims (%#)", (changes) => {
+  const view = fixtureSupportedView();
+  expect(
+    collectSupportedClaims({ ...view, origins: [{ ...only(view.origins), ...changes }] }).claims,
+  ).toEqual([]);
 });

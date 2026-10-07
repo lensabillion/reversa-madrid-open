@@ -132,6 +132,7 @@ def view(
         *extra,
     )
     return LineageView(
+        schema_version="lineage-1",
         procedure_id="2099/0001(COD)",
         slug="2099-0001-COD",
         title="Widget Act",

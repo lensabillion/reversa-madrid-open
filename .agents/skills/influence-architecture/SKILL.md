@@ -27,7 +27,7 @@ setup → collect → lineage → lineage.json → GET /api/v1/lineage → /line
 | Actor resolution | Register/MEP identities and normalized names in collected records |
 | Wording lineage | Identify new final wording and carrying amendments; find earlier consultation wording and tabled-only matches with explicit eligibility |
 | Optional semantic origins | Existing BM25 shortlist and Jev judgment, enabled only by CLI `--jev`, with existing request bounds, cache and spend cap |
-| Persisted view | `lineage.json`, schema `lineage-1`; preserve compatibility with committed snapshots |
+| Persisted view | `lineage.json`, new schema `lineage-2` with exact lexical carrier supports; read legacy `lineage-1` without fabricating evidence |
 | Read-only API | Health and lineage list/detail; caching, validation and explicit missing/error states |
 | Website | Existing lineage summary, holders, graph, evidence, sample and method; backend supplies records, frontend derives its existing organisation aggregates and layout |
 | Quality tooling | Independent lineage review with separate human labels; locked installs, Ruff/Biome, strict types, behavioral tests, gate probes, dependency audits and container checks |

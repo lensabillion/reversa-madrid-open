@@ -21,9 +21,9 @@ from influence.schemas.atlas import (
     SourceSpan,
     TimeEligibility,
 )
-from influence.schemas.scoring import FrozenModel
+from influence.schemas.scoring import TOKEN_PATTERN, FrozenModel
 
-LINEAGE_SCHEMA_VERSION = "lineage-1"
+LINEAGE_SCHEMA_VERSION = "lineage-2"
 # Phrases are found as runs of consecutive words; an 8-word window is the unit that is
 # looked up, and a run must be at least this many words to count as shared wording. A run
 # must also hold rare words (`services/lineage.Rarity`), so the law's own formulas do not
@@ -109,6 +109,100 @@ class TabledPhrase(FrozenModel):
         return self
 
 
+def _folded_words(text: str) -> tuple[str, ...]:
+    return tuple(
+        token.group().casefold()
+        for token in TOKEN_PATTERN.finditer(text)
+        if any(character.isalnum() for character in token.group())
+    )
+
+
+def _span_word_interval(parent: SourceSpan, child: SourceSpan) -> tuple[int, int]:
+    """Validate a quote's exact parent occurrence and recover its word interval."""
+    if (
+        parent.record_id != child.record_id
+        or parent.field != child.field
+        or not parent.start <= child.start < child.end <= parent.end
+        or parent.text[child.start - parent.start : child.end - parent.start] != child.text
+    ):
+        raise ValueError("An evidence projection must quote its exact parent occurrence")
+    words = tuple(
+        token
+        for token in TOKEN_PATTERN.finditer(parent.text)
+        if any(character.isalnum() for character in token.group())
+    )
+    starts = {parent.start + token.start(): index for index, token in enumerate(words)}
+    ends = {parent.start + token.end(): index + 1 for index, token in enumerate(words)}
+    first, end = starts.get(child.start), ends.get(child.end)
+    if first is None or end is None:
+        raise ValueError("Evidence projections must align with word boundaries")
+    return first, end
+
+
+class AdoptionEvidence(FrozenModel):
+    """One accepted amendment run at one exact occurrence in the final act.
+
+    Offsets in `inserted_word_offsets` index the folded words of this run, never the
+    merged phrase or the full amendment. The producer checks rarity and raw source slices.
+    """
+
+    evidence_id: NonEmpty
+    phrase_id: PhraseId
+    amendment_span: SourceSpan
+    final_span: SourceSpan
+    inserted_word_offsets: tuple[int, ...]
+
+    @model_validator(mode="after")
+    def run_and_insertions_agree(self) -> Self:
+        amendment = _folded_words(self.amendment_span.text)
+        final = _folded_words(self.final_span.text)
+        if self.amendment_span.field != "new_text" or self.final_span.field != "text":
+            raise ValueError("Adoption evidence quotes amendment new_text and final text")
+        if amendment != final or len(amendment) < MIN_ADOPTED_RUN_WORDS:
+            raise ValueError("Adoption evidence shares at least eight consecutive folded words")
+        offsets = self.inserted_word_offsets
+        if (
+            not offsets
+            or offsets != tuple(sorted(set(offsets)))
+            or offsets[0] < 0
+            or offsets[-1] >= len(amendment)
+        ):
+            raise ValueError(
+                "Inserted word offsets are nonempty, sorted, unique and within the run"
+            )
+        return self
+
+
+class OriginSupport(FrozenModel):
+    """One exact consultation/amendment/final projection of accepted carrier evidence."""
+
+    support_id: NonEmpty
+    adoption_evidence_id: NonEmpty
+    amendment_id: AmendmentId
+    submission_span: SourceSpan
+    amendment_span: SourceSpan
+    final_span: SourceSpan
+
+    @model_validator(mode="after")
+    def projections_share_the_same_words(self) -> Self:
+        submission = _folded_words(self.submission_span.text)
+        if (
+            self.submission_span.field != "text"
+            or self.amendment_span.field != "new_text"
+            or self.final_span.field != "text"
+        ):
+            raise ValueError(
+                "Origin support quotes submission text, amendment new_text and final text"
+            )
+        if (
+            len(submission) < MIN_ADOPTED_RUN_WORDS
+            or submission != _folded_words(self.amendment_span.text)
+            or submission != _folded_words(self.final_span.text)
+        ):
+            raise ValueError("Origin support shares at least eight consecutive folded words")
+        return self
+
+
 class AmendmentAdoption(FrozenModel):
     """One amendment whose new wording reached the final act, verbatim or reworded.
 
@@ -133,6 +227,7 @@ class AmendmentAdoption(FrozenModel):
     inserted_words: int = Field(ge=1)
     new_words: int = Field(ge=1)
     longest_run: int = Field(ge=1)
+    evidence: tuple[AdoptionEvidence, ...] = ()
 
     @model_validator(mode="after")
     def adoption_fits_inside_the_new_text(self) -> Self:
@@ -220,6 +315,7 @@ class OriginMatch(FrozenModel):
     # A run that is a citation of another act ("... of the European Parliament and of the
     # Council of 20 May 2021 ...") is shared wording but not a request.
     is_citation: bool = False
+    supports: tuple[OriginSupport, ...] = ()
 
     @property
     def counts_as_origin(self) -> bool:
@@ -275,7 +371,7 @@ class LineageCounts(FrozenModel):
 class LineageView(FrozenModel):
     """Everything the explorer and the review need about one law's lineage."""
 
-    schema_version: Literal["lineage-1"] = LINEAGE_SCHEMA_VERSION
+    schema_version: Literal["lineage-1", "lineage-2"] = LINEAGE_SCHEMA_VERSION
     procedure_id: ProcedureId
     slug: NonEmpty
     title: NonEmpty
@@ -321,6 +417,93 @@ class LineageView(FrozenModel):
                 raise ValueError(f"{origin.document_id} names a phrase that is not listed")
             if not set(origin.amendment_ids) <= carriers[origin.phrase_id]:
                 raise ValueError("An origin names an amendment that does not carry its phrase")
+        evidence_by_id: dict[str, tuple[AmendmentAdoption, AdoptionEvidence]] = {}
+        phrases = {phrase.phrase_id: phrase for phrase in self.adopted_phrases}
+        for adoption in self.adoptions:
+            if (
+                self.schema_version == "lineage-2"
+                and adoption.kind == "verbatim"
+                and {item.phrase_id for item in adoption.evidence} != set(adoption.phrase_ids)
+            ):
+                raise ValueError("A lineage-2 adoption needs carrier evidence for every phrase")
+            for evidence in adoption.evidence:
+                if evidence.evidence_id in evidence_by_id:
+                    raise ValueError("Duplicate adoption evidence identifiers")
+                if (
+                    adoption.kind != "verbatim"
+                    or evidence.amendment_span.record_id != adoption.amendment_id
+                    or evidence.phrase_id not in adoption.phrase_ids
+                ):
+                    raise ValueError("Carrier evidence must reference its own amendment and phrase")
+                phrase = phrases[evidence.phrase_id]
+                if phrase.kind != "verbatim":
+                    raise ValueError("Carrier evidence references only verbatim adopted phrases")
+                containing = [
+                    span
+                    for span in phrase.final_spans
+                    if (
+                        span.record_id == evidence.final_span.record_id
+                        and span.start <= evidence.final_span.start
+                        and evidence.final_span.end <= span.end
+                    )
+                ]
+                if not containing:
+                    raise ValueError("Carrier evidence names no listed final occurrence")
+                _span_word_interval(containing[0], evidence.final_span)
+                evidence_by_id[evidence.evidence_id] = (adoption, evidence)
+        support_ids: set[str] = set()
+        for origin in self.origins:
+            exact_adopted = origin.phrase_id in adopted and origin.kind == "verbatim"
+            if self.schema_version == "lineage-2" and exact_adopted and not origin.supports:
+                raise ValueError("A lineage-2 adopted verbatim origin needs exact carrier supports")
+            if not origin.supports:
+                continue
+            if not exact_adopted:
+                raise ValueError("Carrier supports belong only to adopted verbatim origins")
+            dates: dict[str, date | None] = {}
+            for support in origin.supports:
+                if support.support_id in support_ids:
+                    raise ValueError("Duplicate origin support identifiers")
+                support_ids.add(support.support_id)
+                carrier = evidence_by_id.get(support.adoption_evidence_id)
+                if carrier is None:
+                    raise ValueError("An origin support names missing adoption evidence")
+                adoption, evidence = carrier
+                if (
+                    support.amendment_id != adoption.amendment_id
+                    or origin.phrase_id != evidence.phrase_id
+                    or support.submission_span != origin.span
+                    or support.submission_span.record_id != origin.document_id
+                ):
+                    raise ValueError(
+                        "An origin support must reference its exact origin and carrier"
+                    )
+                interval = _span_word_interval(evidence.amendment_span, support.amendment_span)
+                if interval != _span_word_interval(evidence.final_span, support.final_span):
+                    raise ValueError(
+                        "Amendment and final projections must align inside the carrier run"
+                    )
+                if not any(
+                    interval[0] <= offset < interval[1] for offset in evidence.inserted_word_offsets
+                ):
+                    raise ValueError("An origin support must intersect an inserted word")
+                dates[adoption.amendment_id] = adoption.tabled_on
+            if origin.amendment_ids != tuple(sorted(dates)):
+                raise ValueError("An origin names exactly the amendments its supports carry")
+            if origin.words != len(_folded_words(origin.span.text)):
+                raise ValueError("Origin word count must equal its exact supported quote")
+            earliest = (
+                None
+                if any(day is None for day in dates.values())
+                else min(day for day in dates.values() if day is not None)
+            )
+            precedes = (
+                None
+                if earliest is None or origin.published_at is None
+                else (origin.published_at.date() < earliest)
+            )
+            if (origin.earliest_amendment_on, origin.precedes) != (earliest, precedes):
+                raise ValueError("An origin's chronology uses only its supported carriers")
         if list(self.credits) != sorted(self.credits, key=credit_rank):
             raise ValueError("Credits are listed in `credit_rank` order")
         return self
@@ -352,6 +535,7 @@ __all__ = [
     "MIN_ADOPTED_RUN_WORDS",
     "NGRAM_WORDS",
     "AdoptedPhrase",
+    "AdoptionEvidence",
     "AmendmentAdoption",
     "Credit",
     "LineageCounts",
@@ -359,6 +543,7 @@ __all__ = [
     "LineageLawSummary",
     "LineageView",
     "OriginMatch",
+    "OriginSupport",
     "TabledPhrase",
     "credit_rank",
 ]

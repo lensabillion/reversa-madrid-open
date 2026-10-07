@@ -87,8 +87,12 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   three steps, each with its share as a 100-cell waffle beside the exact "N of M": new words
   traced word for word to an amendment (and in how many phrases), amendments that got wording
   in, and consultation documents that said that wording first, split into documents with a
-  word-for-word origin (teal) and documents found only by a reworded Jev match (violet). The
-  narrowing card width is the funnel's shape only. A count not computed reads "unknown" and
+  word-for-word origin (teal) and documents found only by a reworded Jev match (violet).
+  The document numerator counts distinct documents with an earlier, non-citation origin
+  for an adopted phrase; tabled-only origins are excluded. Both the method split and named
+  organisation detail use that adopted population. A document with both methods counts once
+  as word-for-word; an unknown view or uncomputed document counts keep these figures unknown.
+  The narrowing card width is the funnel's shape only. A count not computed reads "unknown" and
   draws no waffle.
 - **Method** (`components/lineage-method.tsx`): the pipeline in plain words as a four-step
   flowchart (compare the texts, find the amendment, find who said it first, rank and check),
@@ -109,13 +113,16 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
   apart from word-for-word ones. Only matches dated before the amendment count, and the view
   keeps only those, so no tile repeats that constant 100%.
 - **Graph** (`buildLineageGraph`, `sliceGraph`, `components/lineage-graph.tsx`): organisation
-  → who tabled the amendment (political groups, or Members) → final-act provision, drawn
-  from adopted wording an organisation said first. The overview shows the 12 largest nodes
-  per column; clicking a node or a line keeps only the paths that share its phrases and
-  lists their evidence. Teal lines are lexical, dashed violet ones semantic.
-- **Check three links at random** (`drawLinks`): the jury's check built in. It draws three
-  adopted phrases a submission said first, with a seeded generator whose seed is shown, so a
-  draw can be repeated.
+  → exact amendment tabler → final-act occurrence. Each saved support ID identifies one
+  experimental association. The overview shows the 12 largest nodes per column; focus uses
+  support IDs rather than merged phrase IDs. Methods, tabler level, focus and node limit are
+  shared with the inspection sample. Legacy snapshots without carrier supports remain
+  inspectable in Evidence; their current graph and organisation associations are unavailable.
+- **Check three associations** (`visibleClaims`, `drawClaims`): draws up to three of the
+  associations with a complete rendered organisation → tabler → final path after method
+  filters, focus and node clipping. A coauthored support counts once. Stable support-ID
+  ordering and a seeded Fisher–Yates draw make the sample reproducible; the seed and scope
+  are displayed, and changing scope clears the draw. Inspection is not an accuracy audit.
 
 - `app/lineage/page.tsx`: the route; a Suspense boundary lets the shell prerender
 - `components/lineage-law-browser.tsx`: law selector, URL state, the view, every state
@@ -128,3 +135,12 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
 `backend/tests/fixtures/lineage/view.json`, which the backend writes from its offline test
 world. Checked once by hand in headless Chromium: the production build against the real
 backend serving that view. Not verified: a real law's run.
+
+### Experimental associations
+
+Every loaded law has a visible notice above its tabs: associations have not passed an
+independent accuracy audit, and wording matches or model judgments do not prove authorship
+or causal influence. Organisation counts and graph headings describe experimental
+associations. The owner chose to keep these exploratory records visible (`rev-u2rn`).
+Collection completeness is distinct from association accuracy; random inspection is not an
+audit. This presentation policy does not change stored records, eligibility or matching.
