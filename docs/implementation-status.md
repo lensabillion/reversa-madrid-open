@@ -88,6 +88,15 @@ Biome, Next.js route types, strict TypeScript and the production build. Regressi
 cover one adopted-origin document plus two tabled-only documents, duplicate/shared documents,
 method precedence, citation/later/undated exclusions, unnamed sources and unknown inputs.
 
+### Technical README Diagram — 7 October 2026
+
+rev-1asy replaces the README architecture illustration with a native SVG showing public
+sources, offline generation, storage, read-only request/response flows, the optional Jev
+origin branch and detached human review. Labels were checked against the shipped setup,
+collection, lineage assembly, view reader, proxy and review tool. No runtime behavior or
+stored records change. XML/accessibility checks pass; the diagram was rendered and visually
+inspected at native size and 900px README width. No new dependencies or external assets.
+
 ### Cleanup Verification
 
 The cleanup removes the retired Atlas runtime modules and their exclusive tests, experiment
