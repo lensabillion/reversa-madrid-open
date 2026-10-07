@@ -45,6 +45,7 @@ With Docker installed, one command builds and serves the API and the explorer:
 ```sh
 make up                                # http://localhost:3000, reading data/
 INFLUENCE_DATA=./mock-data make up     # the committed snapshots instead of data/
+INFLUENCE_LOG_LEVEL=debug make up      # more API log lines (default info)
 ```
 
 `LAW` takes a procedure number (`2021/0106(COD)`), a CELEX or COM reference, a common

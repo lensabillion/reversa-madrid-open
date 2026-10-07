@@ -37,9 +37,13 @@ COPY --from=builder /opt/influence /opt/influence
 # /data is where `influence atlas` and `influence lineage` write; compose mounts the
 # repository's data/ (or mock-data/) there. The default is explicit because the
 # installed package's "beside the source" fallback has no meaning inside an image.
+# INFLUENCE_LOG_LEVEL (debug, info, warning, error or critical, any case) sets the level
+# of the API's own loggers and of uvicorn's; the app applies it when uvicorn imports it,
+# before uvicorn logs its first line, and a wrong value stops the container at startup.
 # INFLUENCE_VIEW_MAX_AGE is the seconds a browser or cache may reuse a lineage view.
 ENV PATH=/opt/influence/bin:$PATH \
     INFLUENCE_DATA_ROOT=/data \
+    INFLUENCE_LOG_LEVEL=info \
     INFLUENCE_VIEW_MAX_AGE=3600 \
     PYTHONUNBUFFERED=1
 
@@ -51,4 +55,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
     CMD ["python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
 
+# No --log-level: INFLUENCE_LOG_LEVEL above governs uvicorn's loggers from inside the app,
+# so the exec form stays (no shell; uvicorn is PID 1 and receives the stop signal).
 CMD ["uvicorn", "influence.api:app", "--host", "0.0.0.0", "--port", "8000"]
