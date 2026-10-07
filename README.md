@@ -8,11 +8,6 @@ amendments to consultation documents, with counts and recorded limitations. Shar
 wording and model judgments do not establish causal influence. Forecasts and the older
 ask-first Atlas pipeline are no longer supported.
 
-The organizers replaced the first Challenge 03 brief (Influence Graph: score 60 supplied
-pairs into CSVs) at kickoff on 3 October 2026. The
-[Atlas brief](docs/brief/influence-atlas-challenge-brief.pdf) is the one that counts; the
-[first brief](docs/brief/madrid-open-reversa-challenges.pdf) is kept for the record.
-
 ## Architecture
 
 The Python CLI generates per-law snapshots from public sources. The read-only web
