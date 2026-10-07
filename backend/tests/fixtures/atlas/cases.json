@@ -1,9 +1,0 @@
-{
-  "ambiguous_actor": "actor:name:hys_feedback.acme",
-  "missing_date": "link:a-am1-undated",
-  "missing_final_act": "outcome:b-ask-labels-final",
-  "opposite_request": "link:a-am1-watch",
-  "partial_outcome": "outcome:a-ask-city-final",
-  "short_shall_may_edit": "link:a-am2-city",
-  "supported_copy": "link:a-am1-makers"
-}

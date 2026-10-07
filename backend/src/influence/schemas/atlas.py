@@ -1,9 +1,8 @@
-"""Shared Influence Atlas contracts: the records every part reads and writes.
+"""Shared collection and lineage candidate contracts.
 
-One file, one schema version. Parts 1 and 2 (collect, resolve actors) write law, document,
-passage, amendment, article and actor records; parts 3 to 5 (find, verify, trace) write
-asks, candidates, link assessments and outcomes; parts 6 to 8 read a graph snapshot. A
-change here is a change for all three teams, so it goes through the integration owner.
+Collection writes law, document, passage, amendment, article and actor records. Lineage
+reads those records, and its optional Jev path uses asks and BM25 candidates. The existing
+atlas-1 serialization remains stable so collected bundles do not need rebuilding.
 
 Three rules hold for every record:
 
@@ -29,6 +28,9 @@ ATLAS_SCHEMA_VERSION = "atlas-1"
 type SchemaVersion = Literal["atlas-1"]
 
 # A procedure reference as the Legislative Observatory writes it: 2021/0106(COD).
+SLUG_PATTERN = r"^\d{4}-\d{4}[A-Z]?-[A-Z]{3}$"
+Slug = Annotated[str, StringConstraints(pattern=SLUG_PATTERN)]
+
 PROCEDURE_PATTERN = r"^\d{4}/\d{4}[A-Z]?\([A-Z]{3}\)$"
 ProcedureId = Annotated[str, StringConstraints(pattern=PROCEDURE_PATTERN)]
 # The Transparency Register's identificationCode: 880143435725-46.
@@ -43,9 +45,6 @@ AskId = Annotated[str, StringConstraints(pattern=r"^ask:\S+$")]
 AmendmentId = Annotated[str, StringConstraints(pattern=r"^am:\S+$")]
 ArticleId = Annotated[str, StringConstraints(pattern=r"^art:\S+$")]
 CandidateId = Annotated[str, StringConstraints(pattern=r"^cand:\S+$")]
-LinkId = Annotated[str, StringConstraints(pattern=r"^link:\S+$")]
-OutcomeId = Annotated[str, StringConstraints(pattern=r"^outcome:\S+$")]
-ForecastId = Annotated[str, StringConstraints(pattern=r"^forecast:\S+$")]
 
 _UNSAFE_ID_CHARACTERS = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -227,10 +226,7 @@ class LawRecord(AtlasRecord):
 
 
 class Passage(AtlasRecord):
-    """A short stretch of a submission, the unit part 3 searches and part 4 quotes.
-
-    Part 1 writes passages; ask extraction (part 3) reads them and writes `Ask` records.
-    """
+    """An exact stretch of a consultation submission searched by optional Jev retrieval."""
 
     passage_id: PassageId
     procedure_id: ProcedureId
@@ -343,7 +339,7 @@ class Actor(AtlasRecord):
         return self
 
 
-# --- Parts 3 and 4: asks, candidates, links ---------------------------------------------
+# --- Optional Jev retrieval: requests and candidate pairs ------------------------------
 
 type Direction = Literal[
     "stricter", "weaker", "delete", "delay", "exempt", "add", "keep", "other", "unknown"
@@ -370,7 +366,7 @@ class Ask(AtlasRecord):
 
 
 class Candidate(AtlasRecord):
-    """A pair part 3 thinks worth checking. A candidate is not a link."""
+    """A request/amendment pair shortlisted for the optional Jev origin judgment."""
 
     candidate_id: CandidateId
     procedure_id: ProcedureId
@@ -382,177 +378,8 @@ class Candidate(AtlasRecord):
     method: NonEmpty
 
 
-type LinkStatus = Literal["published", "unconfirmed", "contradicted", "insufficient_evidence"]
-type LinkTier = Literal["copied", "reworded", "same_direction"]
-# `unknown_date` can never be published: an undated source is ineligible, not passing.
+# An undated source remains visible but cannot count as an earlier origin.
 type TimeEligibility = Literal["ask_first", "amendment_first", "unknown_date"]
-
-
-class LinkAssessment(AtlasRecord):
-    """Part 4's verdict on one candidate, with the signals and quotations behind it.
-
-    `support_score` is a support score, not a probability: no calibration exists yet.
-    """
-
-    link_id: LinkId
-    procedure_id: ProcedureId
-    candidate_id: CandidateId | None = None
-    amendment_id: AmendmentId
-    ask_id: AskId
-    status: LinkStatus
-    tier: LinkTier | None = None
-    support_score: float = Field(ge=0, le=1, allow_inf_nan=False)
-    signals: dict[str, float] = Field(default_factory=dict)
-    amendment_spans: tuple[SourceSpan, ...] = ()
-    ask_spans: tuple[SourceSpan, ...] = ()
-    time_eligibility: TimeEligibility
-    method: NonEmpty
-    method_revision: NonEmpty
-    limitations: tuple[str, ...] = ()
-
-    @model_validator(mode="after")
-    def published_links_are_defensible(self) -> Self:
-        if self.status != "published":
-            return self
-        if self.time_eligibility != "ask_first":
-            raise ValueError("A published link needs an ask dated before its amendment")
-        if not self.amendment_spans or not self.ask_spans:
-            raise ValueError("A published link quotes both the amendment and the ask")
-        if self.tier is None:
-            raise ValueError("A published link states its evidence tier")
-        return self
-
-
-# --- Part 5: outcomes -------------------------------------------------------------------
-
-type OutcomeStage = Literal["heard", "parliament_position", "final_act"]
-type OutcomeResult = Literal["full", "partial", "not_observed", "unknown"]
-type OutcomeKind = Literal["wording", "reworded", "deletion", "status_quo"]
-type OutcomeRelation = Literal["via_amendment", "direct_to_final"]
-
-
-class Outcome(AtlasRecord):
-    """What became of one ask at one stage. Unknown is a result and must say why."""
-
-    outcome_id: OutcomeId
-    procedure_id: ProcedureId
-    ask_id: AskId
-    link_id: LinkId | None = None
-    amendment_id: AmendmentId | None = None
-    relation: OutcomeRelation
-    stage: OutcomeStage
-    result: OutcomeResult
-    kind: OutcomeKind | None = None
-    article_id: ArticleId | None = None
-    spans: tuple[SourceSpan, ...] = ()
-    reason: str | None = None
-    method: NonEmpty
-
-    @model_validator(mode="after")
-    def result_is_supported(self) -> Self:
-        if self.result == "unknown" and not self.reason:
-            raise ValueError("An unknown outcome must say why it could not be assessed")
-        if self.result in ("full", "partial") and not self.spans:
-            raise ValueError("An observed outcome quotes the text it was observed in")
-        if self.relation == "via_amendment" and self.amendment_id is None:
-            raise ValueError("An outcome via an amendment names that amendment")
-        return self
-
-
-# --- Part 7: forecasts ------------------------------------------------------------------
-
-type ForecastScoreType = Literal["probability", "scenario", "rule"]
-
-
-class Forecast(AtlasRecord):
-    """A forecast or scenario for one open ask, built only from pre-cutoff information."""
-
-    forecast_id: ForecastId
-    procedure_id: ProcedureId
-    ask_id: AskId
-    as_of: AwareDatetime
-    event: NonEmpty
-    horizon: str | None = None
-    score_type: ForecastScoreType
-    # None for a scenario: without calibration evidence no number is published.
-    score: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
-    scenario: str | None = None
-    reasons: tuple[str, ...]
-    missing_features: tuple[str, ...] = ()
-    model_revision: NonEmpty
-
-    @model_validator(mode="after")
-    def score_matches_type(self) -> Self:
-        if self.score_type == "probability" and self.score is None:
-            raise ValueError("A probability forecast carries its score")
-        if self.score_type == "scenario" and not self.scenario:
-            raise ValueError("A scenario forecast describes the scenario")
-        return self
-
-
-# --- Part 6: graph ----------------------------------------------------------------------
-
-type NodeKind = Literal["actor", "ask", "amendment", "article", "procedure", "topic"]
-type Relation = Literal[
-    "REQUESTED",
-    "ECHOED_BY",
-    "TABLED_BY",
-    "EDITS",
-    "ALIGNED_TO",
-    "REALIZED_IN",
-    "MET_WITH",
-    "MEMBER_OF",
-    "ABOUT",
-]
-# Relations our pipeline infers; each must open exact source evidence.
-INFERRED_RELATIONS: frozenset[str] = frozenset({"ECHOED_BY", "ALIGNED_TO", "REALIZED_IN"})
-
-
-class GraphNode(FrozenModel):
-    node_id: NonEmpty
-    kind: NodeKind
-    label: NonEmpty
-    # The record this node shows: an actor, ask, amendment, article or procedure ID.
-    record_id: NonEmpty
-
-
-class GraphEdge(FrozenModel):
-    edge_id: NonEmpty
-    relation: Relation
-    source: NonEmpty
-    target: NonEmpty
-    spans: tuple[SourceSpan, ...] = ()
-    link_id: LinkId | None = None
-    outcome_id: OutcomeId | None = None
-    dated_on: date | None = None
-
-    @model_validator(mode="after")
-    def inferred_edges_show_evidence(self) -> Self:
-        if self.relation in INFERRED_RELATIONS and not self.spans:
-            raise ValueError(f"A {self.relation} edge must carry the spans that support it")
-        return self
-
-
-class GraphSnapshot(AtlasRecord):
-    """The graph the explorer, rankings and report read: published links only."""
-
-    snapshot_id: NonEmpty
-    run_id: NonEmpty
-    generated_at: AwareDatetime
-    procedure_ids: tuple[ProcedureId, ...]
-    nodes: tuple[GraphNode, ...]
-    edges: tuple[GraphEdge, ...]
-    coverage: dict[str, tuple[LayerCoverage, ...]]
-
-    @model_validator(mode="after")
-    def edges_join_known_nodes(self) -> Self:
-        node_ids = {node.node_id for node in self.nodes}
-        if len(node_ids) != len(self.nodes):
-            raise ValueError("The snapshot repeats a node ID")
-        for edge in self.edges:
-            if edge.source not in node_ids or edge.target not in node_ids:
-                raise ValueError(f"Edge {edge.edge_id} joins a node the snapshot lacks")
-        return self
 
 
 # --- Run manifest -----------------------------------------------------------------------

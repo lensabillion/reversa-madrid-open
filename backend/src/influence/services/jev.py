@@ -1,4 +1,4 @@
-"""Part 4's bounded TypeSafe transport; model answers are evidence, not publication rules.
+"""Bounded TypeSafe transport for optional Jev judgments of reworded origins.
 
 Contract: https://docs.typesafe.ai/api and /models, checked 3 October 2026. The caller
 reserves its monetary budget before each call and records returned usage afterwards.

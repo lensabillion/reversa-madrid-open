@@ -10,8 +10,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from influence.schemas.lineage import LineageLawList, LineageLawSummary, LineageView
+from influence.services.collected import PipelineError
 from influence.services.lineage_assembly import VIEW_FILE
-from influence.services.pipeline import PipelineError
 
 
 @dataclass(frozen=True)

@@ -133,7 +133,7 @@ export function questionsFor(
       label: "Next",
       question: "Who wins next?",
       state: "missing",
-      answer: "No forecast yet: it needs several laws and years.",
+      answer: "Forecasting is not part of this lineage view.",
       more: null,
     },
   ];

@@ -1,3 +1,8 @@
+> Historical evaluation record. On 7 October 2026 (`rev-w1ao`), the standalone
+> runners and their dependencies were retired from the lineage-only product. The
+> measurements and JSON evidence are preserved; commands below require the earlier
+> repository revision (`015bdac`), not the current checkout.
+
 # Isolated local model evaluation
 
 This directory is an offline model laboratory for parts 3 and 4. It does not change the

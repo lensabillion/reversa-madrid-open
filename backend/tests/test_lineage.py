@@ -3,15 +3,15 @@
 from datetime import date
 from itertools import pairwise
 
-from atlas_fixture import build_fixture
+from collection_fixture import build_fixture
 from hypothesis import given
 from hypothesis import strategies as st
 
 from influence.schemas.atlas import Actor, Amendment, ArticleVersion, span_matches
 from influence.schemas.lineage import MIN_ADOPTED_RUN_WORDS
 from influence.services import lineage
+from influence.services.collected import Collected
 from influence.services.lineage import COMMITTEE_TEXT, Rarity, adopt, adopt_records
-from influence.services.pipeline import Collected
 from influence.services.tabling_groups import LATEST_SPELL_FALLBACK, TABLING_DAY_GROUPS
 
 PROCEDURE = "2099/0001(COD)"

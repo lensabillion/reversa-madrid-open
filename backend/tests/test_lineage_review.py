@@ -12,6 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from influence.practice.lineage_review import (
+    AuditError,
     LabelRecord,
     ReviewRow,
     ReviewSummary,
@@ -25,6 +26,7 @@ from influence.practice.lineage_review import (
     summarise,
     to_csv,
     to_markdown,
+    wilson_interval,
 )
 from influence.schemas.atlas import SourceSpan
 from influence.schemas.lineage import (
@@ -35,7 +37,6 @@ from influence.schemas.lineage import (
     MatchKind,
     OriginMatch,
 )
-from influence.services.audit import AuditError, wilson_interval
 
 SPAN = SourceSpan(
     record_id="art:32099R0001:article-6-1", start=0, end=20, text="Providers shall keep"
@@ -281,6 +282,27 @@ def test_rows_with_an_invalid_line_are_refused(tmp_path: Path) -> None:
     path.write_text('{"claim_id": "x"}\n', encoding="utf-8")
     with pytest.raises(AuditError, match="invalid row"):
         read_rows(path)
+
+
+def test_export_failure_keeps_previous_output_and_the_saved_view(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = _write_view(tmp_path / "lineage.json")
+    original_view = source.read_bytes()
+    out = tmp_path / "review"
+    out.mkdir()
+    rows = out / "rows.jsonl"
+    rows.write_text("previous review\n", encoding="utf-8")
+
+    def fail_replace(_source: Path, _destination: Path) -> Path:
+        raise OSError("simulated export commit failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    assert main(["export", "--view", str(source), "--out", str(out), "--n", "2"]) == 1
+    assert "simulated export commit failure" in capsys.readouterr().err
+    assert rows.read_text(encoding="utf-8") == "previous review\n"
+    assert source.read_bytes() == original_view
+    assert sorted(path.name for path in out.iterdir()) == ["rows.jsonl"]
 
 
 def _row(key: str, kind: MatchKind = "verbatim", selection: str = "sample") -> ReviewRow:

@@ -39,6 +39,19 @@ Read [the Atlas explainer](docs/explainer/influence-atlas-primer.md) and the
 [organizers' brief](docs/brief/influence-atlas-challenge-brief.pdf) before changing
 behavior.
 
+## Maintained Product Scope
+
+Owner decision, 7 October 2026 (`rev-w1ao`): maintain only the lineage website and its
+data-generation path. Supported product commands are `setup`, `collect`, and `lineage`
+(including optional `--jev`); HTTP serves health and lineage views. The Atlas producer,
+forecast/report/audit/directions/channels/coordinated/batch commands and standalone
+practice/model experiments are retired. Keep independent lineage review
+(`influence.practice.lineage_review`) and its tests as quality tooling, even though HTTP
+does not call them. Preserve documents, recorded evaluation evidence
+and ignored user data. Shared record schemas keep their persisted format for compatibility.
+The historical challenge descriptions below are context, not authorization to restore
+retired features. The [backend guide](backend/README.md) is the current command contract.
+
 ## Where the Project's State Lives
 
 Chat history, a session's context and an agent's local memory files are not sources of
@@ -86,13 +99,13 @@ These come from the project owner and override any default habit.
 
 ## Commands
 
-`make check` is the one gate: it verifies everything and changes nothing.
+`make check` is the local quality gate. Container verification is separate (`make check-containers`).
 CI runs the same targets, so a local pass predicts a CI pass.
 Each area adds its targets to the root `Makefile` and to this table when it lands.
 
 | Command | What it does |
 | --- | --- |
-| `make check` | Every gate below except the dev servers; changes nothing |
+| `make check` | Local script/docs/backend/frontend checks and dependency audits; container verification is separate |
 | `make check-scripts` | Ruff format and lint check of `scripts/` |
 | `make check-docs` | Validates every research catalog against its schema |
 | `make check-backend` | Locked install, Ruff format and lint, basedpyright strict, tests with gate probes and 100% branch coverage |
@@ -101,9 +114,6 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make audit-frontend` | `npm audit` of `frontend/package-lock.json`; moderate severity or higher fails (needs network) |
 | `make fix-scripts`, `make fix-backend` | Apply Ruff's safe fixes, then formatting |
 | `make fix-frontend` | Applies Biome formatting and fixes, including unsafe ones such as adding braces |
-| `make fetch-lobbyplag` | Downloads LobbyPlag's practice data, pinned to a commit and verified by SHA-256, into `data/lobbyplag/` (needs network) |
-| `make fetch-qwen-embedding`, `make fetch-qwen-reranker` | Downloads the Qwen3 embedding and reranker models (ONNX, about 1.8 GB), pinned to a Hugging Face commit and verified by SHA-256, into `data/models/` (needs network) |
-| `make evaluate-dense` | Measures the Qwen meaning signals on LobbyPlag into `backend/evaluation/dense-meaning.json`; needs the optional `models` dependency group (`uv sync --group models`) and the two fetches above |
 | `make dev-backend` | Serves the API at http://127.0.0.1:8000 (`GET /health`), restarting on changes in `backend/src/` |
 | `make dev-frontend` | Serves the web app at http://localhost:3000, reloading on changes |
 | `make up` | Builds both container images (`backend/Dockerfile`, `frontend/Dockerfile`, bases pinned by digest) and runs the API with the explorer at http://localhost:3000 through `compose.yaml` (needs Docker). `INFLUENCE_DATA=./mock-data make up` serves the committed snapshots instead of `data/`; `INFLUENCE_LOG_LEVEL=debug make up` sets the API's log level (default `info`); `INFLUENCE_VIEW_MAX_AGE=<seconds>` sets how long browsers and caches may reuse a view (default 3600) |
@@ -111,18 +121,9 @@ Each area adds its targets to the root `Makefile` and to this table when it land
 | `make check-containers` | Builds both images, starts them, probes `GET /health` on the API and the explorer's page and `/api/v1` proxy, then stops them (needs Docker; CI's Containers job runs it) |
 | `make setup` | Atlas part 1, once per machine (needs network): streams the four Parltrack dumps and the Transparency Register export into `data/raw/`, each published atomically with a `<name>.source.json` provenance record, then builds `data/catalog/hys-index.jsonl` (about 35 minutes uncached, resumable). Present files are kept; `ARGS='--only parltrack,register'` picks groups, `ARGS=--refresh` fetches again. See the backend README, "Setup Command" |
 | `make collect LAW='<query>'` | Atlas part 1: resolves a procedure number, CELEX, COM reference, common name (`'AI Act'`, `'DSA'`) or title and writes that law's texts, amendments, submissions, passages and actors, with typed coverage and a run manifest, under `data/laws/<procedure>/`. `ARGS=--no-attachments` skips attachments; `ARGS=--refresh` redoes every stage. See the backend README, "Collect Command" |
-| `make atlas LAW='<query>'` | Resolves a procedure number, CELEX, COM reference, common name or title, collects the law, then runs parts 3 to 7 (asks, candidates, link verdicts, outcomes, graph, outcome counts) and writes `data/laws/<procedure>/atlas.json`, which `make forecast`, `make directions`, `make report` and the blind audit read. See the backend README, "Atlas Command" |
-| `make coordinated LAW='<query>'` | Atlas part 3, from Parltrack alone: collects the law, then lists the amendments whose inserted wording is near-identical and that Members of different political groups tabled, and writes `data/laws/<procedure>/coordinated.json`. `ARGS=--no-attachments` skips attachments, which this command does not read. See the backend README, "Coordinated Amendments Command" |
-| `make forecast LAW='<query>'` | Atlas part 7, NEXT, with no network: reads every written `atlas.json`, validates on rolling time splits over the completed laws' decided asks, and forecasts the named open laws' asks into `data/laws/forecast.json`. A probability only when validation beats prevalence, else a reasoned scenario with no score; the rapporteur-draft fallback is reported as not computable (no draft reports are collected). More laws in `ARGS`. See the backend README, "Forecast Command" |
 | `make lineage LAW='<query>'` | Lineage, outcome first: collects the law, then traces each stretch of the final act that is new against the proposal to the amendments that carry it and the consultation documents that say it, with whole (never fractional) credit and rates per amendment tabled, into `data/laws/<procedure>/lineage.json`, which `GET /api/v1/lineage/{slug}` serves to the explorer at `/lineage`; without the proposal or final act the view is "unknown" with its reason. `ARGS=--jev` adds reworded origins judged by Jev on BM25's shortlist (key in `TYPESAFE_API_KEY`, `--jev-max-usd`, default 1). See the backend README, "Lineage Command (Outcome First)" and "Lineage View API" |
-| `make channels LAW='<query>'` | Atlas part 7 (HOW), from collected records alone: collects the law, then counts feedback by consultation stage and submitter, timing against the proposal and completion, amendments by stage, committee, group and tabling Member, cross-group co-signing and coordinated clusters, and reports the votes and meetings coverage rows, into `data/laws/<procedure>/channels.json`. See the backend README, "Channels Command (Part 7, HOW)" |
-| `make directions LAW='<query>'` | Atlas part 7, TOWARDS: collects the law, then labels each amendment's direction (stricter, weaker, delete, delay, exempt, add, keep, other, unknown) with transparent English cue rules, counts them by stage, political group and Member and, only through the published links of an existing `atlas.json`, by asking actor, and writes `data/laws/<procedure>/directions.json`. See the backend README, "Directions Command" |
-| `make audit-sample LAW='<procedure>' SEED=<n>` | Gate 7, the blind audit: draws a seeded sample (default 40, `SIZE=`) of the law's published links from its `atlas.json`, spread over (law, tier), into two blind reader sheets (`reader-a.csv`, `reader-b.csv`: no link ID, score, tier or status) and a private `key.json` under `data/audit/<slug>/<sample-id>/`. `ARGS='--status unconfirmed'` samples unconfirmed links instead, for the **proposed** (not adopted) re-scope that sets a prose threshold; `ARGS='--tier copied'` keeps one tier. See the backend README, "Blind Audit Commands" |
-| `make audit-score DIR=<sample dir>` | Scores both filled sheets against the key: agreed correct, splits (counted incorrect) and precision with a Wilson 95% interval per stratum and overall; for an unconfirmed sample, also the lowest support-score cut whose lower bound reaches 0.90, as a proposal only. Writes `audit-result.json` and `audit-summary.md` in the sample directory; never writes to `atlas.json` |
 
-| `make batch ARGS=...` | Plan gate 9, many laws at once: `ARGS="--laws 'AI Act,DSA'"` names laws, `ARGS='--since 2019 --with-amendments'` selects every catalog procedure with an amendment tabled since 1 January 2019 (`--limit N` keeps the N most amended). Collects each law without attachments (`--attachments` reads them), then runs `--steps` (default `coordinated,channels,lineage,directions`; `atlas` is opt-in and slow). Resumable: a collected law is not collected again and a step already built from its run is skipped, unless `--refresh`; a failing law is recorded and the batch goes on. Writes `data/laws/batch.json` after every law, with a coverage banner. See the backend README, "Batch Command" |
 
-| `make report LAW='<query>[, <query> ...]'` | Part 8: reads only what the commands above wrote (`atlas.json`, `coordinated.json`, `channels.json`, `directions.json`, `lineage.json`, `data/laws/forecast.json`) and writes the public report, WHO / WHAT / TOWARDS / HOW / NEXT with "N of M" counts, wins beside declared spend, and a seeded sample of published links quoted side by side, to `data/laws/report.md` atomically. A missing file is named with the command that writes it. `ARGS='--links 3 --seed 7'` redraws the sample; `ARGS='--out FILE'` writes elsewhere. See the backend README, "Report Command" |
 
 Ruff is pinned once, in `backend/uv.lock`; `check-scripts` uses the same binary.
 
@@ -192,7 +193,7 @@ Each behavior is checked from the angles that can catch its failures:
 | Property-based | Does an invariant hold on many generated inputs (for example, a score stays within 0–1, matching is symmetric where it should be)? | Hypothesis, fast-check |
 | Contract | Do the API, CLI and data outputs keep their exact shape? | pytest with the FastAPI test client; golden files |
 | Gate probes | Do the linters still reject a known violation? | committed probe files run by the gates |
-| Evaluation | Does a scoring change raise the precision of the links we publish without losing recall? | the practice harness on LobbyPlag's labelled pairs (organization-grouped folds), plus a blind audit of a random sample of our own published links, reported with a confidence interval |
+| Evaluation | Does a scoring change raise precision without losing recall? | retained lineage review with separately stored human labels and confidence intervals; account for its phrase-vs-graph sampling limits. Historical LobbyPlag results remain evidence, but their retired runners do not validate new changes |
 | Performance | Does one law, named live, finish within minutes? | timed runs on fixed laws, from download and from cache |
 | End to end | Does one command turn a procedure number into a graph, rankings and report figures? | a rehearsal on laws not used during development |
 

@@ -29,11 +29,6 @@ class TextChange(FrozenModel):
         return self
 
 
-class ScoreRequest(FrozenModel):
-    amendment: TextChange
-    submission: TextChange
-
-
 class TextSpan(FrozenModel):
     """Half-open Python Unicode code-point offsets into the unmodified source."""
 
@@ -46,20 +41,3 @@ class ChangeSpan(TextSpan):
     """Insertions index `new`; deletions index `old`. Whitespace alone is ignored."""
 
     operation: Operation
-
-
-class MatchEvidence(FrozenModel):
-    operation: Operation
-    amendment: TextSpan
-    submission: TextSpan
-
-
-class ScoreResult(FrozenModel):
-    score: float = Field(ge=0, le=1, allow_inf_nan=False)
-    score_type: Literal["lexical_similarity"] = "lexical_similarity"
-    method: Literal["lexical-delta-v1"] = "lexical-delta-v1"
-    amendment_changes: tuple[ChangeSpan, ...]
-    submission_changes: tuple[ChangeSpan, ...]
-    evidence: tuple[MatchEvidence, ...]
-    negation_conflict: bool
-    limitations: tuple[str, ...]

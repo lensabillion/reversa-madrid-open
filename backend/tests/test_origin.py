@@ -21,7 +21,6 @@ from influence.services import origin
 from influence.services.lineage import Rarity
 from influence.services.origin import (
     OriginError,
-    coalition_phrase_ids,
     is_citation,
     submitters_from,
 )
@@ -272,26 +271,6 @@ def test_the_organisation_comes_from_the_submitter_a_comment_title_or_nothing() 
     assert by_title == {"doc:hys_feedback:9": "Acme Lobby", "doc:hys_attachment:8": None}
 
 
-def test_coalition_phrases_are_those_carried_by_two_or_more_known_groups() -> None:
-    other = "phrase:fedcba9876543210"
-    lone = "phrase:aaaaaaaaaaaaaaaa"
-    adoptions = [
-        adoption("am:2099-0001-COD:IMCO:1", authors=("actor:mep:1",), groups=("PPE",)),
-        adoption("am:2099-0001-COD:IMCO:2", authors=("actor:mep:3",), groups=("S&D",)),
-        # Two Members of one group, and one of unknown group: not a coalition.
-        adoption(
-            "am:2099-0001-COD:IMCO:3",
-            phrase_id=other,
-            authors=("actor:mep:1", "actor:mep:2", "actor:mep:9"),
-            groups=("PPE", "PPE", None),
-        ),
-        adoption("am:2099-0001-COD:IMCO:4", phrase_id=lone),
-    ]
-    assert coalition_phrase_ids(adoptions) == {PHRASE_ID}
-    assert coalition_phrase_ids(adoptions, minimum=3) == frozenset()
-    assert coalition_phrase_ids([]) == frozenset()
-
-
 def test_contradictory_inputs_are_refused() -> None:
     with pytest.raises(OriginError, match="carried by no amendment"):
         find_origins([phrase()], [], [document(text=REQUEST)])
@@ -314,7 +293,6 @@ def test_semantic_phrases_and_adoptions_are_left_to_the_semantic_piece() -> None
         update={"kind": "semantic"}
     )
     assert find_origins([semantic], [other], [document(text="providers keep logs")]) == ()
-    assert coalition_phrase_ids([other]) == frozenset()
 
 
 def test_a_repeated_quotation_is_reported_once_with_its_longest_run() -> None:

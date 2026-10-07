@@ -16,7 +16,7 @@ check (an exact span, the dates, whether the run is a citation, which amendments
 and nothing more. Only consultation documents (`CONSULTATION_KINDS`) are searched, so the
 law's own texts never match themselves. A document counts as an origin only when it is dated
 before every carrying amendment, so an undated document, or one undated carrier, leaves the
-order unknown (`eligibility` "unknown_date", the same rule as part 4).
+order unknown (`eligibility` "unknown_date").
 
 Complexity: the index holds one entry per 8-word window of every phrase; each document is
 scanned once, and a window is built only where its first word starts some indexed window, so
@@ -43,7 +43,6 @@ from influence.schemas.atlas import (
     TimeEligibility,
 )
 from influence.schemas.lineage import (
-    COALITION_GROUPS,
     MIN_ADOPTED_RUN_WORDS,
     NGRAM_WORDS,
     AdoptedPhrase,
@@ -116,24 +115,6 @@ def submitters_from(passages: Iterable[Passage], actors: Iterable[Actor]) -> dic
     return found
 
 
-def coalition_phrase_ids(
-    adoptions: Iterable[AmendmentAdoption], *, minimum: int = COALITION_GROUPS
-) -> frozenset[str]:
-    """Phrases carried by amendments of at least `minimum` different political groups.
-
-    The groups are the adoptions' `author_groups`. An author with no known group counts for
-    none, and committee text has no author, so it counts for no group either.
-    """
-    groups: defaultdict[str, set[str]] = defaultdict(set)
-    for adoption in adoptions:
-        if adoption.kind != "verbatim":
-            continue
-        known = {group for group in adoption.author_groups if group is not None}
-        for phrase_id in adoption.phrase_ids:
-            groups[phrase_id] |= known
-    return frozenset(phrase_id for phrase_id, found in groups.items() if len(found) >= minimum)
-
-
 def _carriers(
     phrases: Sequence[AdoptedPhrase], adoptions: Iterable[AmendmentAdoption]
 ) -> dict[str, list[AmendmentAdoption]]:
@@ -201,7 +182,7 @@ def find_origins(
     adoption) is reported once. Documents that are not consultation documents are skipped.
     `precedes` is True when the document is dated before the earliest amendment carrying the
     phrase, False when not, and None when the document or any carrying amendment is undated;
-    `eligibility` says the same in part 4's terms. `is_citation` marks a run that is a
+    `eligibility` records the corresponding date status. `is_citation` marks a run that is a
     reference to another act. An adopted phrase holds no window of the proposal by
     construction, so there is no second test against the proposal here. `amendments`
     supplies a tabling date for an adoption that has none. `submitters` (see

@@ -1,6 +1,6 @@
 """Cut a submission into short overlapping passages with exact offsets into its text.
 
-A passage is the unit ask extraction searches and a published link quotes, so its offsets
+A passage is a unit of consultation wording searched and quoted by lineage, so its offsets
 must index the unmodified document text: `text[start:end] == passage.text`, always. The
 splitter therefore never rewrites, joins or normalises anything; it only chooses cut
 points. Sentence detection is a small rule set, not a model: it has to survive PDF text
@@ -192,7 +192,7 @@ def document_passages(
     actor_id: str,
     submitted_at: datetime | None,
 ) -> tuple[Passage, ...]:
-    """Atlas passages for one document; the actor comes from the caller's resolver.
+    """Collection passages for one document; the actor comes from the caller's resolver.
 
     The language is whatever the source declared for the document (Have Your Say's
     `language` for feedback text, nothing for attachments): it is not detected here.
