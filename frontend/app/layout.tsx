@@ -4,7 +4,7 @@ import "./globals.css";
 
 const title = "influence";
 const description =
-  "Who shapes EU law: asks traced to amendments and to the final text, with the evidence side by side.";
+  "Experimental wording associations between EU laws, amendments and consultation submissions, with evidence and limitations.";
 
 /**
  * The public origin (for example https://influence.example.org), set by the host so link

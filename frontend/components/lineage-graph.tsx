@@ -251,7 +251,7 @@ export function LineageGraphExplorer({
     <section aria-labelledby="lineage-graph" className="space-y-4">
       <div className="space-y-1">
         <h3 id="lineage-graph" className="font-serif text-xl text-stone-900">
-          The graph: who → through whom → into which provision
+          Experimental associations: organisation → tabler → provision
         </h3>
         <p className="max-w-3xl text-sm leading-6 text-stone-600">
           Line thickness is the number of phrases. Click a node or a line to follow it and read its
@@ -357,7 +357,7 @@ export function LineageGraphExplorer({
       <div className="overflow-x-auto rounded-sm border border-stone-200 bg-stone-50">
         {graph.edges.length === 0 ? (
           <p className="p-4 text-sm text-stone-600">
-            No adopted wording is said by a named organisation with these settings.
+            No eligible organisation association is recorded with these settings.
           </p>
         ) : (
           <svg

@@ -27,6 +27,15 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Experimental Presentation Policy — 7 October 2026
+
+The owner chose to keep unaudited associations visible with explicit experimental labels
+(`rev-u2rn`). A notice above every loaded law’s tabs explains that shared wording and model
+judgments do not establish authorship or causal influence. Organisation, graph and summary
+headings describe associations, and complete collection status is explicitly not validation.
+This changes presentation only; carrier support, semantic targeting and sample consistency
+remain separate repairs.
+
 ### Adopted-Origin Funnel Count — 7 October 2026
 
 rev-is6b fixes the website's consultation-document funnel numerator: it counts distinct

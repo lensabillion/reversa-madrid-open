@@ -405,7 +405,7 @@ function CreditList({ title, rows }: { title: string; rows: readonly LineageCred
               Name
             </th>
             <th scope="col" className="py-1 text-right font-normal">
-              Amendments adopted
+              Amendments with matched final wording
             </th>
             <th scope="col" className="py-1 text-right font-normal">
               Rate
@@ -445,10 +445,10 @@ function Credits({ tables }: { tables: readonly LineageCreditTable[] }) {
   return (
     <section aria-labelledby="lineage-credits" className="space-y-4">
       <h3 id="lineage-credits" className="font-serif text-xl text-stone-900">
-        Who gets their way: Members and political groups
+        Amendment wording matches by Member and political group
       </h3>
       <p className="max-w-3xl text-sm leading-6 text-stone-600">
-        Ranked by the share of their amendments that reached the final act.
+        Ordered by the share of their amendments that contain matching final wording.
       </p>
       {tables.length === 0 ? (
         <p className="text-sm text-stone-600">No adopted wording, so no credit.</p>
@@ -521,7 +521,7 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
   });
   const tabs: readonly { id: LawTab; label: string }[] = [
     { id: "summary", label: "Summary" },
-    { id: "who", label: "Who" },
+    { id: "who", label: "Associations" },
     { id: "how", label: "How" },
     { id: "graph", label: "Graph" },
     { id: "evidence", label: "Evidence" },
@@ -537,6 +537,16 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
           {view.procedure_id} · run {view.run_id}
         </p>
       </header>
+      <aside
+        aria-label="Association status"
+        className="rounded-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950"
+      >
+        <p className="font-semibold">Experimental wording associations</p>
+        <p>
+          These links have not passed an independent accuracy audit. Shared wording and model
+          judgments do not prove authorship or causal influence. Counts describe recorded matches.
+        </p>
+      </aside>
       <div
         role="tablist"
         aria-label="Views of this law"
@@ -605,7 +615,10 @@ function LawLineageView({ view, onRetry }: { view: LineageView; onRetry: () => v
             <li key={limitation}>{sentence(limitation)}</li>
           ))}
           {gaps.length === 0 ? (
-            <li>Every source layer recorded for this law is complete.</li>
+            <li>
+              All recorded source layers have complete collection status. This does not validate the
+              associations.
+            </li>
           ) : (
             gaps.map((gap) => <li key={gap}>{gap}</li>)
           )}
@@ -736,8 +749,8 @@ export function LineageLawBrowser() {
         collected.length > 0 && (
           <StateMessage announce={null} title="Choose a law">
             <p>
-              Open a collected law to see which of its final wording came from which amendments, who
-              tabled them, and which submissions said it first.
+              Open a collected law to inspect experimental wording associations between final text,
+              amendments, their tablers, and earlier submissions.
             </p>
           </StateMessage>
         )

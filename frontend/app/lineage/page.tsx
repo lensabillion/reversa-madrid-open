@@ -5,7 +5,7 @@ import { LineageLawBrowser } from "../../components/lineage-law-browser";
 export const metadata: Metadata = {
   title: "influence · Lineage explorer",
   description:
-    "See which wording of collected EU laws came from which amendments, who tabled them, and which submissions said it first.",
+    "Explore experimental wording associations between EU laws, amendments, their tablers and consultation submissions.",
 };
 
 /**

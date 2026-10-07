@@ -74,7 +74,7 @@ function topGroup(tables: readonly LineageCreditTable[]): string | null {
   const row = tables.find((table) => table.basis === "verbatim")?.groups[0];
   return row === undefined
     ? null
-    : `${row.name} (${count.format(row.amendments)} of ${count.format(row.amendmentsTabled)} amendments adopted)`;
+    : `${row.name} (${count.format(row.amendments)} of ${count.format(row.amendmentsTabled)} amendments with matched final wording)`;
 }
 
 /** The brief's five questions, each answered in one line from this law's lineage, or not. */
@@ -92,12 +92,12 @@ export function questionsFor(
     {
       id: "who",
       label: "Who",
-      question: "Who shaped this law the most?",
+      question: "Which organisations have the most associations?",
       state: leader === undefined ? "missing" : "answered",
       answer:
         leader === undefined
-          ? "No organisation said adopted wording before the amendments."
-          : `${leader.name} leads, with ${plural(leader.adoptedFirst, "adopted phrase")} said first.${group === null ? "" : ` Top group: ${group}.`}`,
+          ? "No eligible organisation association is recorded for adopted wording."
+          : `${leader.name} has ${plural(leader.adoptedFirst, "adopted phrase")} associated with earlier submissions.${group === null ? "" : ` Top group: ${group}.`}`,
       more: "who",
     },
     {
@@ -105,7 +105,7 @@ export function questionsFor(
       label: "What",
       question: "On which topics?",
       state: "partial",
-      answer: `${count.format(lineage.adopted.length)} phrases of ${view.title} came from amendments. Search them by topic.`,
+      answer: `${count.format(lineage.adopted.length)} phrases of ${view.title} match amendment wording. Search them by topic.`,
       more: "evidence",
     },
     {
@@ -131,7 +131,7 @@ export function questionsFor(
     {
       id: "next",
       label: "Next",
-      question: "Who wins next?",
+      question: "Are future outcomes forecast?",
       state: "missing",
       answer: "Forecasting is not part of this lineage view.",
       more: null,
@@ -257,10 +257,11 @@ export function WhoShaped({ ranking }: { ranking: OrganisationRanking }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h3 id="lineage-who" className="font-serif text-xl text-stone-900">
-            Who gets their way: organisations
+            Experimental associations by organisation
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-stone-600">
-            Ranked by adopted wording each organisation said before the amendments.
+            Ordered by distinct adopted phrases associated with earlier submissions. These counts do
+            not measure causal influence.
           </p>
           <KindLegend />
         </div>
@@ -427,19 +428,19 @@ function funnelCopy(step: FunnelStep): FunnelCopy {
       return { headline: "", unit: "provisions", note: "" };
     case "traced":
       return {
-        headline: "of the new words came word for word from a Parliament amendment",
+        headline: "of the new words match wording in a Parliament amendment",
         unit: "words",
-        note: `In ${detail} phrases. For the rest no amendment has the same words: it may come from the Council, the trilogue, or reworded amendments.`,
+        note: `In ${detail} phrases. No qualifying match was recorded for the remainder; collection gaps and rewording may affect coverage.`,
       };
     case "amendments":
       return {
-        headline: "of the amendments tabled got wording into the law",
+        headline: "of the amendments tabled contain wording matched in the final act",
         unit: "amendments",
         note: "Committee and plenary amendments holding at least one adopted phrase.",
       };
     case "documents":
       return {
-        headline: "of the consultation documents said that wording first",
+        headline: "of the consultation documents have eligible adopted-wording associations",
         unit: "documents",
         note: `Before any amendment carried it, from ${detail} named organisations. Shared wording is evidence, not proof of authorship.`,
       };
@@ -562,7 +563,7 @@ export function Channels({ channels }: { channels: LineageChannels }) {
     <section aria-labelledby="lineage-how" className="space-y-4">
       <div className="space-y-1">
         <h3 id="lineage-how" className="font-serif text-xl text-stone-900">
-          How it got there: channels and timing
+          Recorded amendment stages and timing
         </h3>
         <p className="max-w-3xl text-sm leading-6 text-stone-600">
           Over the {count.format(channels.adoptingAmendments)} amendments whose wording reached the
@@ -643,12 +644,12 @@ export function LinkCheck({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h3 id="lineage-check" className="font-serif text-xl text-stone-900">
-            Check three links at random
+            Inspect three experimental associations
           </h3>
           <p className="max-w-3xl text-sm leading-6 text-stone-600">
             Draws {LINKS_DRAWN} of the {count.format(pool.length)} adopted phrases a submission said
             word for word before the amendments: what the organisation asked, the amendment that
-            carried it, and the final act, side by side.
+            carried it, and the final act, side by side. This inspection is not an accuracy audit.
           </p>
         </div>
         <button
