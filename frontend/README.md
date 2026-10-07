@@ -24,6 +24,13 @@ requests to `http://127.0.0.1:8000`. Set `INFLUENCE_API_URL` before starting or 
 Next.js to use another backend address. `make up` runs both in containers (root README).
 There is no sample-data fallback: an unavailable service shows an error with Retry.
 
+On a public host, set `INFLUENCE_PUBLIC_URL` to the site's origin (for example
+`https://atlas.example.org`) before building, so the link-preview metadata in
+`app/layout.tsx` (Open Graph and Twitter card) resolves against it as `metadataBase`. When
+it is unset, `metadataBase` is left out. The site icon (`app/icon.svg`), `/robots.txt`
+(`app/robots.ts`, every crawler allowed) and the 404 page (`app/not-found.tsx`) need no
+setting.
+
 ## Code
 
 - `app/lineage/page.tsx`: the route; `app/page.tsx` redirects to it
