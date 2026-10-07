@@ -27,6 +27,15 @@ not the current command list. Use [the backend guide](../backend/README.md). Sha
 collection and lineage formats stay compatible. This scope reduction does not fix the
 remaining lineage findings in the [repository review](reviews/repository-consistency-2026-10-07.md).
 
+### Technical README Diagram — 7 October 2026
+
+rev-1asy replaces the README architecture illustration with a native SVG showing public
+sources, offline generation, storage, read-only request/response flows, the optional Jev
+origin branch and detached human review. Labels were checked against the shipped setup,
+collection, lineage assembly, view reader, proxy and review tool. No runtime behavior or
+stored records change. XML/accessibility checks pass; the diagram was rendered and visually
+inspected at native size and 900px README width. No new dependencies or external assets.
+
 ### Cleanup Verification
 
 The cleanup removes the retired Atlas runtime modules and their exclusive tests, experiment

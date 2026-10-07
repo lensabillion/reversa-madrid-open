@@ -15,12 +15,15 @@ pairs into CSVs) at kickoff on 3 October 2026. The
 
 ## Architecture
 
-One data path powers the website. A command builds a saved view for each law; the web
-application reads that view and turns its records into a graph, counts and evidence cards.
+The Python CLI generates per-law snapshots from public sources. The read-only web
+application serves those saved records; independent human review reads them separately
+and never writes its labels back into the production view.
 
-![Architecture of influence: public records are collected and traced into lineage.json; a read-only API and Next.js proxy serve the lineage explorer. Optional Jev judgments add reworded consultation origins.](docs/architecture/influence-lineage.svg)
+![Technical architecture of influence: public sources feed offline collection and lineage generation; saved snapshots serve a read-only API, Next.js proxy and browser. Optional Jev judgments add consultation origins; independent human review stores labels separately from production output.](docs/architecture/influence-lineage.svg)
 
-[Open the full-size diagram](docs/architecture/influence-lineage.svg).
+[Open the full-size diagram](docs/architecture/influence-lineage.svg). Solid arrows carry
+data; dashed web arrows are GET requests. The purple branch is optional. Storage paths
+are under `data/`; `setup` is a prerequisite, and `make lineage` runs collection and tracing.
 
 1. **Prepare the public inputs.** `make setup` downloads Parltrack's law, amendment and
    Member of Parliament records, the Transparency Register, and the Have Your Say
