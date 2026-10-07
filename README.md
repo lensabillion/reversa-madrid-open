@@ -71,11 +71,6 @@ There is no hidden test and no supplied data. The jury scores 100 points live at
 | Report | 15 | Reads our public report and opens this repository |
 | Ambition | 15 | How much of Europe since 2019 we cover, and our forecast |
 
-The original challenge requested a graph, a report and an open repository. The owner
-subsequently narrowed the maintained product to the lineage website on 7 October. The
-challenge documents remain historical context; [implementation status](docs/implementation-status.md)
-and the [backend guide](backend/README.md) define the supported system.
-
 ## Quickstart
 
 You need Python 3.14 and uv 0.12 or later (the Makefile's `UV_EXCLUDE_NEWER` setting needs
