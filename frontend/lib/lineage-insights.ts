@@ -1,4 +1,8 @@
-import { collectSupportedClaims, type LineagePhraseRow } from "./lineage";
+import {
+  collectSupportedClaims,
+  type LineagePhraseRow,
+  type SupportedLineageClaim,
+} from "./lineage";
 import type { LineageView, OriginMatchRecord } from "./lineage-api";
 
 /**
@@ -346,32 +350,19 @@ function generator(seed: number): () => number {
 }
 
 /**
- * The phrases a published link can be drawn from: adopted wording that a submission said
- * word for word before the amendments, so the link reads submission → amendment → final
- * act. Semantic (Jev) matches are left out of the draw: word-for-word wording is the
- * strongest evidence, while a reworded match can pair the same safeguard on a different
- * object (on the AI Act, trade secrets in technical documentation, Art. 11, with personal
- * data in the sandbox, Art. 54(1)(g)).
+ * Draws `size` distinct support claims from the stable ID-sorted `pool` with a partial Fisher–Yates shuffle seeded by
+ * `seed`; the same seed and support-ID population always draw the same claims.
+ * O(n log n) time for stable sorting, O(n) memory; intended for a law's visible claims.
  */
-export function linkPool(adopted: readonly LineagePhraseRow[]): readonly LineagePhraseRow[] {
-  return adopted.filter(
-    (phrase) =>
-      phrase.adopted &&
-      phrase.origins.some((origin) => origin.countsAsOrigin && origin.kind === "verbatim"),
-  );
-}
-
-/**
- * Draws `size` distinct phrases from `pool` with a partial Fisher–Yates shuffle seeded by
- * `seed`; the same seed always draws the same links. O(pool) time for the copy.
- */
-export function drawLinks(
-  pool: readonly LineagePhraseRow[],
+export function drawClaims(
+  pool: readonly SupportedLineageClaim[],
   size: number,
   seed: number,
-): readonly LineagePhraseRow[] {
+): readonly SupportedLineageClaim[] {
   const random = generator(seed);
-  const items = [...pool];
+  const items = [...new Map(pool.map((claim) => [claim.claimId, claim])).values()].sort(
+    (left, right) => left.claimId.localeCompare(right.claimId),
+  );
   const taken = Math.min(size, items.length);
   for (let index = 0; index < taken; index += 1) {
     const pick = index + Math.floor(random() * (items.length - index));

@@ -1,13 +1,12 @@
 import { expect, test } from "vitest";
-import { type LineagePhraseRow, prepareLineage } from "../lib/lineage";
+import { collectSupportedClaims, prepareLineage, type SupportedLineageClaim } from "../lib/lineage";
 import type { LineageView, OriginMatchRecord } from "../lib/lineage-api";
 import {
   anyPhrase,
-  drawLinks,
+  drawClaims,
   filterPhrases,
   lineageChannels,
   lineageFunnel,
-  linkPool,
   phraseFacets,
   rankOrganisations,
 } from "../lib/lineage-insights";
@@ -137,12 +136,15 @@ test("channels count each amendment once and split matches by their dates", () =
   expect(coalition.crossGroup).toBe(1);
 });
 
-function rows(count: number): readonly LineagePhraseRow[] {
-  const [row] = prepareLineage(view).adopted;
-  if (row === undefined) {
-    throw new Error("The fixture has no adopted phrase");
+function claims(count: number): readonly SupportedLineageClaim[] {
+  const claim = collectSupportedClaims(view).claims[0];
+  if (claim === undefined) {
+    throw new Error("Missing support claim");
   }
-  return Array.from({ length: count }, (_, index) => ({ ...row, phraseId: `phrase:${index}` }));
+  return Array.from({ length: count }, (_, index) => ({
+    ...claim,
+    claimId: `claim:${index.toString().padStart(4, "0")}`,
+  }));
 }
 
 test("search matches every word across quotes, Members and organisations, ignoring accents", () => {
@@ -159,26 +161,20 @@ test("search matches every word across quotes, Members and organisations, ignori
   expect(phraseFacets(adopted)).toEqual({ groups: ["S&D"], committees: ["ENVI"] });
 });
 
-test("only adopted phrases a submission said first, word for word, can be drawn", () => {
-  const lineage = prepareLineage(withOrigins([]));
-  expect(linkPool(lineage.adopted)).toHaveLength(0);
-  expect(linkPool(prepareLineage(view).adopted)).toHaveLength(1);
-  const semanticOnly = withOrigins([{ ...origin, kind: "semantic", similarity: 0.8 }]);
-  expect(linkPool(prepareLineage(semanticOnly).adopted)).toHaveLength(0);
-});
-
 test("a draw is distinct, bounded by the pool, and repeated by its seed", () => {
-  const pool = rows(50);
+  const pool = claims(50);
   for (let seed = 0; seed < 200; seed += 1) {
-    const drawn = drawLinks(pool, 3, seed);
+    const drawn = drawClaims(pool, 3, seed);
     expect(drawn, `seed ${seed}`).toHaveLength(3);
-    expect(new Set(drawn.map((row) => row.phraseId)).size, `seed ${seed}`).toBe(3);
-    expect(drawLinks(pool, 3, seed)).toEqual(drawn);
+    expect(new Set(drawn.map((row) => row.claimId)).size, `seed ${seed}`).toBe(3);
+    expect(drawClaims(pool, 3, seed)).toEqual(drawn);
+    expect(drawClaims([...pool].reverse(), 3, seed)).toEqual(drawn);
+    expect(drawClaims([...pool, ...pool], 3, seed)).toEqual(drawn);
   }
-  expect(drawLinks(rows(2), 3, 7)).toHaveLength(2);
-  expect(drawLinks([], 3, 7)).toHaveLength(0);
+  expect(drawClaims(claims(2), 3, 7)).toHaveLength(2);
+  expect(drawClaims([], 3, 7)).toHaveLength(0);
   const seen = new Set(
-    Array.from({ length: 200 }, (_, seed) => drawLinks(pool, 1, seed)[0]?.phraseId),
+    Array.from({ length: 200 }, (_, seed) => drawClaims(pool, 1, seed)[0]?.claimId),
   );
   // Not a fixed pick: 200 seeds reach most of the 50 phrases.
   expect(seen.size).toBeGreaterThan(40);
