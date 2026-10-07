@@ -102,7 +102,7 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
     name: "The five questions, for this law",
   });
   expect(questions.closest("section")?.textContent).toContain(
-    "Acme Unknown Lobby leads, with 1 adopted phrase said first.",
+    "Acme Unknown Lobby has 1 adopted phrase associated with earlier submissions.",
   );
   expect(questions.closest("section")?.textContent).toContain(
     "Forecasting is not part of this lineage view.",
@@ -112,18 +112,26 @@ test("lists laws, opens one into the URL and shows adopted wording beside its so
   expect(within(summary).getByText("1 of 3 amendments")).toBeDefined();
   expect(within(summary).getByRole("img", { name: "17%: 18 of 103 words" })).toBeDefined();
   expect(screen.queryByRole("article")).toBeNull();
+  const notice = screen.getByRole("complementary", { name: "Association status" });
+  expect(notice.textContent).toContain("have not passed an independent accuracy audit");
+  expect(notice.textContent).toContain("do not prove authorship or causal influence");
   await openTab("Evidence");
+  expect(screen.getByRole("complementary", { name: "Association status" })).toBe(notice);
   const card = await screen.findByRole("article", { name: /Phrase phrase:/ });
   expect(within(card).getByText("In the final act")).toBeDefined();
   expect(within(card).getByText("am:2021-0106-COD:ENVI:PE7-7")).toBeDefined();
   expect(within(card).getByText("Acme Unknown Lobby")).toBeDefined();
   expect(within(card).getByText("Said before the amendments")).toBeDefined();
   expect(within(card).getAllByRole("blockquote")).toHaveLength(2);
-  await openTab("Who");
+  await openTab("Associations");
   expect(
-    screen.getByRole("heading", { name: "Who gets their way: Members and political groups" }),
+    screen.getByRole("heading", {
+      name: "Amendment wording matches by Member and political group",
+    }),
   ).toBeDefined();
-  const organisations = screen.getByRole("heading", { name: "Who gets their way: organisations" });
+  const organisations = screen.getByRole("heading", {
+    name: "Experimental associations by organisation",
+  });
   const orgSection = organisations.closest("section");
   if (orgSection === null) {
     throw new Error("Organisation section missing");
@@ -188,7 +196,9 @@ test("drawing three links shows the drawn link with its seed", async () => {
   render(<LineagePage />);
 
   await openTab("Check 3 links");
-  const heading = await screen.findByRole("heading", { name: "Check three links at random" });
+  const heading = await screen.findByRole("heading", {
+    name: "Inspect three experimental associations",
+  });
   const section = heading.closest("section");
   if (section === null) {
     throw new Error("Link check section missing");
@@ -244,7 +254,7 @@ test("a long list is paged, and an undated or citing submission is labelled as s
   });
   render(<LineagePage />);
 
-  await openTab("Who");
+  await openTab("Associations");
   await screen.findByText("No adopted wording, so no credit.");
   await openTab("Evidence");
   fireEvent.click(screen.getByRole("button", { name: `Tabled, not adopted (${total})` }));
@@ -273,7 +283,7 @@ test("many credit holders are cut to the first rows until all are asked for", as
   serve({ ...view, credits });
   render(<LineagePage />);
 
-  await openTab("Who");
+  await openTab("Associations");
   await screen.findByText("Member 0");
   expect(screen.queryByText("Member 19")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show all 20" }));
@@ -291,7 +301,9 @@ test("complete coverage is stated instead of left blank", async () => {
   render(<LineagePage />);
 
   expect(
-    await screen.findByText("Every source layer recorded for this law is complete."),
+    await screen.findByText(
+      "All recorded source layers have complete collection status. This does not validate the associations.",
+    ),
   ).toBeDefined();
 });
 
@@ -438,7 +450,9 @@ test("clicking a graph node follows its paths and lists their evidence", async (
   render(<LineagePage />);
 
   await openTab("Graph");
-  const heading = await screen.findByRole("heading", { name: /The graph: who/ });
+  const heading = await screen.findByRole("heading", {
+    name: /Experimental associations: organisation/,
+  });
   const section = heading.closest("section");
   if (section === null) {
     throw new Error("Graph section missing");

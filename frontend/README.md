@@ -132,3 +132,12 @@ Evidence, Check 3 links and Method. Everything comes from the same view only
 `backend/tests/fixtures/lineage/view.json`, which the backend writes from its offline test
 world. Checked once by hand in headless Chromium: the production build against the real
 backend serving that view. Not verified: a real law's run.
+
+### Experimental associations
+
+Every loaded law has a visible notice above its tabs: associations have not passed an
+independent accuracy audit, and wording matches or model judgments do not prove authorship
+or causal influence. Organisation counts and graph headings describe experimental
+associations. The owner chose to keep these exploratory records visible (`rev-u2rn`).
+Collection completeness is distinct from association accuracy; random inspection is not an
+audit. This presentation policy does not change stored records, eligibility or matching.
